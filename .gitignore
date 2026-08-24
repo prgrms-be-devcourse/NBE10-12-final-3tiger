@@ -1,0 +1,6 @@
+.idea/
+.gradle/
+.gradle-task/
+**/build/
+**/out/
+*.iml
