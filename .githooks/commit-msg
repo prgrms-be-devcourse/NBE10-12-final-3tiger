@@ -1,0 +1,16 @@
+#!/bin/sh
+
+msg="$(cat "$1")"
+lower_msg="$(printf '%s' "$msg" | tr '[:upper:]' '[:lower:]')"
+
+pattern='^(feat|fix|refactor|docs|test|chore): .+ (\(#[0-9]+\)|#[0-9]+)$'
+
+if ! printf '%s' "$lower_msg" | grep -Eq "$pattern"; then
+  echo "커밋 메시지 형식이 올바르지 않습니다."
+  echo "예시:"
+  echo "feat: 사용자 조회 API 구현 #12"
+  echo "Feat: 사용자 조회 API 구현 (#12)"
+  exit 1
+fi
+
+exit 0
