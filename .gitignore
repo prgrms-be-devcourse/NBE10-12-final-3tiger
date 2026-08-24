@@ -4,3 +4,8 @@
 **/build/
 **/out/
 *.iml
+
+.claude/
+
+drafts/
+final-2026-08-gs-yc-v1/
