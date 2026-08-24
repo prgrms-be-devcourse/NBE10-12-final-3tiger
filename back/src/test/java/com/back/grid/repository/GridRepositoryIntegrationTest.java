@@ -3,7 +3,6 @@ package com.back.grid.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,7 +61,5 @@ class GridRepositoryIntegrationTest {
         assertThat(first.getBenchDensity()).isEqualByComparingTo(new BigDecimal("0.700"));
         assertThat(first.getRestroomProximity()).isEqualByComparingTo(new BigDecimal("0.800"));
         assertThat(first.getWaterFacility()).isEqualByComparingTo(new BigDecimal("0.900"));
-        assertThat(first.getDataVersion()).isEqualTo("test-v1");
-        assertThat(first.getUpdatedAt()).isEqualTo(Instant.parse("2026-08-24T05:00:00Z"));
     }
 }

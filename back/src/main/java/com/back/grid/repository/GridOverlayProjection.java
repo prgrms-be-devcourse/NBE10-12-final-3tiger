@@ -1,7 +1,6 @@
 package com.back.grid.repository;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 
 public interface GridOverlayProjection {
     Long getGridId();
@@ -17,6 +16,4 @@ public interface GridOverlayProjection {
     BigDecimal getBenchDensity();
     BigDecimal getRestroomProximity();
     BigDecimal getWaterFacility();
-    String getDataVersion();
-    Instant getUpdatedAt();
 }

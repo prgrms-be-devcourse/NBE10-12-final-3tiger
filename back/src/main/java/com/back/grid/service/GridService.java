@@ -3,7 +3,6 @@ package com.back.grid.service;
 import com.back.grid.dto.Bbox;
 import com.back.grid.dto.GridOverlayResponse;
 import com.back.grid.repository.GridRepository;
-import java.time.ZoneOffset;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,9 +39,7 @@ public class GridService {
                         grid.getSurfaceNatural(),
                         grid.getBenchDensity(),
                         grid.getRestroomProximity(),
-                        grid.getWaterFacility(),
-                        grid.getDataVersion(),
-                        grid.getUpdatedAt().atOffset(ZoneOffset.UTC)
+                        grid.getWaterFacility()
                 ))
                 .toList();
     }

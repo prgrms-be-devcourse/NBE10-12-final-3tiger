@@ -20,9 +20,7 @@ public interface GridRepository extends Repository<GridScore, Long> {
                    surface_natural AS "surfaceNatural",
                    bench_density AS "benchDensity",
                    restroom_proximity AS "restroomProximity",
-                   water_facility AS "waterFacility",
-                   data_version AS "dataVersion",
-                   updated_at AS "updatedAt"
+                   water_facility AS "waterFacility"
             FROM grid_score
             CROSS JOIN (
                 SELECT ST_MakeEnvelope(

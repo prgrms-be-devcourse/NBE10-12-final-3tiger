@@ -1,7 +1,6 @@
 package com.back.grid.dto;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 
 public record GridOverlayResponse(
         long gridId,
@@ -16,8 +15,6 @@ public record GridOverlayResponse(
         BigDecimal surfaceNatural,
         BigDecimal benchDensity,
         BigDecimal restroomProximity,
-        BigDecimal waterFacility,
-        String dataVersion,
-        OffsetDateTime updatedAt
+        BigDecimal waterFacility
 ) {
 }
