@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    platform: linux/amd64
+    container_name: walking-mvp-postgres
+    environment:
+      POSTGRES_DB: walking_mvp
+      POSTGRES_USER: walking
+      POSTGRES_PASSWORD: walking
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./final-2026-08-gs-yc-v1/walking_mvp_final.dump:/tmp/walking_mvp_final.dump:ro
+      - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/10-restore.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U walking -d walking_mvp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
