@@ -1,0 +1,19 @@
+#!/bin/sh
+
+echo "Running tests before push..."
+
+cd back || exit 1
+
+if [ "$OS" = "Windows_NT" ]; then
+    ./gradlew.bat test
+else
+    ./gradlew test
+fi
+
+if [ $? -ne 0 ]; then
+    echo "Tests failed. Push aborted."
+    exit 1
+fi
+
+echo "Tests passed."
+exit 0
