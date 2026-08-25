@@ -112,15 +112,18 @@ export default function ProfileBookmarkScreen() {
     }, 350);
   };
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFB]" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       {!isTabRoot && (
-        <View className="h-14 flex-row items-center justify-between bg-white px-5">
-          <Pressable
-            className="h-11 w-11 justify-center"
+        <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
+          <Button
+            variant="ghost"
+            size="icon"
+            accessibilityLabel="뒤로 가기"
+            className="h-11 w-11"
             onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={24} color="#191C1D" />
-          </Pressable>
+            <Ionicons name="arrow-back" size={22} color="#223128" />
+          </Button>
           <Text className="text-lg text-[#006E2F]">저장한 코스</Text>
           <View className="w-11" />
         </View>
@@ -128,7 +131,7 @@ export default function ProfileBookmarkScreen() {
       <FlatList
         data={COURSES.slice(0, visibleCount)}
         keyExtractor={(item) => item.id}
-        contentContainerClassName="gap-4 p-5 pb-[30px]"
+        contentContainerClassName="gap-6 p-5 pb-[30px]"
         showsVerticalScrollIndicator={false}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
@@ -143,21 +146,20 @@ export default function ProfileBookmarkScreen() {
           ) : null
         }
         renderItem={({ item }) => (
-          <Pressable
-            className="rounded-xl bg-white p-4"
-            onPress={() => setSelected(item)}
-          >
+          <Pressable className="w-full" onPress={() => setSelected(item)}>
             <View>
               <Image
                 source={{ uri: item.image }}
-                className="h-32 w-full rounded-lg"
+                className="h-40 w-full rounded-2xl bg-slate-200"
               />
-              <Pressable
+              <Button
+                variant="secondary"
+                size="icon"
                 accessibilityRole="button"
                 accessibilityLabel={
                   savedIds.has(item.id) ? "북마크 해제" : "북마크 추가"
                 }
-                className="absolute right-[9px] top-[9px] h-[34px] w-[34px] items-center justify-center rounded-full bg-white/85"
+                className="absolute right-2.5 top-2.5 h-9 w-9 rounded-full bg-white/90"
                 onPress={(event) => {
                   event.stopPropagation();
                   setSavedIds((current) => {
@@ -174,10 +176,10 @@ export default function ProfileBookmarkScreen() {
                   size={21}
                   color={savedIds.has(item.id) ? "#22C55E" : "#64748B"}
                 />
-              </Pressable>
+              </Button>
             </View>
-            <View className="mt-[11px] flex-row items-center gap-2">
-              <Text className="flex-1 text-lg font-extrabold text-[#191C1D]">
+            <View className="mt-3 flex-row items-center gap-2 px-1">
+              <Text className="flex-1 text-[17px] font-bold text-[#191C1D]">
                 {item.name}
               </Text>
               {item.badge && (
@@ -194,7 +196,7 @@ export default function ProfileBookmarkScreen() {
                 </View>
               )}
             </View>
-            <View className="mt-[9px] flex-row items-center gap-1">
+            <View className="mt-2 flex-row items-center gap-1 px-1">
               <Ionicons name="git-branch-outline" size={17} color="#475569" />
               <Text className="mr-[9px] text-[13px] text-slate-600">
                 {item.distance}

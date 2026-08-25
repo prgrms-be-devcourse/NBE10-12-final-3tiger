@@ -37,6 +37,13 @@ const MENUS = [
     route: "/(tabs)/profile/mypost",
   },
   {
+    label: "게시글 작성",
+    description: "새로운 산책 기록을 남겨보세요",
+    icon: "pencil" as const,
+    color: "bg-[#22C55E]",
+    route: "/review/write",
+  },
+  {
     label: "좋아요한 글",
     description: "공감한 산책 이야기를 확인해요",
     icon: "heart" as const,
