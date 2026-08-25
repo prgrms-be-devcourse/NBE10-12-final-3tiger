@@ -13,6 +13,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.UUID;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -25,9 +27,19 @@ class BackApplicationTests {
     @Autowired CourseRepository courses;
     Long userId; Long courseId;
 
-    @BeforeEach void setUp() {
-        userId = users.save(new User("산책러")).getId();
-        courseId = courses.save(new Course("성수 서울숲 순환", "11200", 2500)).getId();
+    @BeforeEach
+    void setUp() {
+        userId = users.save(
+                User.createLocal(
+                        "test-" + UUID.randomUUID() + "@example.com",
+                        "dummy-password-hash",
+                        "산책러"
+                )
+        ).getId();
+
+        courseId = courses.save(
+                new Course("성수 서울숲 순환", "11200", 2500)
+        ).getId();
     }
 
     @Test void bookmarkLifecycle() throws Exception {
