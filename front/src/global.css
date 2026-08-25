@@ -3,14 +3,66 @@
 @tailwind utilities;
 
 :root {
+  --background: 120 20% 99%;
+  --foreground: 136 20% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 136 20% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 136 20% 12%;
+  --primary: 149 88% 25%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 133 45% 94%;
+  --secondary-foreground: 149 73% 22%;
+  --muted: 120 14% 95%;
+  --muted-foreground: 130 8% 43%;
+  --accent: 133 45% 94%;
+  --accent-foreground: 149 73% 22%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 125 14% 90%;
+  --input: 125 14% 90%;
+  --ring: 149 88% 25%;
+  --radius: 0.75rem;
+  --chart-1: 149 88% 25%;
+  --chart-2: 143 55% 42%;
+  --chart-3: 92 42% 48%;
+  --chart-4: 42 80% 55%;
+  --chart-5: 24 75% 55%;
   --font-display:
-    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif,
-    Apple Color Emoji, Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
+    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji,
+    Segoe UI Emoji, Segoe UI Symbol, Noto Color Emoji;
   --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    Liberation Mono, Courier New, monospace;
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono,
+    Courier New, monospace;
   --font-rounded:
-    'SF Pro Rounded', 'Hiragino Maru Gothic ProN',
-    Meiryo, 'MS PGothic', sans-serif;
-  --font-serif: Georgia, 'Times New Roman', serif;
+    "SF Pro Rounded", "Hiragino Maru Gothic ProN", Meiryo, "MS PGothic",
+    sans-serif;
+  --font-serif: Georgia, "Times New Roman", serif;
+}
+
+.dark:root {
+  --background: 140 18% 8%;
+  --foreground: 120 20% 96%;
+  --card: 140 16% 11%;
+  --card-foreground: 120 20% 96%;
+  --popover: 140 16% 11%;
+  --popover-foreground: 120 20% 96%;
+  --primary: 143 65% 55%;
+  --primary-foreground: 145 50% 10%;
+  --secondary: 140 14% 17%;
+  --secondary-foreground: 120 20% 96%;
+  --muted: 140 14% 17%;
+  --muted-foreground: 125 10% 68%;
+  --accent: 140 14% 19%;
+  --accent-foreground: 120 20% 96%;
+  --destructive: 0 62% 48%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 140 12% 20%;
+  --input: 140 12% 20%;
+  --ring: 143 65% 55%;
+  --chart-1: 143 65% 55%;
+  --chart-2: 160 52% 48%;
+  --chart-3: 92 45% 58%;
+  --chart-4: 42 80% 60%;
+  --chart-5: 24 75% 60%;
 }
