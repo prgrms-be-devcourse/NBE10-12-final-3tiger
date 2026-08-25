@@ -1,16 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
 import { Button } from "@/components/ui/button";
+import { BottomSheetHandle } from "@/components/ui/bottom-sheet-handle";
 import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/text";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   FlatList,
   Image,
   Modal,
   Pressable,
   ScrollView,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -107,22 +111,45 @@ function PostDetailSheet({
   onClose: () => void;
   onOpenComments: (post: MyPost) => void;
 }) {
+  const { height: windowHeight } = useWindowDimensions();
+  const translateY = useRef(new Animated.Value(windowHeight)).current;
+
+  useEffect(() => {
+    if (!post) return;
+    translateY.setValue(windowHeight);
+    Animated.timing(translateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [post, translateY, windowHeight]);
+
   return (
     <Modal
       visible={!!post}
       transparent
-      animationType="slide"
+      animationType="none"
       onRequestClose={onClose}
     >
-      <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
-        <Pressable
-          className="max-h-[88%] rounded-t-[30px] bg-white pt-2.5"
-          onPress={(event) => event.stopPropagation()}
+      <View className="flex-1 justify-end">
+        <Pressable className="absolute inset-0 bg-black/40" onPress={onClose} />
+        <Animated.View
+          className="h-[88%] rounded-t-[30px] bg-white pt-2.5"
+          style={{ transform: [{ translateY }] }}
         >
-          <View className="mb-3 h-[5px] w-[42px] self-center rounded-full bg-slate-300" />
+          <BottomSheetHandle
+            onDismiss={onClose}
+            translateY={translateY}
+            dismissThreshold={windowHeight * 0.88 * 0.5}
+            dismissDistance={windowHeight}
+            velocityDismiss={false}
+          />
           {post && (
             <ScrollView
-              showsVerticalScrollIndicator={false}
+              className="flex-1"
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
               contentContainerClassName="px-5 pb-8"
             >
               <Image
@@ -140,15 +167,6 @@ function PostDetailSheet({
                     {post.course}
                   </Text>
                 </View>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  accessibilityLabel="상세 닫기"
-                  className="h-11 w-11 rounded-full"
-                  onPress={onClose}
-                >
-                  <Ionicons name="close" size={22} color="#526056" />
-                </Button>
               </View>
 
               <View className="mt-4 flex-row rounded-2xl bg-[#F2F8F2] py-3">
@@ -171,16 +189,16 @@ function PostDetailSheet({
               </Text>
               <Separator className="my-5 bg-[#E6EBE7]" />
               <View className="flex-row items-center gap-6">
-                <Pressable
-                  className="flex-row items-center gap-1.5 rounded-full px-2 py-1"
-                  onPress={() => onOpenComments(post)}
-                >
+                <View className="flex-row items-center gap-1.5 rounded-full px-2 py-1">
                   <Ionicons name="heart" size={22} color="#22C55E" />
                   <Text className="text-sm font-bold text-[#405047]">
                     {post.likes}
                   </Text>
-                </Pressable>
-                <View className="flex-row items-center gap-1.5">
+                </View>
+                <Pressable
+                  className="flex-row items-center gap-1.5 rounded-full px-2 py-1"
+                  onPress={() => onOpenComments(post)}
+                >
                   <Ionicons
                     name="chatbubble-outline"
                     size={21}
@@ -189,12 +207,12 @@ function PostDetailSheet({
                   <Text className="text-sm font-bold text-[#405047]">
                     {post.comments}
                   </Text>
-                </View>
+                </Pressable>
               </View>
             </ScrollView>
           )}
-        </Pressable>
-      </Pressable>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
@@ -248,7 +266,9 @@ export default function MyPostScreen() {
             accessibilityRole="button"
             accessibilityLabel={`${item.course} 게시글 상세 보기`}
             className="aspect-square flex-1 overflow-hidden bg-slate-200"
-            onPress={() => setSelected(item)}
+            onPress={() => {
+              setSelected(item);
+            }}
           >
             <Image
               source={{ uri: item.image }}

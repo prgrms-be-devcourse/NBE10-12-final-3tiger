@@ -1,15 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
-import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
+import { BottomSheetHandle } from "@/components/ui/bottom-sheet-handle";
 import { Button } from "@/components/ui/button";
 import { router, usePathname } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
   Image,
   Modal,
   Pressable,
+  ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -23,7 +27,6 @@ type Course = {
   badgeColor?: string;
   image: string;
   summary: string;
-  comments: number;
 };
 const COURSES: Course[] = [
   {
@@ -36,7 +39,6 @@ const COURSES: Course[] = [
     image:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuB7HGo2x5xVJhpBxmNNUyccRXDEKmCGCIgFhoEh_2j6CXcq1dJCFrFiOgoudNo4okUPhlImO_TpCDeZ6r6N0mZxjCEzsNQc6iRvWL6BXEX2j5JzPZc0wDcpTsBNdILm3fGYeu_NtljTW-dGmh4Fwh8bMNJsPKi8Cjv66oEkeSpEeOF-fUNVInsU8N2p5G38rIRxZJ8wlq0_q0I4Vl9xckkUvbAYwORbSIcrL4F6y06mCasrWwNaszB5gQ",
     summary: "그늘 78% · 경사 완만 · 흙길 위주 · 벤치 5개 · 화장실 2곳",
-    comments: 12,
   },
   {
     id: "102",
@@ -48,7 +50,6 @@ const COURSES: Course[] = [
     image:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuBWpe1PgtZx-GmQZdkz1brXe-TRKnk70RS6IpKziY4XJImFF0Wc3VllTfrslO9vpbS-3GIJuKSBxM5hY13fF74c-OUwae9vui8D3APNs0MjIaYDaU_nSWrbbAs9hciVNjWyHkr4ogwksrYIJpbjQ3akv8fxFuvceUhe-_eROW3hw7Sh54aOmNnck8kdjU3laGJ977OIcSwJKDq7vAoVWBA_BtIqoRRlXJWwXu0HMwVG9EdO124bOPHxyA",
     summary: "한강 바람이 시원하고 반려견과 함께 걷기 좋은 평탄한 수변 코스",
-    comments: 8,
   },
   {
     id: "103",
@@ -60,7 +61,6 @@ const COURSES: Course[] = [
     image:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuCS3goN0J6hVlG4OwqbUJXI9C-kJ40Dc2kQ8G_wSA8VEMDGslygorxXaDuOiLLcXmB0ixNDhvbag84nqKHUIbK0ac7XRdnJJEWaR-lZtq258Y-MNXA2NDiVctKBocfVWZUGqchamrXGlrE3giBWDEaCvQojCIoXmd5Pg7rIg-fqoIaW-ZtP0Y8p4TP02wh07WSODRSMWcvUWkBzwVUzpSw9l43g-6WdXFkw2Kccqu769yakj3ENKOQMrg",
     summary: "짧고 평탄하며 곳곳에 쉴 수 있는 공간이 있는 도심 숲길",
-    comments: 6,
   },
   {
     id: "104",
@@ -70,7 +70,6 @@ const COURSES: Course[] = [
     image:
       "https://lh3.googleusercontent.com/aida-public/AB6AXuC8IeGGiaHwu0gLJuacSlNRsTAtK59EA3AaqmKRwiOBEeo7fh8LzTUM6WngywvDqxWVhOumpxUoRpwDNvZeK-LTyrMnUYPEWYeBjXUPvgx-BUcQ8XL0_AadTIAO4vYz3AjYrHxPGQk0Lp2njnklRN5Nfoas_D3VY_ktpado7-gOq3vPf51V5yenjdlZ0hizeETJ57wMGgABX4BrnsrhYck-5vJ20_pCspjuidrFgQNrSQczoIpyuEKeQw",
     summary: "넓은 공원을 한 바퀴 도는 여유로운 장거리 순환 코스",
-    comments: 4,
   },
 ];
 
@@ -78,9 +77,20 @@ export default function ProfileBookmarkScreen() {
   const pathname = usePathname();
   const isTabRoot = pathname === "/bookmark";
   const [selected, setSelected] = useState<Course | null>(null);
-  const [commentCourse, setCommentCourse] = useState<Course | null>(null);
   const [visibleCount, setVisibleCount] = useState(4);
   const [loadingMore, setLoadingMore] = useState(false);
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
+  useEffect(() => {
+    if (!selected) return;
+    sheetTranslateY.setValue(windowHeight);
+    Animated.timing(sheetTranslateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [selected, sheetTranslateY, windowHeight]);
   const openCourseDetails = (courseId: string) => {
     setSelected(null);
     setTimeout(() => router.push(`/course/${courseId}` as never), 300);
@@ -92,10 +102,6 @@ export default function ProfileBookmarkScreen() {
       setVisibleCount((count) => Math.min(count + 4, COURSES.length));
       setLoadingMore(false);
     }, 350);
-  };
-  const openComments = (course: Course) => {
-    setSelected(null);
-    setTimeout(() => setCommentCourse(course), 250);
   };
   return (
     <SafeAreaView className="flex-1 bg-[#F8FAFB]" edges={["top"]}>
@@ -176,20 +182,32 @@ export default function ProfileBookmarkScreen() {
       <Modal
         visible={!!selected}
         transparent
-        animationType="slide"
+        animationType="none"
         onRequestClose={() => setSelected(null)}
       >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={() => setSelected(null)}
-        >
+        <View className="flex-1 justify-end">
           <Pressable
-            className="rounded-t-[28px] bg-white p-5 pt-2.5"
-            onPress={(event) => event.stopPropagation()}
+            className="absolute inset-0 bg-black/40"
+            onPress={() => setSelected(null)}
+          />
+          <Animated.View
+            className="h-[78%] rounded-t-[28px] bg-white pt-2.5"
+            style={{ transform: [{ translateY: sheetTranslateY }] }}
           >
-            <View className="mb-[15px] h-[5px] w-[42px] self-center rounded-full bg-slate-300" />
+            <BottomSheetHandle
+              onDismiss={() => setSelected(null)}
+              translateY={sheetTranslateY}
+              dismissThreshold={windowHeight * 0.78 * 0.5}
+              dismissDistance={windowHeight}
+              velocityDismiss={false}
+            />
             {selected && (
-              <>
+              <ScrollView
+                className="flex-1"
+                contentContainerClassName="px-5 pb-8"
+                nestedScrollEnabled
+                showsVerticalScrollIndicator
+              >
                 <Image
                   source={{ uri: selected.image }}
                   className="h-[170px] w-full rounded-xl"
@@ -203,12 +221,6 @@ export default function ProfileBookmarkScreen() {
                       {selected.name}
                     </Text>
                   </View>
-                  <Pressable
-                    className="h-[42px] w-[42px] items-center justify-center rounded-full bg-slate-100"
-                    onPress={() => setSelected(null)}
-                  >
-                    <Ionicons name="close" size={22} color="#475569" />
-                  </Pressable>
                 </View>
                 <View className="mt-3 flex-row items-center gap-1.5">
                   <Ionicons
@@ -239,39 +251,19 @@ export default function ProfileBookmarkScreen() {
                     </View>
                   ))}
                 </View>
-                <View className="mt-4 flex-row gap-2.5">
-                  <Button
-                    variant="outline"
-                    className="h-14 flex-1 rounded-xl"
-                    onPress={() => openComments(selected)}
-                  >
-                    <Ionicons
-                      name="chatbubble-outline"
-                      size={19}
-                      color="#087A3F"
-                    />
-                    <Text className="font-black text-[#087A3F]">
-                      댓글 {selected.comments}
-                    </Text>
-                  </Button>
-                  <Button
-                    className="h-14 flex-[1.35] rounded-xl bg-[#006E2F]"
-                    onPress={() => openCourseDetails(selected.id)}
-                  >
-                    <Text className="font-black text-white">
-                      코스 자세히 보기
-                    </Text>
-                  </Button>
-                </View>
-              </>
+                <Button
+                  className="mt-4 h-14 rounded-xl bg-[#006E2F]"
+                  onPress={() => openCourseDetails(selected.id)}
+                >
+                  <Text className="font-black text-white">
+                    코스 자세히 보기
+                  </Text>
+                </Button>
+              </ScrollView>
             )}
-          </Pressable>
-        </Pressable>
+          </Animated.View>
+        </View>
       </Modal>
-      <CourseCommentSheet
-        courseId={commentCourse?.id ?? null}
-        onClose={() => setCommentCourse(null)}
-      />
     </SafeAreaView>
   );
 }

@@ -1,16 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { BottomSheetHandle } from "@/components/ui/bottom-sheet-handle";
 import { Text } from "@/components/ui/text";
 import { LIKED_COLOR } from "@/components/feed/post-actions";
 import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
   Modal,
   Pressable,
+  useWindowDimensions,
   View,
 } from "react-native";
+import { useRef } from "react";
 
 type CommentItem = {
   id: string;
@@ -56,20 +61,32 @@ export function CourseCommentSheet({
     () => (courseId ? createComments(courseId) : []),
     [courseId],
   );
-  const [visibleCount, setVisibleCount] = useState(5);
+  const [visibleCount, setVisibleCount] = useState(8);
   const [loadingMore, setLoadingMore] = useState(false);
   const [upvoted, setUpvoted] = useState<Set<string>>(new Set());
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
+  const halfSheetHeight = windowHeight * 0.78 * 0.5;
 
   useEffect(() => {
-    setVisibleCount(5);
+    setVisibleCount(8);
     setUpvoted(new Set());
-  }, [courseId]);
+    if (courseId) {
+      sheetTranslateY.setValue(windowHeight);
+      Animated.timing(sheetTranslateY, {
+        toValue: 0,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [courseId, sheetTranslateY, windowHeight]);
 
   const loadMore = () => {
     if (loadingMore || visibleCount >= allComments.length) return;
     setLoadingMore(true);
     setTimeout(() => {
-      setVisibleCount((count) => Math.min(count + 5, allComments.length));
+      setVisibleCount((count) => Math.min(count + 4, allComments.length));
       setLoadingMore(false);
     }, 300);
   };
@@ -85,16 +102,23 @@ export function CourseCommentSheet({
     <Modal
       visible={courseId !== null}
       transparent
-      animationType="slide"
+      animationType="none"
       onRequestClose={onClose}
     >
-      <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
-        <Pressable
+      <View className="flex-1 justify-end">
+        <Pressable className="absolute inset-0 bg-black/40" onPress={onClose} />
+        <Animated.View
           className="h-[78%] rounded-t-[30px] bg-background pt-2.5"
-          onPress={(event) => event.stopPropagation()}
+          style={{ transform: [{ translateY: sheetTranslateY }] }}
         >
-          <View className="mb-2 h-[5px] w-[42px] self-center rounded-full bg-slate-300" />
-          <View className="h-12 flex-row items-center justify-end px-5">
+          <BottomSheetHandle
+            onDismiss={onClose}
+            translateY={sheetTranslateY}
+            dismissThreshold={halfSheetHeight}
+            dismissDistance={windowHeight}
+            velocityDismiss={false}
+          />
+          <View className="h-10 items-center justify-center px-5">
             <View
               pointerEvents="none"
               className="absolute inset-x-0 items-center"
@@ -103,21 +127,15 @@ export function CourseCommentSheet({
                 댓글
               </Text>
             </View>
-            <Button
-              variant="secondary"
-              size="icon"
-              className="rounded-full"
-              accessibilityLabel="댓글 닫기"
-              onPress={onClose}
-            >
-              <Ionicons name="close" size={22} color="#526056" />
-            </Button>
           </View>
           <FlatList
+            className="flex-1"
             data={allComments.slice(0, visibleCount)}
             keyExtractor={(item) => item.id}
             contentContainerClassName="gap-7 py-5 pb-10"
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator
+            scrollEnabled
+            nestedScrollEnabled
             onEndReached={loadMore}
             onEndReachedThreshold={0.35}
             renderItem={({ item }) => {
@@ -172,8 +190,8 @@ export function CourseCommentSheet({
               ) : null
             }
           />
-        </Pressable>
-      </Pressable>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
