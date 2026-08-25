@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { PostActions } from "@/components/feed/post-actions";
+import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -12,6 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const POSTS = [
   {
     id: "1",
+    courseId: "101",
+    courseName: "성수 서울숲 순환",
     user: "김산책 할아버지",
     time: "2시간 전",
     avatar:
@@ -25,6 +28,8 @@ const POSTS = [
   },
   {
     id: "2",
+    courseId: "102",
+    courseName: "한강공원 뚝섬길",
     user: "유모차마실",
     time: "4시간 전",
     avatar:
@@ -62,7 +67,13 @@ function IconButton({
   );
 }
 
-function Post({ item }: { item: PostItem }) {
+function Post({
+  item,
+  onOpenComments,
+}: {
+  item: PostItem;
+  onOpenComments: () => void;
+}) {
   const [liked, setLiked] = useState(item.liked);
   const [bookmarked, setBookmarked] = useState(false);
   const likeCount = item.likes + (liked === item.liked ? 0 : liked ? 1 : -1);
@@ -101,6 +112,7 @@ function Post({ item }: { item: PostItem }) {
         likeCount={likeCount}
         commentCount={item.comments}
         onToggleLike={() => setLiked((value) => !value)}
+        onOpenComments={onOpenComments}
         bookmarked={bookmarked}
         onToggleBookmark={() => setBookmarked((value) => !value)}
       />
@@ -117,6 +129,7 @@ function Post({ item }: { item: PostItem }) {
 }
 
 export default function CommunityScreen() {
+  const [commentCourse, setCommentCourse] = useState<PostItem | null>(null);
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-3">
@@ -143,11 +156,17 @@ export default function CommunityScreen() {
       <FlatList
         data={POSTS}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <Post item={item} />}
+        renderItem={({ item }) => (
+          <Post item={item} onOpenComments={() => setCommentCourse(item)} />
+        )}
         showsVerticalScrollIndicator={false}
         contentContainerClassName="pb-6"
         ItemSeparatorComponent={() => <View className="h-3 bg-[#F3F6F3]" />}
         onEndReachedThreshold={0.6}
+      />
+      <CourseCommentSheet
+        courseId={commentCourse?.courseId ?? null}
+        onClose={() => setCommentCourse(null)}
       />
     </SafeAreaView>
   );

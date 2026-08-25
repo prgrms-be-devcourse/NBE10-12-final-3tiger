@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { PostActions } from "@/components/feed/post-actions";
+import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -12,6 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const POSTS = [
   {
     id: "1",
+    courseId: "101",
+    courseName: "성수 서울숲 순환",
     user: "건강한하루",
     time: "2시간 전",
     image:
@@ -22,6 +25,8 @@ const POSTS = [
   },
   {
     id: "2",
+    courseId: "102",
+    courseName: "한강공원 뚝섬길",
     user: "유모차라이더",
     time: "어제",
     image:
@@ -32,7 +37,13 @@ const POSTS = [
   },
 ];
 
-function Card({ item }: { item: (typeof POSTS)[number] }) {
+function Card({
+  item,
+  onOpenComments,
+}: {
+  item: (typeof POSTS)[number];
+  onOpenComments: () => void;
+}) {
   const [liked, setLiked] = useState(true);
   const [bookmarked, setBookmarked] = useState(false);
 
@@ -76,6 +87,7 @@ function Card({ item }: { item: (typeof POSTS)[number] }) {
         likeCount={item.likes - (liked ? 0 : 1)}
         commentCount={item.comments}
         onToggleLike={() => setLiked((value) => !value)}
+        onOpenComments={onOpenComments}
         bookmarked={bookmarked}
         onToggleBookmark={() => setBookmarked((value) => !value)}
       />
@@ -97,6 +109,9 @@ function Card({ item }: { item: (typeof POSTS)[number] }) {
 }
 
 export default function LikedPostsScreen() {
+  const [commentCourse, setCommentCourse] = useState<
+    (typeof POSTS)[number] | null
+  >(null);
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
@@ -115,9 +130,15 @@ export default function LikedPostsScreen() {
       <FlatList
         data={POSTS}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <Card item={item} />}
+        renderItem={({ item }) => (
+          <Card item={item} onOpenComments={() => setCommentCourse(item)} />
+        )}
         contentContainerClassName="pb-6"
         ItemSeparatorComponent={() => <View className="h-3 bg-[#F3F6F3]" />}
+      />
+      <CourseCommentSheet
+        courseId={commentCourse?.courseId ?? null}
+        onClose={() => setCommentCourse(null)}
       />
     </SafeAreaView>
   );

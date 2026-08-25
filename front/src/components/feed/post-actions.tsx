@@ -11,6 +11,7 @@ type PostActionsProps = {
   likeCount: number;
   commentCount: number;
   onToggleLike: () => void;
+  onOpenComments?: () => void;
   bookmarked?: boolean;
   onToggleBookmark?: () => void;
 };
@@ -20,6 +21,7 @@ export function PostActions({
   likeCount,
   commentCount,
   onToggleLike,
+  onOpenComments,
   bookmarked,
   onToggleBookmark,
 }: PostActionsProps) {
@@ -47,6 +49,7 @@ export function PostActions({
           variant="ghost"
           accessibilityLabel="댓글 보기"
           className="h-11 flex-row gap-1.5 rounded-full px-3 active:bg-[#F1F4F1]"
+          onPress={onOpenComments}
         >
           <Ionicons name="chatbubble-outline" size={22} color={IDLE_COLOR} />
           <Text className="text-sm font-bold text-[#526056]">
