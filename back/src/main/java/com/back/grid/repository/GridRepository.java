@@ -1,6 +1,6 @@
 package com.back.grid.repository;
 
-import com.back.grid.entity.GridScore;
+import com.back.grid.domain.GridScore;
 import java.util.List;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.Repository;

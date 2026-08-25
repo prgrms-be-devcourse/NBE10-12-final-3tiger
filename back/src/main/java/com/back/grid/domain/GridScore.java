@@ -1,4 +1,4 @@
-package com.back.grid.entity;
+package com.back.grid.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

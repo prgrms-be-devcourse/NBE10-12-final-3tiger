@@ -1,9 +1,15 @@
 package com.back.course.service;
 
+import com.back.bookmark.repository.BookmarkRepository;
+import com.back.course.repository.CourseDetailView;
 import com.back.course.domain.Persona;
 import com.back.course.repository.CourseListView;
 import com.back.course.repository.CourseRepository;
 import com.back.global.api.PageResponse;
+import com.back.global.error.ApiException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,9 +21,43 @@ import java.util.List;
 public class CourseService {
 
     private final CourseRepository courses;
+    private final BookmarkRepository bookmarks;
+    private final ObjectMapper objectMapper;
 
-    public CourseService(CourseRepository courses) {
+    public CourseService(CourseRepository courses, BookmarkRepository bookmarks, ObjectMapper objectMapper) {
         this.courses = courses;
+        this.bookmarks = bookmarks;
+        this.objectMapper = objectMapper;
+    }
+
+    public CourseDetail getDetail(Long courseId, Long userId, LocalDateTime at) {
+        boolean useSummer = isSummer(at != null ? at : LocalDateTime.now());
+        CourseDetailView view = courses.findDetailById(courseId, useSummer)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 코스입니다."));
+
+        boolean isBookmarked = userId != null && bookmarks.existsByUserIdAndCourseId(userId, courseId);
+        Double flatness = view.getFlatness();
+        Double avgSlopeDegree = flatness == null ? null : (1.0 - flatness) * 30.0;
+
+        return new CourseDetail(
+                view.getCourseId(), view.getName(), parsePath(view.getPathGeoJson()),
+                view.getDistanceM(), view.getEstimatedMinutes(),
+                view.getElevationGainM(), view.getElevationLossM(),
+                Boolean.TRUE.equals(view.getIsLoop()), view.getSource(),
+                new ScoreBars(flatness, avgSlopeDegree, view.getShade(), view.getSurfaceTemp(), view.getAmenity()),
+                view.getSurfaceType(), null, List.of(), isBookmarked
+        );
+    }
+
+    private GeoJsonLineString parsePath(String geoJson) {
+        if (geoJson == null) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(geoJson, GeoJsonLineString.class);
+        } catch (JacksonException e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "코스 경로 데이터를 읽을 수 없습니다.");
+        }
     }
 
     public PageResponse<CourseItem> search(CourseSearchQuery q) {
@@ -94,5 +134,32 @@ public class CourseService {
             Double windShelter,
             Double wheelchair,
             String surfaceType
+    ) {}
+
+    public record CourseDetail(
+            Long courseId,
+            String name,
+            GeoJsonLineString path,
+            int distanceM,
+            int estimatedMinutes,
+            Integer elevationGainM,
+            Integer elevationLossM,
+            boolean isLoop,
+            String source,
+            ScoreBars scoreBars,
+            String surfaceType,
+            String summary,
+            List<String> personaBadges,
+            boolean isBookmarked
+    ) {}
+
+    public record GeoJsonLineString(String type, List<List<Double>> coordinates) {}
+
+    public record ScoreBars(
+            Double flatness,
+            Double avgSlopeDegree,
+            Double shade,
+            Double surfaceTemp,
+            Double amenity
     ) {}
 }
