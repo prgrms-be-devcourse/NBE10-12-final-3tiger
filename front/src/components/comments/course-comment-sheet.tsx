@@ -53,6 +53,100 @@ function createComments(courseId: string): CommentItem[] {
   }));
 }
 
+function CommentLikeButton({
+  active,
+  count,
+  onToggle,
+}: {
+  active: boolean;
+  count: number;
+  onToggle: () => void;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const burst = useRef(new Animated.Value(0)).current;
+
+  const handlePress = () => {
+    scale.stopAnimation();
+    burst.stopAnimation();
+    scale.setValue(1);
+    burst.setValue(0);
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(scale, {
+          toValue: 0.78,
+          duration: 80,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scale, {
+          toValue: active ? 1 : 1.3,
+          speed: 30,
+          bounciness: 9,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scale, {
+          toValue: 1,
+          speed: 24,
+          bounciness: 4,
+          useNativeDriver: true,
+        }),
+      ]),
+      ...(!active
+        ? [
+            Animated.timing(burst, {
+              toValue: 1,
+              duration: 360,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+          ]
+        : []),
+    ]).start();
+    onToggle();
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      className="-mr-2 h-12 w-10 flex-col gap-0 rounded-full px-0 py-1"
+      accessibilityLabel={active ? "댓글 공감 취소" : "댓글 공감"}
+      onPress={handlePress}
+    >
+      <View className="h-[22px] w-[22px] items-center justify-center">
+        <Animated.View
+          pointerEvents="none"
+          className="absolute h-[22px] w-[22px] rounded-full border border-[#22C55E]"
+          style={{
+            opacity: burst.interpolate({
+              inputRange: [0, 0.15, 1],
+              outputRange: [0, 0.45, 0],
+            }),
+            transform: [
+              {
+                scale: burst.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.5, 1.75],
+                }),
+              },
+            ],
+          }}
+        />
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <Ionicons
+            name={active ? "heart" : "heart-outline"}
+            size={21}
+            color={active ? LIKED_COLOR : "#64748B"}
+          />
+        </Animated.View>
+      </View>
+      <Text
+        className={`text-[11px] font-bold ${active ? "text-[#22C55E]" : "text-[#64748B]"}`}
+      >
+        {count + (active ? 1 : 0)}
+      </Text>
+    </Button>
+  );
+}
+
 export function CourseCommentSheet({
   courseId,
   onClose,
@@ -137,7 +231,7 @@ export function CourseCommentSheet({
             className="flex-1"
             data={allComments.slice(0, visibleCount)}
             keyExtractor={(item) => item.id}
-            contentContainerClassName="gap-7 py-5 pb-10"
+            contentContainerClassName="gap-3 py-4 pb-8"
             showsVerticalScrollIndicator
             scrollEnabled
             nestedScrollEnabled
@@ -155,33 +249,21 @@ export function CourseCommentSheet({
                     </AvatarFallback>
                   </Avatar>
                   <View className="flex-1">
-                    <View className="flex-row items-center gap-2">
-                      <Text className="font-extrabold">{item.nickname}</Text>
-                      <Text variant="muted" className="text-xs">
+                    <View className="flex-row items-center gap-1.5">
+                      <Text className="text-xs font-bold">{item.nickname}</Text>
+                      <Text variant="muted" className="text-[10px]">
                         {item.createdAt}
                       </Text>
                     </View>
-                    <Text className="mt-1.5 text-[14px] leading-[21px] text-[#34443A]">
+                    <Text className="mt-0.5 text-xs leading-[18px] text-[#34443A]">
                       {item.content}
                     </Text>
                   </View>
-                  <Button
-                    variant="ghost"
-                    className="-mr-2 h-12 w-10 flex-col gap-0 rounded-full px-0 py-1"
-                    accessibilityLabel={active ? "댓글 공감 취소" : "댓글 공감"}
-                    onPress={() => toggleUpvote(item.id)}
-                  >
-                    <Ionicons
-                      name={active ? "heart" : "heart-outline"}
-                      size={21}
-                      color={active ? LIKED_COLOR : "#64748B"}
-                    />
-                    <Text
-                      className={`text-[11px] font-bold ${active ? "text-[#22C55E]" : "text-[#64748B]"}`}
-                    >
-                      {item.upvoteCount + (active ? 1 : 0)}
-                    </Text>
-                  </Button>
+                  <CommentLikeButton
+                    active={active}
+                    count={item.upvoteCount}
+                    onToggle={() => toggleUpvote(item.id)}
+                  />
                 </View>
               );
             }}

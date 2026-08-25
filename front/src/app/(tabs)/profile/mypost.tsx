@@ -146,7 +146,7 @@ function PostDetailSheet({
           onPress={dismissSheet}
         />
         <Animated.View
-          className="h-[88%] rounded-t-[30px] bg-white pt-2.5"
+          className="h-[76%] rounded-t-[30px] bg-white pt-2.5"
           style={{ transform: [{ translateY }] }}
         >
           <BottomSheetHandle
@@ -197,7 +197,7 @@ function PostDetailSheet({
                 {post.content}
               </Text>
               <Separator className="my-5 bg-[#E6EBE7]" />
-              <View className="-mx-4">
+              <View className="-mx-5">
                 <PostActions
                   liked={liked}
                   likeCount={post.likes - (liked ? 0 : 1)}
@@ -234,7 +234,7 @@ export default function MyPostScreen() {
         >
           <Ionicons name="arrow-back" size={22} color="#223128" />
         </Button>
-        <Text className="text-2xl font-black text-[#006E2F]">나의 게시글</Text>
+        <Text className="text-lg text-[#006E2F]">나의 게시글</Text>
         <View className="w-11" />
       </View>
 

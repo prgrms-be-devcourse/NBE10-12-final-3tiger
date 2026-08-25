@@ -94,7 +94,7 @@ export default function CourseScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="gap-2 pt-3"
         >
-          <View className="h-10 flex-row items-center gap-1.5 rounded-full bg-[#087A3F] px-[15px]">
+          <View className="h-10 flex-row items-center gap-1.5 rounded-full bg-[#22C55E] px-[15px]">
             <Ionicons name="leaf" size={16} color="white" />
             <Text className="text-[13px] font-extrabold text-white">
               가장 쾌적한 길
@@ -159,7 +159,7 @@ export default function CourseScreen() {
                 </View>
               ))}
             </View>
-            <Pressable className="mt-[15px] h-14 flex-row items-center justify-center gap-2 rounded-[18px] bg-[#087A3F]">
+            <Pressable className="mt-[15px] h-14 flex-row items-center justify-center gap-2 rounded-[18px] bg-[#22C55E]">
               <Ionicons name="navigate" size={20} color="white" />
               <Text className="text-base font-black text-white">안내 시작</Text>
             </Pressable>
@@ -175,7 +175,7 @@ export default function CourseScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="코스 정보 다시 열기"
-            className="h-14 flex-row items-center gap-2 rounded-full bg-[#087A3F] px-6 shadow-lg"
+            className="h-14 flex-row items-center gap-2 rounded-full bg-[#22C55E] px-6 shadow-lg"
             onPress={openDetails}
           >
             <Ionicons name="chevron-up" size={20} color="white" />

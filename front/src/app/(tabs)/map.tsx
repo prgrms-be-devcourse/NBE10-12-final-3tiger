@@ -186,19 +186,19 @@ export default function MapScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="현재 위치로 이동"
-          className="h-[52px] w-[52px] items-center justify-center rounded-[18px] bg-white shadow-md"
+          className="h-[52px] w-[52px] items-center justify-center rounded-[18px] bg-[#22C55E] shadow-md"
           disabled={locating}
           onPress={() => void locate()}
         >
           {locating ? (
-            <ActivityIndicator color="#087A3F" />
+            <ActivityIndicator color="white" />
           ) : (
-            <Ionicons name="navigate" size={22} color="#087A3F" />
+            <Ionicons name="navigate" size={22} color="white" />
           )}
         </Pressable>
         <Pressable
           accessibilityRole="button"
-          className="min-h-[82px] w-full flex-row items-center gap-3 rounded-3xl bg-[#087A3F] px-4 shadow-lg"
+          className="min-h-[82px] w-full flex-row items-center gap-3 rounded-3xl bg-[#22C55E] px-4 shadow-lg"
           onPress={() => router.push("/(tabs)/course" as never)}
         >
           <View className="h-[42px] w-[42px] items-center justify-center rounded-[14px] bg-[#BDF4CB]">

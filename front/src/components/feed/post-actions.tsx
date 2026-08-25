@@ -87,18 +87,18 @@ export function PostActions({
   };
 
   return (
-    <View className="min-h-[60px] flex-row items-center justify-between px-4">
-      <View className="flex-row items-center gap-1">
+    <View className="min-h-10 flex-row items-center justify-between px-2">
+      <View className="flex-row items-center">
         <Button
           variant="ghost"
           accessibilityLabel={liked ? "좋아요 취소" : "좋아요"}
-          className="h-11 flex-row gap-1.5 rounded-full px-3 active:bg-[#E9F5EC]"
+          className="h-10 flex-row gap-1 rounded-full px-1 active:bg-[#E9F5EC]"
           onPress={handleToggleLike}
         >
-          <View className="h-7 w-7 items-center justify-center">
+          <View className="h-6 w-6 items-center justify-center">
             <Animated.View
               pointerEvents="none"
-              className="absolute h-7 w-7 rounded-full border-2 border-[#22C55E]"
+              className="absolute h-6 w-6 rounded-full border-2 border-[#22C55E]"
               style={{
                 opacity: burstProgress.interpolate({
                   inputRange: [0, 0.15, 1],
@@ -117,13 +117,13 @@ export function PostActions({
             <Animated.View style={{ transform: [{ scale: heartScale }] }}>
               <Ionicons
                 name={liked ? "heart" : "heart-outline"}
-                size={24}
+                size={21}
                 color={liked ? LIKED_COLOR : IDLE_COLOR}
               />
             </Animated.View>
           </View>
           <Text
-            className={`text-sm font-bold ${liked ? "text-[#22C55E]" : "text-[#526056]"}`}
+            className={`text-xs font-semibold ${liked ? "text-[#22C55E]" : "text-[#526056]"}`}
           >
             {likeCount}
           </Text>
@@ -131,11 +131,11 @@ export function PostActions({
         <Button
           variant="ghost"
           accessibilityLabel="댓글 보기"
-          className="h-11 flex-row gap-1.5 rounded-full px-3 active:bg-[#F1F4F1]"
+          className="h-10 flex-row gap-1 rounded-full px-1 active:bg-[#F1F4F1]"
           onPress={onOpenComments}
         >
-          <Ionicons name="chatbubble-outline" size={22} color={IDLE_COLOR} />
-          <Text className="text-sm font-bold text-[#526056]">
+          <Ionicons name="chatbubble-outline" size={20} color={IDLE_COLOR} />
+          <Text className="text-xs font-semibold text-[#526056]">
             {commentCount}
           </Text>
         </Button>
@@ -145,12 +145,12 @@ export function PostActions({
           variant="ghost"
           size="icon"
           accessibilityLabel={bookmarked ? "북마크 해제" : "북마크"}
-          className="h-11 w-11 rounded-full active:bg-[#E9F5EC]"
+          className="h-10 w-10 rounded-full active:bg-[#E9F5EC]"
           onPress={onToggleBookmark}
         >
           <Ionicons
             name={bookmarked ? "bookmark" : "bookmark-outline"}
-            size={24}
+            size={21}
             color={bookmarked ? "#087A3F" : IDLE_COLOR}
           />
         </Button>

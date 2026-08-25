@@ -3,7 +3,6 @@ import { PostActions } from "@/components/feed/post-actions";
 import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/text";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -46,39 +45,40 @@ function Card({
 }) {
   const [liked, setLiked] = useState(true);
   const [bookmarked, setBookmarked] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   return (
     <View className="bg-white">
-      <View className="min-h-[72px] flex-row items-center gap-3 px-5 py-3">
+      <View className="min-h-[52px] flex-row items-center gap-2 px-3 py-2">
         <Avatar
           alt={`${item.user} 프로필`}
-          className="h-11 w-11 border border-[#E4EAE5]"
+          className="h-8 w-8 border border-[#E4EAE5]"
         >
           <AvatarFallback className="bg-[#E9F5EC]">
-            <Text className="font-extrabold text-[#087A3F]">
+            <Text className="text-xs font-bold text-[#087A3F]">
               {item.user.slice(0, 1)}
             </Text>
           </AvatarFallback>
         </Avatar>
         <View className="flex-1">
-          <Text className="text-[16px] font-extrabold text-[#191C1D]">
+          <Text className="text-[13px] font-semibold leading-4 text-[#191C1D]">
             {item.user}
           </Text>
-          <Text className="mt-1 text-xs text-[#6B756D]">{item.time}</Text>
+          <Text className="text-[10px] text-[#6B756D]">{item.time}</Text>
         </View>
         <Button
           variant="ghost"
           size="icon"
           accessibilityLabel="게시글 메뉴"
-          className="h-11 w-11 rounded-full"
+          className="h-8 w-8 rounded-full"
         >
-          <Ionicons name="ellipsis-vertical" size={23} color="#526056" />
+          <Ionicons name="ellipsis-vertical" size={18} color="#526056" />
         </Button>
       </View>
 
       <Image
         source={{ uri: item.image }}
-        className="h-80 w-full bg-slate-200"
+        className="h-64 w-full bg-slate-200"
         resizeMode="cover"
       />
 
@@ -92,18 +92,32 @@ function Card({
         onToggleBookmark={() => setBookmarked((value) => !value)}
       />
 
-      <View className="px-5 pb-5">
-        <Text className="text-[15px] leading-[24px] text-[#252A26]">
-          <Text className="text-[16px] font-extrabold leading-[24px] text-[#191C1D]">
-            {item.user}{" "}
+      <View className="px-3 pb-4">
+        <View className="flex-row items-end">
+          <Text
+            className="flex-1 text-[13px] leading-5 text-[#252A26]"
+            numberOfLines={expanded ? undefined : 1}
+          >
+            <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
+              {item.user}{" "}
+            </Text>
+            {item.text}
           </Text>
-          {item.text}
-        </Text>
-        <Text className="mt-2 text-[13px] text-[#758078]">
+          {!expanded && (
+            <Button
+              variant="link"
+              size="sm"
+              className="ml-1 h-5 px-0"
+              onPress={() => setExpanded(true)}
+            >
+              <Text className="text-[11px] text-slate-500">더 보기</Text>
+            </Button>
+          )}
+        </View>
+        <Text className="mt-1 text-[10px] text-[#758078]">
           댓글 {item.comments}개 모두 보기
         </Text>
       </View>
-      <Separator className="bg-[#E8ECE8]" />
     </View>
   );
 }
@@ -124,7 +138,7 @@ export default function LikedPostsScreen() {
         >
           <Ionicons name="arrow-back" size={22} color="#223128" />
         </Button>
-        <Text className="text-2xl font-black text-[#006E2F]">좋아요한 글</Text>
+        <Text className="text-lg text-[#006E2F]">좋아요한 글</Text>
         <View className="w-11" />
       </View>
       <FlatList
@@ -134,7 +148,6 @@ export default function LikedPostsScreen() {
           <Card item={item} onOpenComments={() => setCommentCourse(item)} />
         )}
         contentContainerClassName="pb-6"
-        ItemSeparatorComponent={() => <View className="h-3 bg-[#F3F6F3]" />}
       />
       <CourseCommentSheet
         courseId={commentCourse?.courseId ?? null}

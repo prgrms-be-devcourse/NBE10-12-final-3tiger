@@ -82,6 +82,9 @@ export default function ProfileBookmarkScreen() {
   const [selected, setSelected] = useState<Course | null>(null);
   const [visibleCount, setVisibleCount] = useState(4);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [savedIds, setSavedIds] = useState(
+    () => new Set(COURSES.map((course) => course.id)),
+  );
   const { height: windowHeight } = useWindowDimensions();
   const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
   const dismissSheet = () =>
@@ -111,16 +114,14 @@ export default function ProfileBookmarkScreen() {
   return (
     <SafeAreaView className="flex-1 bg-[#F8FAFB]" edges={["top"]}>
       {!isTabRoot && (
-        <View className="h-14 flex-row items-center justify-between bg-white px-5 shadow-sm">
+        <View className="h-14 flex-row items-center justify-between bg-white px-5">
           <Pressable
             className="h-11 w-11 justify-center"
             onPress={() => router.back()}
           >
             <Ionicons name="arrow-back" size={24} color="#191C1D" />
           </Pressable>
-          <Text className="text-2xl font-black text-[#006E2F]">
-            저장한 코스
-          </Text>
+          <Text className="text-lg text-[#006E2F]">저장한 코스</Text>
           <View className="w-11" />
         </View>
       )}
@@ -133,7 +134,7 @@ export default function ProfileBookmarkScreen() {
         onEndReachedThreshold={0.5}
         ListHeaderComponent={
           <Text className="mb-0.5 text-sm text-slate-600">
-            총 {COURSES.length}개의 코스
+            총 {savedIds.size}개의 코스
           </Text>
         }
         ListFooterComponent={
@@ -143,7 +144,7 @@ export default function ProfileBookmarkScreen() {
         }
         renderItem={({ item }) => (
           <Pressable
-            className="rounded-xl bg-white p-4 shadow-sm"
+            className="rounded-xl bg-white p-4"
             onPress={() => setSelected(item)}
           >
             <View>
@@ -151,9 +152,29 @@ export default function ProfileBookmarkScreen() {
                 source={{ uri: item.image }}
                 className="h-32 w-full rounded-lg"
               />
-              <View className="absolute right-[9px] top-[9px] h-[34px] w-[34px] items-center justify-center rounded-full bg-white/85">
-                <Ionicons name="bookmark" size={21} color="#006E2F" />
-              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  savedIds.has(item.id) ? "북마크 해제" : "북마크 추가"
+                }
+                className="absolute right-[9px] top-[9px] h-[34px] w-[34px] items-center justify-center rounded-full bg-white/85"
+                onPress={(event) => {
+                  event.stopPropagation();
+                  setSavedIds((current) => {
+                    const next = new Set(current);
+                    next.has(item.id)
+                      ? next.delete(item.id)
+                      : next.add(item.id);
+                    return next;
+                  });
+                }}
+              >
+                <Ionicons
+                  name={savedIds.has(item.id) ? "bookmark" : "bookmark-outline"}
+                  size={21}
+                  color={savedIds.has(item.id) ? "#22C55E" : "#64748B"}
+                />
+              </Pressable>
             </View>
             <View className="mt-[11px] flex-row items-center gap-2">
               <Text className="flex-1 text-lg font-extrabold text-[#191C1D]">
@@ -196,7 +217,7 @@ export default function ProfileBookmarkScreen() {
             onPress={dismissSheet}
           />
           <Animated.View
-            className="h-[78%] rounded-t-[28px] bg-white pt-2.5"
+            className="h-[66%] rounded-t-[28px] bg-white pt-2.5"
             style={{ transform: [{ translateY: sheetTranslateY }] }}
           >
             <BottomSheetHandle

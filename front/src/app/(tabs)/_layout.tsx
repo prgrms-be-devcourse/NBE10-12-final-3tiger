@@ -7,6 +7,7 @@ export default function TabLayout() {
   return (
     <Tabs
       initialRouteName="map"
+      detachInactiveScreens={false}
       screenOptions={{
         headerShown: false,
         lazy: false,
@@ -57,23 +58,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="bookmark"
-        options={{
-          title: "북마크",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? "bookmark" : "bookmark-outline"}
-              color={color}
-              size={size}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="profile"
         options={{
           title: "마이",
-          popToTopOnBlur: true,
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
               name={focused ? "person" : "person-outline"}
