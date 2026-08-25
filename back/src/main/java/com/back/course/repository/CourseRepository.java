@@ -6,8 +6,36 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface CourseRepository extends JpaRepository<Course, Long> {
+
+    @Query(value = """
+            SELECT c.course_id                         AS courseId,
+                   c.name                              AS name,
+                   ST_AsGeoJSON(c.path)                AS pathGeoJson,
+                   c.distance_m                        AS distanceM,
+                   c.estimated_minutes                 AS estimatedMinutes,
+                   c.elevation_gain_m                  AS elevationGainM,
+                   c.elevation_loss_m                  AS elevationLossM,
+                   c.is_loop                           AS isLoop,
+                   c.source                            AS source,
+                   cs.flatness                         AS flatness,
+                   CASE WHEN :useSummer
+                        THEN cs.shade_summer
+                        ELSE cs.shade_winter_sun
+                   END                                 AS shade,
+                   NULL::double precision              AS surfaceTemp,
+                   (COALESCE(cs.bench_density, 0)
+                    + COALESCE(cs.restroom_proximity, 0)
+                    + COALESCE(cs.water_facility, 0)) / 3.0 AS amenity,
+                   NULL::varchar                       AS surfaceType
+              FROM course c
+              LEFT JOIN course_score cs ON cs.course_id = c.course_id
+             WHERE c.course_id = :courseId
+            """, nativeQuery = true)
+    Optional<CourseDetailView> findDetailById(@Param("courseId") Long courseId,
+                                               @Param("useSummer") boolean useSummer);
 
     @Query(value = """
             SELECT c.course_id                                                       AS courseId,

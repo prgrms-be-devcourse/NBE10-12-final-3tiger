@@ -32,6 +32,37 @@ class CourseControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean CourseService courseService;
 
+    @Test void returnsCourseDetailWithGeoJsonPath() throws Exception {
+        var detail = new CourseService.CourseDetail(
+                101L,
+                "성수 서울숲 순환",
+                new CourseService.GeoJsonLineString(
+                        "LineString",
+                        List.of(List.of(127.037, 37.544), List.of(127.038, 37.545))
+                ),
+                2500,
+                35,
+                12,
+                12,
+                true,
+                "auto_discovered",
+                new CourseService.ScoreBars(0.82, 5.4, 0.78, null, 0.73),
+                null,
+                null,
+                List.of(),
+                true
+        );
+        given(courseService.getDetail(101L, 1L, null)).willReturn(detail);
+
+        mvc.perform(get("/api/v1/courses/101").header("X-User-Id", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("코스 상세 조회 성공"))
+                .andExpect(jsonPath("$.data.path.type").value("LineString"))
+                .andExpect(jsonPath("$.data.path.coordinates[0][0]").value(127.037))
+                .andExpect(jsonPath("$.data.path.coordinates[0][1]").value(37.544))
+                .andExpect(jsonPath("$.data.isBookmarked").value(true));
+    }
+
     @Test void returnsCourseList() throws Exception {
         var item = new CourseService.CourseItem(
                 101L,
