@@ -1,7 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
+import { PostActions } from "@/components/feed/post-actions";
 import { Button } from "@/components/ui/button";
-import { BottomSheetHandle } from "@/components/ui/bottom-sheet-handle";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
 import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/text";
 import { router } from "expo-router";
@@ -113,9 +117,13 @@ function PostDetailSheet({
 }) {
   const { height: windowHeight } = useWindowDimensions();
   const translateY = useRef(new Animated.Value(windowHeight)).current;
+  const [liked, setLiked] = useState(true);
+  const dismissSheet = () =>
+    dismissBottomSheet(translateY, windowHeight, onClose);
 
   useEffect(() => {
     if (!post) return;
+    setLiked(true);
     translateY.setValue(windowHeight);
     Animated.timing(translateY, {
       toValue: 0,
@@ -130,10 +138,13 @@ function PostDetailSheet({
       visible={!!post}
       transparent
       animationType="none"
-      onRequestClose={onClose}
+      onRequestClose={dismissSheet}
     >
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-black/40" onPress={onClose} />
+        <Pressable
+          className="absolute inset-0 bg-black/40"
+          onPress={dismissSheet}
+        />
         <Animated.View
           className="h-[88%] rounded-t-[30px] bg-white pt-2.5"
           style={{ transform: [{ translateY }] }}
@@ -141,9 +152,7 @@ function PostDetailSheet({
           <BottomSheetHandle
             onDismiss={onClose}
             translateY={translateY}
-            dismissThreshold={windowHeight * 0.88 * 0.5}
             dismissDistance={windowHeight}
-            velocityDismiss={false}
           />
           {post && (
             <ScrollView
@@ -188,26 +197,14 @@ function PostDetailSheet({
                 {post.content}
               </Text>
               <Separator className="my-5 bg-[#E6EBE7]" />
-              <View className="flex-row items-center gap-6">
-                <View className="flex-row items-center gap-1.5 rounded-full px-2 py-1">
-                  <Ionicons name="heart" size={22} color="#22C55E" />
-                  <Text className="text-sm font-bold text-[#405047]">
-                    {post.likes}
-                  </Text>
-                </View>
-                <Pressable
-                  className="flex-row items-center gap-1.5 rounded-full px-2 py-1"
-                  onPress={() => onOpenComments(post)}
-                >
-                  <Ionicons
-                    name="chatbubble-outline"
-                    size={21}
-                    color="#526056"
-                  />
-                  <Text className="text-sm font-bold text-[#405047]">
-                    {post.comments}
-                  </Text>
-                </Pressable>
+              <View className="-mx-4">
+                <PostActions
+                  liked={liked}
+                  likeCount={post.likes - (liked ? 0 : 1)}
+                  commentCount={post.comments}
+                  onToggleLike={() => setLiked((value) => !value)}
+                  onOpenComments={() => onOpenComments(post)}
+                />
               </View>
             </ScrollView>
           )}

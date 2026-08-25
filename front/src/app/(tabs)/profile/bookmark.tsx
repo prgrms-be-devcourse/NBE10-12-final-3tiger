@@ -1,5 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { BottomSheetHandle } from "@/components/ui/bottom-sheet-handle";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
 import { Button } from "@/components/ui/button";
 import { router, usePathname } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -81,6 +84,8 @@ export default function ProfileBookmarkScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const { height: windowHeight } = useWindowDimensions();
   const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
+  const dismissSheet = () =>
+    dismissBottomSheet(sheetTranslateY, windowHeight, () => setSelected(null));
   useEffect(() => {
     if (!selected) return;
     sheetTranslateY.setValue(windowHeight);
@@ -183,12 +188,12 @@ export default function ProfileBookmarkScreen() {
         visible={!!selected}
         transparent
         animationType="none"
-        onRequestClose={() => setSelected(null)}
+        onRequestClose={dismissSheet}
       >
         <View className="flex-1 justify-end">
           <Pressable
             className="absolute inset-0 bg-black/40"
-            onPress={() => setSelected(null)}
+            onPress={dismissSheet}
           />
           <Animated.View
             className="h-[78%] rounded-t-[28px] bg-white pt-2.5"
@@ -197,9 +202,7 @@ export default function ProfileBookmarkScreen() {
             <BottomSheetHandle
               onDismiss={() => setSelected(null)}
               translateY={sheetTranslateY}
-              dismissThreshold={windowHeight * 0.78 * 0.5}
               dismissDistance={windowHeight}
-              velocityDismiss={false}
             />
             {selected && (
               <ScrollView

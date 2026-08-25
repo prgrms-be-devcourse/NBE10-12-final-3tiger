@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { BottomSheetHandle } from "@/components/ui/bottom-sheet-handle";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
 import { Text } from "@/components/ui/text";
 import { LIKED_COLOR } from "@/components/feed/post-actions";
 import { useEffect, useMemo, useState } from "react";
@@ -66,7 +69,8 @@ export function CourseCommentSheet({
   const [upvoted, setUpvoted] = useState<Set<string>>(new Set());
   const { height: windowHeight } = useWindowDimensions();
   const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
-  const halfSheetHeight = windowHeight * 0.78 * 0.5;
+  const dismissSheet = () =>
+    dismissBottomSheet(sheetTranslateY, windowHeight, onClose);
 
   useEffect(() => {
     setVisibleCount(8);
@@ -103,10 +107,13 @@ export function CourseCommentSheet({
       visible={courseId !== null}
       transparent
       animationType="none"
-      onRequestClose={onClose}
+      onRequestClose={dismissSheet}
     >
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-black/40" onPress={onClose} />
+        <Pressable
+          className="absolute inset-0 bg-black/40"
+          onPress={dismissSheet}
+        />
         <Animated.View
           className="h-[78%] rounded-t-[30px] bg-background pt-2.5"
           style={{ transform: [{ translateY: sheetTranslateY }] }}
@@ -114,9 +121,7 @@ export function CourseCommentSheet({
           <BottomSheetHandle
             onDismiss={onClose}
             translateY={sheetTranslateY}
-            dismissThreshold={halfSheetHeight}
             dismissDistance={windowHeight}
-            velocityDismiss={false}
           />
           <View className="h-10 items-center justify-center px-5">
             <View

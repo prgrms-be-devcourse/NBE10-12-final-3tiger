@@ -1,18 +1,29 @@
 import { useMemo, useRef } from "react";
 import { Animated, PanResponder } from "react-native";
 
+export function dismissBottomSheet(
+  translateY: Animated.Value,
+  dismissDistance: number,
+  onDismiss: () => void,
+) {
+  translateY.stopAnimation();
+  Animated.timing(translateY, {
+    toValue: dismissDistance,
+    duration: 180,
+    useNativeDriver: true,
+  }).start(onDismiss);
+}
+
 export function BottomSheetHandle({
   onDismiss,
   translateY: sharedTranslateY,
-  dismissThreshold = 70,
   dismissDistance = 700,
-  velocityDismiss = true,
+  dismissVelocity = 0.8,
 }: {
   onDismiss: () => void;
   translateY?: Animated.Value;
-  dismissThreshold?: number;
   dismissDistance?: number;
-  velocityDismiss?: boolean;
+  dismissVelocity?: number;
 }) {
   const localTranslateY = useRef(new Animated.Value(0)).current;
   const translateY = sharedTranslateY ?? localTranslateY;
@@ -25,17 +36,8 @@ export function BottomSheetHandle({
         onPanResponderMove: (_, gesture) =>
           translateY.setValue(Math.max(0, gesture.dy)),
         onPanResponderRelease: (_, gesture) => {
-          if (
-            gesture.dy >= dismissThreshold ||
-            (velocityDismiss && gesture.vy > 0.8)
-          ) {
-            Animated.timing(translateY, {
-              toValue: dismissDistance,
-              duration: 180,
-              useNativeDriver: true,
-            }).start(() => {
-              onDismiss();
-            });
+          if (gesture.vy >= dismissVelocity) {
+            dismissBottomSheet(translateY, dismissDistance, onDismiss);
             return;
           }
           Animated.spring(translateY, {
@@ -51,7 +53,7 @@ export function BottomSheetHandle({
             useNativeDriver: true,
           }).start(),
       }),
-    [dismissDistance, dismissThreshold, onDismiss, translateY, velocityDismiss],
+    [dismissDistance, dismissVelocity, onDismiss, translateY],
   );
 
   return (

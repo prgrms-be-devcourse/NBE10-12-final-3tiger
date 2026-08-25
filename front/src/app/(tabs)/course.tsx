@@ -1,5 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { BottomSheetHandle } from "@/components/ui/bottom-sheet-handle";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -28,6 +31,10 @@ export default function CourseScreen() {
   const openDetails = () => {
     setShowDetails(true);
   };
+  const dismissDetails = () =>
+    dismissBottomSheet(sheetTranslateY, windowHeight, () =>
+      setShowDetails(false),
+    );
   useEffect(() => {
     if (!showDetails) return;
     sheetTranslateY.setValue(windowHeight);
@@ -42,7 +49,7 @@ export default function CourseScreen() {
     <View className="flex-1 bg-[#E8F0E5]">
       <MapView
         style={StyleSheet.absoluteFill}
-        onPress={() => setShowDetails(false)}
+        onPress={dismissDetails}
         initialRegion={{
           latitude: 37.5462,
           longitude: 127.0372,
@@ -51,7 +58,13 @@ export default function CourseScreen() {
         }}
       >
         <Polyline coordinates={ROUTE} strokeColor="#087A3F" strokeWidth={7} />
-        <Marker coordinate={ROUTE[0]} onPress={openDetails}>
+        <Marker
+          coordinate={ROUTE[0]}
+          onPress={(event) => {
+            event.stopPropagation();
+            openDetails();
+          }}
+        >
           <View className="h-[42px] w-[42px] items-center justify-center rounded-full border-[3px] border-white bg-[#087A3F]">
             <Ionicons name="walk" size={19} color="white" />
           </View>
@@ -107,9 +120,7 @@ export default function CourseScreen() {
           <BottomSheetHandle
             onDismiss={() => setShowDetails(false)}
             translateY={sheetTranslateY}
-            dismissThreshold={windowHeight * 0.68 * 0.5}
             dismissDistance={windowHeight}
-            velocityDismiss={false}
           />
           <ScrollView
             className="flex-1"
