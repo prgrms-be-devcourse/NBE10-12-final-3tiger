@@ -17,7 +17,15 @@ public class DevDataInitializer {
     @Bean
     CommandLineRunner initializeDevData(UserRepository users, CourseRepository courses) {
         return args -> {
-            if (!users.existsById(1L)) users.save(new User("임시 산책러"));
+            if (!users.existsById(1L)) {
+                users.save(
+                        User.createLocal(
+                                "dev@example.com",
+                                "dummy-password-hash",
+                                "임시 산책러"
+                        )
+                );
+            }
             if (courses.count() == 0) courses.save(new Course("서울숲 임시 산책 코스", "11200", 2500));
         };
     }
