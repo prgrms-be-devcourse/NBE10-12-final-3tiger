@@ -16,14 +16,14 @@ import java.util.Objects;
 
 @Entity
 @Table(
-        name = "users",
+        name = "\"user\"",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_users_email",
+                        name = "uk_user_email",
                         columnNames = "email"
                 ),
                 @UniqueConstraint(
-                        name = "uk_users_provider_uid",
+                        name = "uq_user_provider",
                         columnNames = {"provider", "provider_uid"}
                 )
         }
@@ -89,6 +89,23 @@ public class User extends BaseEntity {
                 nickname,
                 Provider.LOCAL,
                 null
+        );
+    }
+
+    public static User createKakao(
+            String providerUid,
+            String email,
+            String nickname
+    ) {
+        Objects.requireNonNull(providerUid, "카카오 회원의 providerUid는 필수입니다.");
+        Objects.requireNonNull(nickname, "닉네임은 필수입니다.");
+
+        return new User(
+                email,
+                null,
+                nickname,
+                Provider.KAKAO,
+                providerUid
         );
     }
 
