@@ -34,4 +34,7 @@ public class Post {
     public String getCaption() { return caption; } public String getPhotoUrl() { return photoUrl; }
     public int getLikeCount() { return likeCount; } public LocalDateTime getWalkedAt() { return walkedAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public void increaseLikeCount() { this.likeCount++; }
+    public void decreaseLikeCount() { if (this.likeCount > 0) this.likeCount--; }
 }

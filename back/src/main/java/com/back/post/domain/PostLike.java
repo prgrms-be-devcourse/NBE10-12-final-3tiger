@@ -13,4 +13,8 @@ public class PostLike {
     @Column(nullable = false, updatable = false) private LocalDateTime createdAt;
     protected PostLike() {}
     public PostLike(Post post, User user) { this.post = post; this.user = user; this.createdAt = LocalDateTime.now(); }
+
+    public Post getPost() { return post; }
+    public User getUser() { return user; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
 }
