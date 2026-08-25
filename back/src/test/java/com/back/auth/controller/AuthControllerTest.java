@@ -4,16 +4,21 @@ import com.back.auth.dto.AuthResponse;
 import com.back.auth.dto.LoginRequest;
 import com.back.auth.dto.SignupRequest;
 import com.back.auth.service.AuthService;
+import com.back.global.auth.CurrentUserIdResolver;
+import com.back.global.config.PasswordEncoderConfig;
 import com.back.global.config.SecurityConfig;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.global.exception.GlobalExceptionHandler;
+import com.back.global.jwt.JwtProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -24,12 +29,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class})
+@Import({CurrentUserIdResolver.class, SecurityConfig.class, GlobalExceptionHandler.class, PasswordEncoderConfig.class})
+@TestPropertySource(properties = {
+        "app.jwt.secret=dGVzdC1zZWNyZXQtdmFsdWUtZm9yLWp3dC10ZXN0aW5nLW9ubHktMjAyNCEh",
+        "app.jwt.access-token-expiry=1800",
+        "app.jwt.refresh-token-expiry=1209600",
+        "app.auth.allow-dev-user=false"
+})
 class AuthControllerTest {
 
     @Autowired MockMvc mvc;
-    @Autowired ObjectMapper objectMapper;
     @MockitoBean AuthService authService;
+    @MockitoBean JwtProvider jwtProvider;
+    @MockitoBean PasswordEncoder passwordEncoder;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
     void signup_성공_201() throws Exception {

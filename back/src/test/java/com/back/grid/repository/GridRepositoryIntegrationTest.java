@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.jdbc.Sql;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -19,6 +20,7 @@ import org.testcontainers.utility.DockerImageName;
         "spring.jpa.hibernate.ddl-auto=none",
         "app.auth.allow-dev-user=false"
 })
+@ActiveProfiles("test")
 @Sql("/grid/grid-score-test-data.sql")
 class GridRepositoryIntegrationTest {
     @Container

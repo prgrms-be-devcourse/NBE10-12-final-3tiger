@@ -7,7 +7,6 @@ import com.back.global.jwt.JwtProvider;
 import com.back.user.domain.Provider;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -40,13 +39,9 @@ class AuthServiceTest {
 
     @InjectMocks AuthService authService;
 
-    @BeforeEach
-    void setUp() {
-        given(redisTemplate.opsForValue()).willReturn(valueOps);
-    }
-
     @Test
     void signup_성공() {
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
         given(userRepository.existsByEmail("test@test.com")).willReturn(false);
         given(passwordEncoder.encode("password123")).willReturn("encoded");
         User savedUser = mock(User.class);
@@ -78,6 +73,7 @@ class AuthServiceTest {
 
     @Test
     void login_성공() {
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
         User user = mock(User.class);
         given(user.getId()).willReturn(1L);
         given(user.getProvider()).willReturn(Provider.LOCAL);
