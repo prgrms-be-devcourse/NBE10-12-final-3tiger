@@ -33,7 +33,13 @@
           "imageWidth": 76
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "주변 산책 코스와 현재 위치를 지도에 표시하기 위해 위치 권한이 필요합니다."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
