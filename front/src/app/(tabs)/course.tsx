@@ -2,12 +2,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
@@ -17,12 +20,23 @@ import { getCourseDetail, getCourses } from "@/api/course-api";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
 
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
 
 export default function CourseScreen() {
   const [coords, setCoords] = useState(DEFAULT_COORDS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [showDetails, setShowDetails] = useState(true);
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
+  const dismissDetails = () =>
+    dismissBottomSheet(sheetTranslateY, windowHeight, () =>
+      setShowDetails(false),
+    );
   useEffect(() => {
     void Location.getLastKnownPositionAsync().then((position) => {
       if (position)
@@ -48,6 +62,16 @@ export default function CourseScreen() {
   useEffect(() => {
     if (selectedId === null && courses[0]) setSelectedId(courses[0].courseId);
   }, [courses, selectedId]);
+  useEffect(() => {
+    if (!showDetails) return;
+    sheetTranslateY.setValue(windowHeight);
+    Animated.timing(sheetTranslateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [showDetails, sheetTranslateY, windowHeight]);
   const detailQuery = useQuery({
     queryKey: ["course", selectedId],
     queryFn: () => getCourseDetail(selectedId!),
@@ -75,6 +99,7 @@ export default function CourseScreen() {
     <View className="flex-1 bg-[#E8F0E5]">
       <MapView
         style={StyleSheet.absoluteFill}
+        onPress={dismissDetails}
         region={{ ...coords, latitudeDelta: 0.014, longitudeDelta: 0.012 }}
       >
         {route.length > 1 && (
@@ -137,8 +162,16 @@ export default function CourseScreen() {
           ))}
         </ScrollView>
       </SafeAreaView>
-      <View className="absolute inset-x-0 bottom-0 rounded-t-[30px] bg-white px-5 pb-[22px] pt-2.5 shadow-2xl">
-        <View className="mb-[15px] h-[5px] w-[42px] self-center rounded-full bg-slate-300" />
+      {showDetails && <Animated.View
+        className="absolute inset-x-0 bottom-0 h-[68%] rounded-t-[30px] bg-white px-5 pb-[22px] pt-2.5 shadow-2xl"
+        style={{ transform: [{ translateY: sheetTranslateY }] }}
+      >
+        <BottomSheetHandle
+          onDismiss={() => setShowDetails(false)}
+          translateY={sheetTranslateY}
+          dismissDistance={windowHeight}
+        />
+        <ScrollView className="flex-1" contentContainerClassName="px-0 pb-2" nestedScrollEnabled showsVerticalScrollIndicator>
         {coursesQuery.isPending || detailQuery.isPending ? (
           <ActivityIndicator color="#087A3F" className="my-12" />
         ) : detail ? (
@@ -208,7 +241,16 @@ export default function CourseScreen() {
             주변 추천 코스가 없어요.
           </Text>
         )}
-      </View>
+        </ScrollView>
+      </Animated.View>}
+      {!showDetails && (
+        <SafeAreaView edges={["bottom"]} className="absolute inset-x-0 bottom-5 items-center" pointerEvents="box-none">
+          <Button className="h-14 flex-row gap-2 rounded-full px-6 shadow-lg" onPress={() => setShowDetails(true)}>
+            <Ionicons name="chevron-up" size={20} color="white" />
+            <Text className="text-[15px] font-black text-white">코스 정보 보기</Text>
+          </Button>
+        </SafeAreaView>
+      )}
     </View>
   );
 }

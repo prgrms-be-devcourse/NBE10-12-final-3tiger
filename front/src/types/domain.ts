@@ -50,7 +50,7 @@ export type Post = {
   profileImageUrl?: string;
 };
 
-export type CourseComment = {
+export type PostComment = {
   commentId: number;
   userId: number;
   nickname: string;

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { apiRequest } from "./client";
 import type { PageParams, PageResponse } from "@/types/api";
-import type { Post } from "@/types/domain";
+import type { Post, PostComment } from "@/types/domain";
 
 export const getPosts = (
   params: PageParams & { sort?: "latest" | "popularity" },
@@ -10,6 +10,22 @@ export const getMyPosts = (params: PageParams) =>
   apiRequest<PageResponse<Post>>({ url: "/api/v1/posts/me", params });
 export const getMyLikedPosts = (params: PageParams) =>
   apiRequest<PageResponse<Post>>({ url: "/api/v1/users/me/likes", params });
+export const getPostComments = (postId: number, params: PageParams) =>
+  apiRequest<PageResponse<PostComment>>({
+    url: `/api/v1/posts/${postId}/comments`,
+    params,
+  });
+export const addPostComment = (postId: number, content: string) =>
+  apiRequest<number>({
+    url: `/api/v1/posts/${postId}/comments`,
+    method: "POST",
+    data: { content },
+  });
+export const toggleCommentUpvote = (commentId: number) =>
+  apiRequest<{ upvoted: boolean; upvoteCount: number }>({
+    url: `/api/v1/comments/${commentId}/upvote`,
+    method: "POST",
+  });
 export const likePost = (postId: number) =>
   apiRequest<{ isLiked: boolean; likeCount: number }>({
     url: `/api/v1/posts/${postId}/likes`,

@@ -1,14 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
   Image,
   Modal,
   Pressable,
   ScrollView,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,6 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getCourseDetail } from "@/api/course-api";
 import { getMyPosts } from "@/api/post-api";
 import { Button } from "@/components/ui/button";
+import { BottomSheetHandle, dismissBottomSheet } from "@/components/ui/bottom-sheet-handle";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/text";
@@ -29,6 +33,14 @@ function PostDetailSheet({
   post: Post | null;
   onClose: () => void;
 }) {
+  const { height: windowHeight } = useWindowDimensions();
+  const translateY = useRef(new Animated.Value(windowHeight)).current;
+  const dismissSheet = () => dismissBottomSheet(translateY, windowHeight, onClose);
+  useEffect(() => {
+    if (!post) return;
+    translateY.setValue(windowHeight);
+    Animated.timing(translateY, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [post, translateY, windowHeight]);
   const courseQuery = useQuery({
     queryKey: ["course", post?.courseId],
     queryFn: () => getCourseDetail(post!.courseId),
@@ -38,18 +50,19 @@ function PostDetailSheet({
     <Modal
       visible={!!post}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={dismissSheet}
     >
-      <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
-        <Pressable
-          className="max-h-[88%] rounded-t-[30px] bg-white pt-2.5"
-          onPress={(event) => event.stopPropagation()}
+      <View className="flex-1 justify-end">
+        <Pressable className="absolute inset-0 bg-black/40" onPress={dismissSheet} />
+        <Animated.View
+          className="h-[76%] rounded-t-[30px] bg-white pt-2.5"
+          style={{ transform: [{ translateY }] }}
         >
-          <View className="mb-3 h-[5px] w-[42px] self-center rounded-full bg-slate-300" />
+          <BottomSheetHandle onDismiss={onClose} translateY={translateY} dismissDistance={windowHeight} />
           {post && (
             <ScrollView
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator
               contentContainerClassName="px-5 pb-8"
             >
               {post.photoUrl ? (
@@ -72,15 +85,6 @@ function PostDetailSheet({
                     {courseQuery.data?.name ?? "산책 기록"}
                   </Text>
                 </View>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  accessibilityLabel="상세 닫기"
-                  className="h-11 w-11 rounded-full"
-                  onPress={onClose}
-                >
-                  <Ionicons name="close" size={22} color="#526056" />
-                </Button>
               </View>
               <View className="mt-4 flex-row rounded-2xl bg-[#F2F8F2] py-3">
                 <View className="flex-1 items-center border-r border-[#DDE7DE]">
@@ -120,8 +124,8 @@ function PostDetailSheet({
               </View>
             </ScrollView>
           )}
-        </Pressable>
-      </Pressable>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
@@ -155,7 +159,7 @@ export default function MyPostScreen() {
         >
           <Ionicons name="arrow-back" size={22} color="#223128" />
         </Button>
-        <Text className="text-2xl font-black text-[#006E2F]">나의 게시글</Text>
+        <Text className="text-lg text-[#006E2F]">나의 게시글</Text>
         <View className="w-11" />
       </View>
       <View className="h-[100px] flex-row items-center gap-[15px] px-5">

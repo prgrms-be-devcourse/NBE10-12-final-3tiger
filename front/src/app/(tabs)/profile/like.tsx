@@ -10,7 +10,7 @@ import { ActivityIndicator, FlatList, Image, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getMyLikedPosts, likePost, unlikePost } from "@/api/post-api";
-import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
+import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ function LikedPostCard({
   const queryClient = useQueryClient();
   const [liked, setLiked] = useState(true);
   const [likeCount, setLikeCount] = useState(item.likeCount);
+  const [expanded, setExpanded] = useState(false);
   const mutation = useMutation({
     mutationFn: () => (liked ? unlikePost(item.postId) : likePost(item.postId)),
     onMutate: () => {
@@ -44,33 +45,33 @@ function LikedPostCard({
   });
   return (
     <View className="bg-white">
-      <View className="min-h-[60px] flex-row items-center gap-3 px-5 py-2">
+      <View className="min-h-[52px] flex-row items-center gap-2 px-3 py-2">
         <Avatar
           alt={`${item.nickname ?? "사용자"} 프로필`}
-          className="h-10 w-10"
+          className="h-8 w-8 border border-[#E4EAE5]"
         >
-          <AvatarFallback className="bg-secondary">
-            <Text className="font-black text-primary">
+          <AvatarFallback className="bg-[#E9F5EC]">
+            <Text className="text-xs font-bold text-[#087A3F]">
               {(item.nickname ?? "산").slice(0, 1)}
             </Text>
           </AvatarFallback>
         </Avatar>
         <View className="flex-1">
-          <Text className="text-sm font-black text-slate-900">
+          <Text className="text-[13px] font-semibold leading-4 text-[#191C1D]">
             {item.nickname ?? "산책러"}
           </Text>
-          <Text className="mt-0.5 text-xs text-[#3D4A3D]">
+          <Text className="text-[10px] text-[#6B756D]">
             {new Date(item.likedAt ?? item.walkedAt).toLocaleDateString(
               "ko-KR",
             )}
           </Text>
         </View>
-        <Ionicons name="ellipsis-vertical" size={21} color="#768179" />
+        <Ionicons name="ellipsis-vertical" size={18} color="#526056" />
       </View>
       {item.photoUrl ? (
         <Image
           source={{ uri: item.photoUrl }}
-          className="h-80 w-full bg-slate-200"
+          className="h-64 w-full bg-slate-200"
           resizeMode="cover"
         />
       ) : (
@@ -87,10 +88,20 @@ function LikedPostCard({
         }}
         onOpenComments={onComments}
       />
-      <View className="px-5 pb-5">
-        <Text className="text-[15px] leading-[22px] text-slate-900">
-          <Text className="font-black">{item.nickname ?? "산책러"} </Text>
-          {item.content}
+      <View className="px-3 pb-4">
+        <View className="flex-row items-end">
+          <Text className="flex-1 text-[13px] leading-5 text-[#252A26]" numberOfLines={expanded ? undefined : 1}>
+            <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">{item.nickname ?? "산책러"} </Text>
+            {item.content}
+          </Text>
+          {!expanded && (
+            <Button variant="link" size="sm" className="ml-1 h-5 px-0" onPress={() => setExpanded(true)}>
+              <Text className="text-[11px] text-slate-500">더 보기</Text>
+            </Button>
+          )}
+        </View>
+        <Text className="mt-1 text-[10px] text-[#758078]">
+          댓글 {item.commentCount ?? 0}개 모두 보기
         </Text>
       </View>
     </View>
@@ -99,7 +110,7 @@ function LikedPostCard({
 
 export default function LikedPostsScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const [commentCourseId, setCommentCourseId] = useState<number | null>(null);
+  const [commentPostId, setCommentPostId] = useState<number | null>(null);
   useEffect(() => {
     if (!isAuthenticated) router.replace("/(auth)/login" as never);
   }, [isAuthenticated]);
@@ -126,7 +137,7 @@ export default function LikedPostsScreen() {
         >
           <Ionicons name="arrow-back" size={22} color="#223128" />
         </Button>
-        <Text className="text-2xl font-black text-[#006E2F]">좋아요한 글</Text>
+        <Text className="text-lg text-[#006E2F]">좋아요한 글</Text>
         <View className="w-11" />
       </View>
       {likedQuery.isPending ? (
@@ -145,7 +156,7 @@ export default function LikedPostsScreen() {
           renderItem={({ item }) => (
             <LikedPostCard
               item={item}
-              onComments={() => setCommentCourseId(item.courseId)}
+              onComments={() => setCommentPostId(item.postId)}
             />
           )}
           contentContainerClassName="grow pb-6"
@@ -162,9 +173,9 @@ export default function LikedPostsScreen() {
           }
         />
       )}
-      <CourseCommentSheet
-        courseId={commentCourseId}
-        onClose={() => setCommentCourseId(null)}
+      <PostCommentSheet
+        postId={commentPostId}
+        onClose={() => setCommentPostId(null)}
       />
     </SafeAreaView>
   );

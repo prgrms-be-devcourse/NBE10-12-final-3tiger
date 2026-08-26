@@ -1,5 +1,5 @@
 import type { PageParams, PageResponse } from "@/types/api";
-import type { Course, CourseComment, Region } from "@/types/domain";
+import type { Course, Region } from "@/types/domain";
 import { apiRequest } from "./client";
 
 export type CourseSearchParams = PageParams & {
@@ -20,17 +20,6 @@ export const getCourses = (params: CourseSearchParams) =>
   apiRequest<PageResponse<Course>>({ url: "/api/v1/courses", params });
 export const getCourseDetail = (courseId: number) =>
   apiRequest<Course>({ url: `/api/v1/courses/${courseId}` });
-export const getComments = (courseId: number, params: PageParams) =>
-  apiRequest<PageResponse<CourseComment>>({
-    url: `/api/v1/courses/${courseId}/comments`,
-    params,
-  });
-export const addComment = (courseId: number, content: string) =>
-  apiRequest<{ commentId: number }>({
-    url: `/api/v1/courses/${courseId}/comments`,
-    method: "POST",
-    data: { content },
-  });
 export const bookmarkCourse = (courseId: number) =>
   apiRequest<{ isBookmarked: boolean }>({
     url: `/api/v1/courses/${courseId}/bookmarks`,

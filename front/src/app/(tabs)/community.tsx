@@ -11,7 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
 import { getPosts, likePost, unlikePost } from "@/api/post-api";
-import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
+import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -178,7 +178,7 @@ function FeedPost({
 }
 
 export default function CommunityScreen() {
-  const [commentCourseId, setCommentCourseId] = useState<number | null>(null);
+  const [commentPostId, setCommentPostId] = useState<number | null>(null);
   const postsQuery = useInfiniteQuery({
     queryKey: ["posts", "latest"],
     queryFn: ({ pageParam }) =>
@@ -230,7 +230,7 @@ export default function CommunityScreen() {
           renderItem={({ item }) => (
             <FeedPost
               item={item}
-              onOpenComments={() => setCommentCourseId(item.courseId)}
+              onOpenComments={() => setCommentPostId(item.postId)}
             />
           )}
           showsVerticalScrollIndicator={false}
@@ -248,9 +248,9 @@ export default function CommunityScreen() {
           }
         />
       )}
-      <CourseCommentSheet
-        courseId={commentCourseId}
-        onClose={() => setCommentCourseId(null)}
+      <PostCommentSheet
+        postId={commentPostId}
+        onClose={() => setCommentPostId(null)}
       />
     </SafeAreaView>
   );

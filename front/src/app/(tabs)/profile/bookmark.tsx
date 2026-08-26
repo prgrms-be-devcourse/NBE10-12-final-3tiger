@@ -1,22 +1,29 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { router, usePathname } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
   Image,
   Modal,
   Pressable,
+  ScrollView,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getCourseDetail, getMyBookmarks } from "@/api/course-api";
-import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Course } from "@/types/domain";
 
@@ -28,7 +35,10 @@ export default function ProfileBookmarkScreen() {
   const isTabRoot = pathname === "/bookmark";
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [commentCourseId, setCommentCourseId] = useState<number | null>(null);
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
+  const dismissSheet = () =>
+    dismissBottomSheet(sheetTranslateY, windowHeight, () => setSelectedId(null));
   useEffect(() => {
     if (!isAuthenticated) router.replace("/(auth)/login" as never);
   }, [isAuthenticated]);
@@ -51,15 +61,25 @@ export default function ProfileBookmarkScreen() {
   const courses =
     bookmarksQuery.data?.pages.flatMap((page) => page.content) ?? [];
   const selected = detailQuery.data;
+  useEffect(() => {
+    if (selectedId === null) return;
+    sheetTranslateY.setValue(windowHeight);
+    Animated.timing(sheetTranslateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [selectedId, sheetTranslateY, windowHeight]);
   const openCourseDetails = (courseId: number) => {
     setSelectedId(null);
     setTimeout(() => router.push(`/course/${courseId}` as never), 300);
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F8FAFB]" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       {!isTabRoot && (
-        <View className="h-14 flex-row items-center justify-between bg-white px-5">
+        <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
           <Button
             variant="ghost"
             size="icon"
@@ -69,7 +89,7 @@ export default function ProfileBookmarkScreen() {
           >
             <Ionicons name="arrow-back" size={24} color="#191C1D" />
           </Button>
-          <Text className="text-2xl font-black text-[#006E2F]">
+          <Text className="text-lg text-[#006E2F]">
             저장한 코스
           </Text>
           <View className="w-11" />
@@ -88,7 +108,7 @@ export default function ProfileBookmarkScreen() {
         <FlatList
           data={courses}
           keyExtractor={(item) => String(item.courseId)}
-          contentContainerClassName="grow gap-4 p-5 pb-[30px]"
+          contentContainerClassName="grow gap-6 p-5 pb-[30px]"
           ListHeaderComponent={
             <Text className="mb-0.5 text-sm text-slate-600">
               총 {bookmarksQuery.data?.pages[0]?.totalElements ?? 0}개의 코스
@@ -124,18 +144,16 @@ export default function ProfileBookmarkScreen() {
       <Modal
         visible={selectedId !== null}
         transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedId(null)}
+        animationType="none"
+        onRequestClose={dismissSheet}
       >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={() => setSelectedId(null)}
-        >
-          <Pressable
-            className="rounded-t-[28px] bg-white p-5 pt-2.5"
-            onPress={(event) => event.stopPropagation()}
+        <View className="flex-1 justify-end">
+          <Pressable className="absolute inset-0 bg-black/40" onPress={dismissSheet} />
+          <Animated.View
+            className="h-[66%] rounded-t-[28px] bg-white pt-2.5"
+            style={{ transform: [{ translateY: sheetTranslateY }] }}
           >
-            <View className="mb-[15px] h-[5px] w-[42px] self-center rounded-full bg-slate-300" />
+            <BottomSheetHandle onDismiss={() => setSelectedId(null)} translateY={sheetTranslateY} dismissDistance={windowHeight} />
             {detailQuery.isPending ? (
               <ActivityIndicator color="#087A3F" className="my-16" />
             ) : detailQuery.isError ? (
@@ -144,7 +162,7 @@ export default function ProfileBookmarkScreen() {
                 onRetry={() => void detailQuery.refetch()}
               />
             ) : selected ? (
-              <>
+              <ScrollView className="flex-1" contentContainerClassName="px-5 pb-8" nestedScrollEnabled showsVerticalScrollIndicator>
                 <Image
                   source={{ uri: selected.imageUrl || FALLBACK_IMAGE }}
                   className="h-[170px] w-full rounded-xl"
@@ -183,19 +201,9 @@ export default function ProfileBookmarkScreen() {
                     selected.personaBadges?.join(" · ") ??
                     "코스 상세 정보를 확인해 보세요."}
                 </Text>
-                <View className="mt-4 flex-row gap-2">
+                <View className="mt-4">
                   <Button
-                    variant="outline"
-                    className="h-14 flex-1 rounded-xl"
-                    onPress={() => {
-                      setSelectedId(null);
-                      setCommentCourseId(selected.courseId);
-                    }}
-                  >
-                    <Text>댓글 보기</Text>
-                  </Button>
-                  <Button
-                    className="h-14 flex-[2] rounded-xl"
+                    className="h-14 w-full rounded-xl"
                     onPress={() => openCourseDetails(selected.courseId)}
                   >
                     <Text className="font-black text-primary-foreground">
@@ -203,34 +211,30 @@ export default function ProfileBookmarkScreen() {
                     </Text>
                   </Button>
                 </View>
-              </>
+              </ScrollView>
             ) : null}
-          </Pressable>
-        </Pressable>
+          </Animated.View>
+        </View>
       </Modal>
-      <CourseCommentSheet
-        courseId={commentCourseId}
-        onClose={() => setCommentCourseId(null)}
-      />
     </SafeAreaView>
   );
 }
 
 function CourseCard({ item, onPress }: { item: Course; onPress: () => void }) {
   return (
-    <Pressable className="rounded-xl bg-white p-4 shadow-sm" onPress={onPress}>
+    <Pressable className="w-full" onPress={onPress}>
       <View>
         <Image
           source={{ uri: item.imageUrl || FALLBACK_IMAGE }}
-          className="h-32 w-full rounded-lg"
+          className="h-40 w-full rounded-2xl bg-slate-200"
           resizeMode="cover"
         />
         <View className="absolute right-[9px] top-[9px] h-[34px] w-[34px] items-center justify-center rounded-full bg-white/85">
           <Ionicons name="bookmark" size={21} color="#006E2F" />
         </View>
       </View>
-      <View className="mt-[11px] flex-row items-center gap-2">
-        <Text className="flex-1 text-lg font-extrabold text-[#191C1D]">
+      <View className="mt-3 flex-row items-center gap-2 px-1">
+        <Text className="flex-1 text-[17px] font-bold text-[#191C1D]">
           {item.name}
         </Text>
         {item.personaBadges?.[0] && (
@@ -241,7 +245,7 @@ function CourseCard({ item, onPress }: { item: Course; onPress: () => void }) {
           </View>
         )}
       </View>
-      <View className="mt-[9px] flex-row items-center gap-1">
+      <View className="mt-2 flex-row items-center gap-1 px-1">
         <Ionicons name="git-branch-outline" size={17} color="#475569" />
         <Text className="mr-[9px] text-[13px] text-slate-600">
           {(item.distanceM / 1000).toFixed(1)}km
