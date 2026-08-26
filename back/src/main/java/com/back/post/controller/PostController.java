@@ -34,7 +34,7 @@ public class PostController {
     }
     @PostMapping
     ApiResponse<PostService.CreatedPost> create(@CurrentUserId Long userId, @Valid @RequestBody CreateRequest request) {
-        var command = new PostService.CreateCommand(request.courseId(), request.title(), request.content(), request.photoUrl(), request.walkedAt());
+        var command = new PostService.CreateCommand(request.courseId(), request.content(), request.photoUrl(), request.walkedAt());
         return ApiResponse.ok("게시물이 등록되었습니다.", service.create(userId, command));
     }
     @DeleteMapping("/{postId}")
@@ -46,7 +46,6 @@ public class PostController {
     record UploadRequest(@NotBlank(message = "파일명은 필수입니다.") String fileName,
                          @Pattern(regexp = "image/(jpeg|png|webp)", message = "지원하지 않는 이미지 형식입니다.") String contentType) {}
     record CreateRequest(@Schema(example = "1") @NotNull(message = "코스 ID는 필수입니다.") Long courseId,
-                         @Schema(example = "서울숲 산책 기록") @NotBlank(message = "제목은 필수입니다.") @Size(max = 200, message = "제목은 200자 이하여야 합니다.") String title,
                          @Schema(example = "날씨가 좋아서 즐겁게 걸었습니다.") @NotBlank(message = "내용은 필수입니다.") @Size(max = 1000, message = "내용은 1000자 이하여야 합니다.") String content,
                          @Schema(example = "https://example.com/walk.jpg") @Size(max = 2048, message = "사진 URL이 너무 깁니다.") String photoUrl,
                          @Schema(example = "2026-08-26T09:50:00") @NotNull(message = "산책 시각은 필수입니다.") LocalDateTime walkedAt) {}

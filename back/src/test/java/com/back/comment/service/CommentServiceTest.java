@@ -53,7 +53,7 @@ class CommentServiceTest {
     private Post newPost() {
         User user = User.createLocal("test@test.com", "dummy-hash", "산책러");
         Course course = new Course("서울숲 코스", "11200", 2500);
-        return new Post(user, course, "산책 기록", "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
+        return new Post(user, course, "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
     }
 
     @Test

@@ -1,6 +1,8 @@
 .idea/
 .gradle/
 .gradle-task/
+node_modules/
+.pnpm-store/
 **/build/
 **/out/
 back/build/local-uploads/

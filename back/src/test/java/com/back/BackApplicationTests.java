@@ -71,7 +71,7 @@ class BackApplicationTests {
     }
 
     @Test void createReadAndDeletePost() throws Exception {
-        String body = "{\"courseId\":" + courseId + ",\"title\":\"산책 기록\",\"content\":\"오늘 산책\",\"photoUrl\":\"https://cdn.example/walk.jpg\",\"walkedAt\":\"2026-08-19T17:30:00\"}";
+        String body = "{\"courseId\":" + courseId + ",\"content\":\"오늘 산책\",\"photoUrl\":\"https://cdn.example/walk.jpg\",\"walkedAt\":\"2026-08-19T17:30:00\"}";
         String response = mvc.perform(post("/api/v1/posts").with(authenticatedAs(userId))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.postId").isNumber())
