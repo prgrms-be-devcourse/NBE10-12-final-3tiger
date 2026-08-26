@@ -7,8 +7,17 @@ export default function TabLayout() {
   return (
     <Tabs
       initialRouteName="map"
+      detachInactiveScreens={false}
       screenOptions={{
         headerShown: false,
+        lazy: false,
+        freezeOnBlur: false,
+        sceneStyle: { backgroundColor: "#FFFFFF" },
+        animation: "shift",
+        transitionSpec: {
+          animation: "timing",
+          config: { duration: 220 },
+        },
         tabBarActiveTintColor: GREEN,
         tabBarInactiveTintColor: "#778078",
         tabBarLabelStyle: { fontSize: 12, fontWeight: "700", marginTop: 2 },
@@ -27,7 +36,11 @@ export default function TabLayout() {
         options={{
           title: "홈",
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "map" : "map-outline"} color={color} size={size} />
+            <Ionicons
+              name={focused ? "map" : "map-outline"}
+              color={color}
+              size={size}
+            />
           ),
         }}
       />
@@ -36,16 +49,11 @@ export default function TabLayout() {
         options={{
           title: "피드",
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "images" : "images-outline"} color={color} size={size} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="bookmark"
-        options={{
-          title: "북마크",
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "bookmark" : "bookmark-outline"} color={color} size={size} />
+            <Ionicons
+              name={focused ? "images" : "images-outline"}
+              color={color}
+              size={size}
+            />
           ),
         }}
       />
@@ -54,7 +62,11 @@ export default function TabLayout() {
         options={{
           title: "마이",
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} color={color} size={size} />
+            <Ionicons
+              name={focused ? "person" : "person-outline"}
+              color={color}
+              size={size}
+            />
           ),
         }}
       />

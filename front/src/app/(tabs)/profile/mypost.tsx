@@ -1,21 +1,31 @@
 import { Ionicons } from "@expo/vector-icons";
+import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
+import { PostActions } from "@/components/feed/post-actions";
 import { Button } from "@/components/ui/button";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
 import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/text";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   FlatList,
   Image,
   Modal,
   Pressable,
   ScrollView,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type MyPost = {
   id: string;
+  courseId: string;
   image: string;
   content: string;
   course: string;
@@ -28,6 +38,7 @@ type MyPost = {
 const POSTS: MyPost[] = [
   {
     id: "1",
+    courseId: "101",
     image: "https://images.unsplash.com/photo-1558788353-f76d92427f16?w=800",
     content:
       "해피와 서울숲을 천천히 걸었어요. 그늘이 많고 길이 평탄해서 편안한 산책이었습니다.",
@@ -39,6 +50,7 @@ const POSTS: MyPost[] = [
   },
   {
     id: "2",
+    courseId: "102",
     image: "https://images.unsplash.com/photo-1472396961693-142e6e269027?w=800",
     content: "바람이 선선한 아침에 만난 초록 풍경을 기록해 봅니다.",
     course: "한강공원 뚝섬길",
@@ -49,6 +61,7 @@ const POSTS: MyPost[] = [
   },
   {
     id: "3",
+    courseId: "103",
     image: "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=800",
     content:
       "노을이 내려앉은 산책길. 오늘도 무리하지 않고 기분 좋게 걸었습니다.",
@@ -60,6 +73,7 @@ const POSTS: MyPost[] = [
   },
   {
     id: "4",
+    courseId: "104",
     image: "https://images.unsplash.com/photo-1519331379826-f10be5486c6f?w=800",
     content: "공원 벤치에서 잠시 쉬며 여유로운 오후를 보냈어요.",
     course: "보라매공원 둘레길",
@@ -70,6 +84,7 @@ const POSTS: MyPost[] = [
   },
   {
     id: "5",
+    courseId: "105",
     image: "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800",
     content: "나무 사이로 이어지는 조용한 길이 무척 마음에 들었습니다.",
     course: "북서울꿈의숲 산책로",
@@ -80,6 +95,7 @@ const POSTS: MyPost[] = [
   },
   {
     id: "6",
+    courseId: "106",
     image: "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800",
     content: "맑은 하늘과 넓은 길 덕분에 기분 좋게 하루를 시작했어요.",
     course: "올림픽공원 순환길",
@@ -93,26 +109,56 @@ const POSTS: MyPost[] = [
 function PostDetailSheet({
   post,
   onClose,
+  onOpenComments,
 }: {
   post: MyPost | null;
   onClose: () => void;
+  onOpenComments: (post: MyPost) => void;
 }) {
+  const { height: windowHeight } = useWindowDimensions();
+  const translateY = useRef(new Animated.Value(windowHeight)).current;
+  const [liked, setLiked] = useState(true);
+  const dismissSheet = () =>
+    dismissBottomSheet(translateY, windowHeight, onClose);
+
+  useEffect(() => {
+    if (!post) return;
+    setLiked(true);
+    translateY.setValue(windowHeight);
+    Animated.timing(translateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [post, translateY, windowHeight]);
+
   return (
     <Modal
       visible={!!post}
       transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      animationType="none"
+      onRequestClose={dismissSheet}
     >
-      <Pressable className="flex-1 justify-end bg-black/40" onPress={onClose}>
+      <View className="flex-1 justify-end">
         <Pressable
-          className="max-h-[88%] rounded-t-[30px] bg-white pt-2.5"
-          onPress={(event) => event.stopPropagation()}
+          className="absolute inset-0 bg-black/40"
+          onPress={dismissSheet}
+        />
+        <Animated.View
+          className="h-[76%] rounded-t-[30px] bg-white pt-2.5"
+          style={{ transform: [{ translateY }] }}
         >
-          <View className="mb-3 h-[5px] w-[42px] self-center rounded-full bg-slate-300" />
+          <BottomSheetHandle
+            onDismiss={onClose}
+            translateY={translateY}
+            dismissDistance={windowHeight}
+          />
           {post && (
             <ScrollView
-              showsVerticalScrollIndicator={false}
+              className="flex-1"
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
               contentContainerClassName="px-5 pb-8"
             >
               <Image
@@ -130,15 +176,6 @@ function PostDetailSheet({
                     {post.course}
                   </Text>
                 </View>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  accessibilityLabel="상세 닫기"
-                  className="h-11 w-11 rounded-full"
-                  onPress={onClose}
-                >
-                  <Ionicons name="close" size={22} color="#526056" />
-                </Button>
               </View>
 
               <View className="mt-4 flex-row rounded-2xl bg-[#F2F8F2] py-3">
@@ -160,34 +197,30 @@ function PostDetailSheet({
                 {post.content}
               </Text>
               <Separator className="my-5 bg-[#E6EBE7]" />
-              <View className="flex-row items-center gap-6">
-                <View className="flex-row items-center gap-1.5">
-                  <Ionicons name="heart" size={22} color="#22C55E" />
-                  <Text className="text-sm font-bold text-[#405047]">
-                    {post.likes}
-                  </Text>
-                </View>
-                <View className="flex-row items-center gap-1.5">
-                  <Ionicons
-                    name="chatbubble-outline"
-                    size={21}
-                    color="#526056"
-                  />
-                  <Text className="text-sm font-bold text-[#405047]">
-                    {post.comments}
-                  </Text>
-                </View>
+              <View className="-mx-5">
+                <PostActions
+                  liked={liked}
+                  likeCount={post.likes - (liked ? 0 : 1)}
+                  commentCount={post.comments}
+                  onToggleLike={() => setLiked((value) => !value)}
+                  onOpenComments={() => onOpenComments(post)}
+                />
               </View>
             </ScrollView>
           )}
-        </Pressable>
-      </Pressable>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
 
 export default function MyPostScreen() {
   const [selected, setSelected] = useState<MyPost | null>(null);
+  const [commentCourse, setCommentCourse] = useState<MyPost | null>(null);
+  const openComments = (post: MyPost) => {
+    setSelected(null);
+    setTimeout(() => setCommentCourse(post), 250);
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -201,7 +234,7 @@ export default function MyPostScreen() {
         >
           <Ionicons name="arrow-back" size={22} color="#223128" />
         </Button>
-        <Text className="text-2xl font-black text-[#006E2F]">나의 게시글</Text>
+        <Text className="text-lg text-[#006E2F]">나의 게시글</Text>
         <View className="w-11" />
       </View>
 
@@ -230,7 +263,9 @@ export default function MyPostScreen() {
             accessibilityRole="button"
             accessibilityLabel={`${item.course} 게시글 상세 보기`}
             className="aspect-square flex-1 overflow-hidden bg-slate-200"
-            onPress={() => setSelected(item)}
+            onPress={() => {
+              setSelected(item);
+            }}
           >
             <Image
               source={{ uri: item.image }}
@@ -247,7 +282,15 @@ export default function MyPostScreen() {
         }
       />
 
-      <PostDetailSheet post={selected} onClose={() => setSelected(null)} />
+      <PostDetailSheet
+        post={selected}
+        onClose={() => setSelected(null)}
+        onOpenComments={openComments}
+      />
+      <CourseCommentSheet
+        courseId={commentCourse?.courseId ?? null}
+        onClose={() => setCommentCourse(null)}
+      />
     </SafeAreaView>
   );
 }

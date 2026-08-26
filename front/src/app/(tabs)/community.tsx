@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { PostActions } from "@/components/feed/post-actions";
+import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/text";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -12,6 +12,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const POSTS = [
   {
     id: "1",
+    courseId: "101",
+    courseName: "성수 서울숲 순환",
     user: "김산책 할아버지",
     time: "2시간 전",
     avatar:
@@ -25,6 +27,8 @@ const POSTS = [
   },
   {
     id: "2",
+    courseId: "102",
+    courseName: "한강공원 뚝섬길",
     user: "유모차마실",
     time: "4시간 전",
     avatar:
@@ -44,55 +48,64 @@ function IconButton({
   label,
   icon,
   onPress,
+  compact = false,
 }: {
   label: string;
   icon: React.ComponentProps<typeof Ionicons>["name"];
   onPress?: () => void;
+  compact?: boolean;
 }) {
   return (
     <Button
       variant="ghost"
       size="icon"
       accessibilityLabel={label}
-      className="h-11 w-11 rounded-full active:bg-[#E9F5EC]"
+      className={`${compact ? "h-8 w-8" : "h-11 w-11"} rounded-full active:bg-[#E9F5EC]`}
       onPress={onPress}
     >
-      <Ionicons name={icon} size={23} color="#087A3F" />
+      <Ionicons name={icon} size={compact ? 18 : 23} color="#087A3F" />
     </Button>
   );
 }
 
-function Post({ item }: { item: PostItem }) {
+function Post({
+  item,
+  onOpenComments,
+}: {
+  item: PostItem;
+  onOpenComments: () => void;
+}) {
   const [liked, setLiked] = useState(item.liked);
   const [bookmarked, setBookmarked] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const likeCount = item.likes + (liked === item.liked ? 0 : liked ? 1 : -1);
 
   return (
     <View className="w-full bg-white">
-      <View className="min-h-[72px] flex-row items-center gap-3 px-5 py-3">
+      <View className="min-h-[52px] flex-row items-center gap-2 px-3 py-2">
         <Avatar
           alt={`${item.user} 프로필`}
-          className="h-11 w-11 border border-[#E4EAE5]"
+          className="h-8 w-8 border border-[#E4EAE5]"
         >
           <AvatarImage source={{ uri: item.avatar }} />
           <AvatarFallback className="bg-[#E9F5EC]">
-            <Text className="font-extrabold text-[#087A3F]">
+            <Text className="text-xs font-bold text-[#087A3F]">
               {item.user.slice(0, 1)}
             </Text>
           </AvatarFallback>
         </Avatar>
         <View className="flex-1">
-          <Text className="text-[16px] font-extrabold leading-5 text-[#191C1D]">
+          <Text className="text-[13px] font-semibold leading-4 text-[#191C1D]">
             {item.user}
           </Text>
-          <Text className="mt-1 text-xs text-[#6B756D]">{item.time}</Text>
+          <Text className="text-[10px] text-[#6B756D]">{item.time}</Text>
         </View>
-        <IconButton label="게시글 메뉴" icon="ellipsis-vertical" />
+        <IconButton label="게시글 메뉴" icon="ellipsis-vertical" compact />
       </View>
 
       <Image
         source={{ uri: item.image }}
-        className="h-80 w-full bg-[#E6E8E9]"
+        className="h-64 w-full bg-[#E6E8E9]"
         resizeMode="cover"
       />
 
@@ -101,22 +114,38 @@ function Post({ item }: { item: PostItem }) {
         likeCount={likeCount}
         commentCount={item.comments}
         onToggleLike={() => setLiked((value) => !value)}
+        onOpenComments={onOpenComments}
         bookmarked={bookmarked}
         onToggleBookmark={() => setBookmarked((value) => !value)}
       />
 
-      <Text className="px-5 pb-5 text-[15px] leading-[24px] text-[#252A26]">
-        <Text className="text-[16px] font-extrabold leading-[24px] text-[#191C1D]">
-          {item.user}{" "}
+      <View className="flex-row items-end px-3 pb-4">
+        <Text
+          className="flex-1 text-[13px] leading-5 text-[#252A26]"
+          numberOfLines={expanded ? undefined : 1}
+        >
+          <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
+            {item.user}{" "}
+          </Text>
+          {item.text}
         </Text>
-        {item.text}
-      </Text>
-      <Separator className="bg-[#E8ECE8]" />
+        {!expanded && (
+          <Button
+            variant="link"
+            size="sm"
+            className="ml-1 h-5 px-0"
+            onPress={() => setExpanded(true)}
+          >
+            <Text className="text-[11px] text-slate-500">더 보기</Text>
+          </Button>
+        )}
+      </View>
     </View>
   );
 }
 
 export default function CommunityScreen() {
+  const [commentCourse, setCommentCourse] = useState<PostItem | null>(null);
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-3">
@@ -143,11 +172,16 @@ export default function CommunityScreen() {
       <FlatList
         data={POSTS}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <Post item={item} />}
+        renderItem={({ item }) => (
+          <Post item={item} onOpenComments={() => setCommentCourse(item)} />
+        )}
         showsVerticalScrollIndicator={false}
         contentContainerClassName="pb-6"
-        ItemSeparatorComponent={() => <View className="h-3 bg-[#F3F6F3]" />}
         onEndReachedThreshold={0.6}
+      />
+      <CourseCommentSheet
+        courseId={commentCourse?.courseId ?? null}
+        onClose={() => setCommentCourse(null)}
       />
     </SafeAreaView>
   );
