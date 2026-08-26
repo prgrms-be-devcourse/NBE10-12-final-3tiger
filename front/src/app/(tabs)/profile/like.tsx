@@ -1,121 +1,96 @@
 import { Ionicons } from "@expo/vector-icons";
-import { PostActions } from "@/components/feed/post-actions";
-import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Text } from "@/components/ui/text";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useState } from "react";
-import { FlatList, Image, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, Image, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const POSTS = [
-  {
-    id: "1",
-    courseId: "101",
-    courseName: "성수 서울숲 순환",
-    user: "건강한하루",
-    time: "2시간 전",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuAe99syyGw6NkbqaoAYXLZYhf3xOBnas6sZ0e07MMtdnHhoD7cSENUqzi8_XLPxG0-5DgF0gLSsUzck5sT1s6T8JREtOzC_q23ZCsXnqAKA5tYraLHH0ghXfoZw101rwAkOxd_PE9I6-4yTKjs_jqz0p42HBjdrB5Zx61hZS9nqQrn8wynTre1O2jum5qy3q3-_gMZ_5-L_vVlDtV9CAA-hoWMrveAUXCRRNht08ceVKtJm-89UDeyWYw",
-    text: "오늘 아침 공원 산책길이 너무 좋았어요. 날씨도 화창하고 걷기 딱 좋은 온도네요. 다들 좋은 하루 보내세요! 🌿",
-    likes: 24,
-    comments: 5,
-  },
-  {
-    id: "2",
-    courseId: "102",
-    courseName: "한강공원 뚝섬길",
-    user: "유모차라이더",
-    time: "어제",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuDm5gtCiLACjWV3nZmzE6oU_w2PAFpfar_lfnhS7eomevejN0O9Jqem8RVhcz4IHxpwlvWDPEBGmqkhj4jJycX1SNEIZaemSjJbh9N16u_mO-2Uq_RvnapuqbNCj0kYTbDVtQ-tMqs-0gIB2D-RBWmr_VOjxZtm7gH1PkMYToO7z98mfNf8S94p5OgiIyKItFhZWJNX-zX8v_wzDkt_WxJF7AZuxDov68WBF98RUiLY-_kFX-TUKRiafg",
-    text: "이 길은 경사도 완만하고 바닥이 평평해서 유모차 끌고 가기 정말 좋아요! 추천합니다 👍",
-    likes: 128,
-    comments: 12,
-  },
-];
+import { getMyLikedPosts, likePost, unlikePost } from "@/api/post-api";
+import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
+import { PostActions } from "@/components/feed/post-actions";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { EmptyState, ErrorState } from "@/components/ui/data-state";
+import { Text } from "@/components/ui/text";
+import { useAuthStore } from "@/stores/auth-store";
+import type { Post } from "@/types/domain";
 
-function Card({
+function LikedPostCard({
   item,
-  onOpenComments,
+  onComments,
 }: {
-  item: (typeof POSTS)[number];
-  onOpenComments: () => void;
+  item: Post;
+  onComments: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [liked, setLiked] = useState(true);
-  const [bookmarked, setBookmarked] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-
+  const [likeCount, setLikeCount] = useState(item.likeCount);
+  const mutation = useMutation({
+    mutationFn: () => (liked ? unlikePost(item.postId) : likePost(item.postId)),
+    onMutate: () => {
+      setLiked((value) => !value);
+      setLikeCount((count) => count + (liked ? -1 : 1));
+    },
+    onError: () => {
+      setLiked((value) => !value);
+      setLikeCount((count) => count + (liked ? 1 : -1));
+    },
+    onSettled: () =>
+      void queryClient.invalidateQueries({ queryKey: ["liked-posts"] }),
+  });
   return (
     <View className="bg-white">
-      <View className="min-h-[52px] flex-row items-center gap-2 px-3 py-2">
+      <View className="min-h-[60px] flex-row items-center gap-3 px-5 py-2">
         <Avatar
-          alt={`${item.user} 프로필`}
-          className="h-8 w-8 border border-[#E4EAE5]"
+          alt={`${item.nickname ?? "사용자"} 프로필`}
+          className="h-10 w-10"
         >
-          <AvatarFallback className="bg-[#E9F5EC]">
-            <Text className="text-xs font-bold text-[#087A3F]">
-              {item.user.slice(0, 1)}
+          <AvatarFallback className="bg-secondary">
+            <Text className="font-black text-primary">
+              {(item.nickname ?? "산").slice(0, 1)}
             </Text>
           </AvatarFallback>
         </Avatar>
         <View className="flex-1">
-          <Text className="text-[13px] font-semibold leading-4 text-[#191C1D]">
-            {item.user}
+          <Text className="text-sm font-black text-slate-900">
+            {item.nickname ?? "산책러"}
           </Text>
-          <Text className="text-[10px] text-[#6B756D]">{item.time}</Text>
+          <Text className="mt-0.5 text-xs text-[#3D4A3D]">
+            {new Date(item.likedAt ?? item.walkedAt).toLocaleDateString(
+              "ko-KR",
+            )}
+          </Text>
         </View>
-        <Button
-          variant="ghost"
-          size="icon"
-          accessibilityLabel="게시글 메뉴"
-          className="h-8 w-8 rounded-full"
-        >
-          <Ionicons name="ellipsis-vertical" size={18} color="#526056" />
-        </Button>
+        <Ionicons name="ellipsis-vertical" size={21} color="#768179" />
       </View>
-
-      <Image
-        source={{ uri: item.image }}
-        className="h-64 w-full bg-slate-200"
-        resizeMode="cover"
-      />
-
+      {item.photoUrl ? (
+        <Image
+          source={{ uri: item.photoUrl }}
+          className="h-80 w-full bg-slate-200"
+          resizeMode="cover"
+        />
+      ) : (
+        <View className="h-52 items-center justify-center bg-muted">
+          <Ionicons name="image-outline" size={34} color="#94A09A" />
+        </View>
+      )}
       <PostActions
         liked={liked}
-        likeCount={item.likes - (liked ? 0 : 1)}
-        commentCount={item.comments}
-        onToggleLike={() => setLiked((value) => !value)}
-        onOpenComments={onOpenComments}
-        bookmarked={bookmarked}
-        onToggleBookmark={() => setBookmarked((value) => !value)}
+        likeCount={likeCount}
+        commentCount={item.commentCount ?? 0}
+        onToggleLike={() => {
+          if (!mutation.isPending) mutation.mutate();
+        }}
+        onOpenComments={onComments}
       />
-
-      <View className="px-3 pb-4">
-        <View className="flex-row items-end">
-          <Text
-            className="flex-1 text-[13px] leading-5 text-[#252A26]"
-            numberOfLines={expanded ? undefined : 1}
-          >
-            <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
-              {item.user}{" "}
-            </Text>
-            {item.text}
-          </Text>
-          {!expanded && (
-            <Button
-              variant="link"
-              size="sm"
-              className="ml-1 h-5 px-0"
-              onPress={() => setExpanded(true)}
-            >
-              <Text className="text-[11px] text-slate-500">더 보기</Text>
-            </Button>
-          )}
-        </View>
-        <Text className="mt-1 text-[10px] text-[#758078]">
-          댓글 {item.comments}개 모두 보기
+      <View className="px-5 pb-5">
+        <Text className="text-[15px] leading-[22px] text-slate-900">
+          <Text className="font-black">{item.nickname ?? "산책러"} </Text>
+          {item.caption}
         </Text>
       </View>
     </View>
@@ -123,9 +98,22 @@ function Card({
 }
 
 export default function LikedPostsScreen() {
-  const [commentCourse, setCommentCourse] = useState<
-    (typeof POSTS)[number] | null
-  >(null);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const [commentCourseId, setCommentCourseId] = useState<number | null>(null);
+  useEffect(() => {
+    if (!isAuthenticated) router.replace("/(auth)/login" as never);
+  }, [isAuthenticated]);
+  const likedQuery = useInfiniteQuery({
+    queryKey: ["liked-posts"],
+    queryFn: ({ pageParam }) => getMyLikedPosts({ page: pageParam, size: 20 }),
+    initialPageParam: 0,
+    enabled: isAuthenticated,
+    getNextPageParam: (lastPage) =>
+      (lastPage.page + 1) * lastPage.size < lastPage.totalElements
+        ? lastPage.page + 1
+        : undefined,
+  });
+  const posts = likedQuery.data?.pages.flatMap((page) => page.content) ?? [];
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
@@ -138,20 +126,45 @@ export default function LikedPostsScreen() {
         >
           <Ionicons name="arrow-back" size={22} color="#223128" />
         </Button>
-        <Text className="text-lg text-[#006E2F]">좋아요한 글</Text>
+        <Text className="text-2xl font-black text-[#006E2F]">좋아요한 글</Text>
         <View className="w-11" />
       </View>
-      <FlatList
-        data={POSTS}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Card item={item} onOpenComments={() => setCommentCourse(item)} />
-        )}
-        contentContainerClassName="pb-6"
-      />
+      {likedQuery.isPending ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color="#087A3F" />
+        </View>
+      ) : likedQuery.isError ? (
+        <ErrorState
+          message={likedQuery.error.message}
+          onRetry={() => void likedQuery.refetch()}
+        />
+      ) : (
+        <FlatList
+          data={posts}
+          keyExtractor={(item) => String(item.postId)}
+          renderItem={({ item }) => (
+            <LikedPostCard
+              item={item}
+              onComments={() => setCommentCourseId(item.courseId)}
+            />
+          )}
+          contentContainerClassName="grow pb-6"
+          ListEmptyComponent={<EmptyState title="좋아요한 글이 없어요" />}
+          onEndReached={() => {
+            if (likedQuery.hasNextPage && !likedQuery.isFetchingNextPage)
+              void likedQuery.fetchNextPage();
+          }}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            likedQuery.isFetchingNextPage ? (
+              <ActivityIndicator color="#087A3F" className="my-4" />
+            ) : null
+          }
+        />
+      )}
       <CourseCommentSheet
-        courseId={commentCourse?.courseId ?? null}
-        onClose={() => setCommentCourse(null)}
+        courseId={commentCourseId}
+        onClose={() => setCommentCourseId(null)}
       />
     </SafeAreaView>
   );

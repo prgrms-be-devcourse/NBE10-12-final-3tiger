@@ -1,133 +1,166 @@
 import { Ionicons } from "@expo/vector-icons";
-import { PostActions } from "@/components/feed/post-actions";
-import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Text } from "@/components/ui/text";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useState } from "react";
-import { FlatList, Image, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, Image, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const POSTS = [
-  {
-    id: "1",
-    courseId: "101",
-    courseName: "성수 서울숲 순환",
-    user: "김산책 할아버지",
-    time: "2시간 전",
-    avatar:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuA5gyewwSk462BPyLv4aUpd6Gu0-57k9gLlQSUlzaJVdzvO04WWCrKT_VLgBNiAvK86rt9rCHCqIrbddBFFW3LS4KUZPPczxbloHqxVWmO-wIajnsYt95Y9GggbLk7KFpZtZs2kYZ-NlKWmaM9bZRBBJFPvXNuWGe9Sw5yG5zQx1jdQPltABOTPAX7D9aBx7gIwo1HptqvoZgAfuWnr4E2aR_2Y8XeCYFL7quxvwlhaVdoJQJQ4ib6itg",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuCQ-xfi1FMqlIjqR4oOIfOxGpSDcrYmdFcnLN8KxrfjSHZBxosM7jZH2SCB-qu22zyp_nXu3c6Yk4AOE6-q9Vv80PthI10oNkU_hv5y_fgnWS1Q2UJBVavXlF8K7Ehzlu2zjebC7nds7b7Qia2lu2K90NfA06nAORAc-0IXNiDOQZRY-008cF5hbaWuucJp4oKl_gr9iKtzd-TfMvjzx3GnRWsK8yr2_CmM_v0muoUQ8qKhVx-P98aA0w",
-    likes: 124,
-    comments: 12,
-    liked: true,
-    text: "오늘 날씨가 너무 좋아서 해피랑 서울숲 한 바퀴 돌았습니다. 산책로가 아주 깨끗하게 정비되어 있어서 걷기 편하네요! 🌳🐕",
-  },
-  {
-    id: "2",
-    courseId: "102",
-    courseName: "한강공원 뚝섬길",
-    user: "유모차마실",
-    time: "4시간 전",
-    avatar:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuD-IZJn35Lx1YHUvr47xi468kAlkqc46dVety-iAqzocpO8cGKcTnvjbLTc-PPJGUolCVWDF56uvwkoUsNnA_NWCmZh0UgNXByBb9U3cp76173InP02AyBwnt8P7MXVAlnfMDH59Iv0hQHJ9htyug7HTdLW-kpXJpnI6NACV31rtFz2rNKq7DyXpGvKWm3X9n13tS333PAAz9UXsRNQgqe2QIDCBD-1Y1MXJU_Wg2Mt86EIjkZKiaFhBw",
-    image:
-      "https://lh3.googleusercontent.com/aida-public/AB6AXuB3cAg1BYFLuIc7ZcUm0zORE2sVZ567hHk1ec1oqA1UzIQ0AmehcjWVcHN2tpeRER-2bjuA4sNLD0kWH7PyJmomD9RrOwnX4akBgY9x_kZDwM_g5c29w160tg1PtDtQUASFdBiqFkm35CRpjI1k7BvoTdzj57TbEZBagqhryfyc1nxHPVSp5o47J5v5YuONPuLbnqJP1xsT-r2QUACznmkY-OXJgYkHQOtVkt4G8tBlH66zXwgLsS2Knw",
-    likes: 89,
-    comments: 5,
-    liked: false,
-    text: "새로 생긴 공원 길, 경사도 없고 바닥이 매끄러워서 유모차 끌기 정말 좋아요. 아이도 신나하네요. 추천합니다! 👶🌸",
-  },
-];
+import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
+import { getPosts, likePost, unlikePost } from "@/api/post-api";
+import { CourseCommentSheet } from "@/components/comments/course-comment-sheet";
+import { PostActions } from "@/components/feed/post-actions";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { EmptyState, ErrorState } from "@/components/ui/data-state";
+import { Text } from "@/components/ui/text";
+import type { Post as PostType } from "@/types/domain";
 
-type PostItem = (typeof POSTS)[number];
+function formatTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const minutes = Math.max(
+    0,
+    Math.floor((Date.now() - date.getTime()) / 60_000),
+  );
+  if (minutes < 60) return `${minutes}분 전`;
+  if (minutes < 1_440) return `${Math.floor(minutes / 60)}시간 전`;
+  return date.toLocaleDateString("ko-KR");
+}
 
 function IconButton({
   label,
   icon,
   onPress,
-  compact = false,
 }: {
   label: string;
   icon: React.ComponentProps<typeof Ionicons>["name"];
   onPress?: () => void;
-  compact?: boolean;
 }) {
   return (
     <Button
       variant="ghost"
       size="icon"
       accessibilityLabel={label}
-      className={`${compact ? "h-8 w-8" : "h-11 w-11"} rounded-full active:bg-[#E9F5EC]`}
+      className="h-11 w-11 rounded-full active:bg-[#E9F5EC]"
       onPress={onPress}
     >
-      <Ionicons name={icon} size={compact ? 18 : 23} color="#087A3F" />
+      <Ionicons name={icon} size={23} color="#087A3F" />
     </Button>
   );
 }
 
-function Post({
+function FeedPost({
   item,
   onOpenComments,
 }: {
-  item: PostItem;
+  item: PostType;
   onOpenComments: () => void;
 }) {
-  const [liked, setLiked] = useState(item.liked);
-  const [bookmarked, setBookmarked] = useState(false);
+  const queryClient = useQueryClient();
+  const [liked, setLiked] = useState(item.isLiked ?? false);
+  const [likeCount, setLikeCount] = useState(item.likeCount);
+  const [bookmarked, setBookmarked] = useState(item.isBookmarked ?? false);
   const [expanded, setExpanded] = useState(false);
-  const likeCount = item.likes + (liked === item.liked ? 0 : liked ? 1 : -1);
+  useEffect(() => {
+    setLiked(item.isLiked ?? false);
+    setLikeCount(item.likeCount);
+    setBookmarked(item.isBookmarked ?? false);
+  }, [item]);
+
+  const likeMutation = useMutation({
+    mutationFn: () => (liked ? unlikePost(item.postId) : likePost(item.postId)),
+    onMutate: () => {
+      setLiked((value) => !value);
+      setLikeCount((count) => count + (liked ? -1 : 1));
+    },
+    onError: () => {
+      setLiked((value) => !value);
+      setLikeCount((count) => count + (liked ? 1 : -1));
+    },
+    onSettled: () =>
+      void queryClient.invalidateQueries({ queryKey: ["posts"] }),
+  });
+  const bookmarkMutation = useMutation({
+    mutationFn: () =>
+      bookmarked
+        ? unbookmarkCourse(item.courseId)
+        : bookmarkCourse(item.courseId),
+    onMutate: () => setBookmarked((value) => !value),
+    onError: () => setBookmarked((value) => !value),
+    onSettled: () =>
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
+  });
 
   return (
     <View className="w-full bg-white">
       <View className="min-h-[52px] flex-row items-center gap-2 px-3 py-2">
         <Avatar
-          alt={`${item.user} 프로필`}
+          alt={`${item.nickname ?? "사용자"} 프로필`}
           className="h-8 w-8 border border-[#E4EAE5]"
         >
-          <AvatarImage source={{ uri: item.avatar }} />
+          {item.profileImageUrl && (
+            <AvatarImage source={{ uri: item.profileImageUrl }} />
+          )}
           <AvatarFallback className="bg-[#E9F5EC]">
             <Text className="text-xs font-bold text-[#087A3F]">
-              {item.user.slice(0, 1)}
+              {(item.nickname ?? "산").slice(0, 1)}
             </Text>
           </AvatarFallback>
         </Avatar>
         <View className="flex-1">
           <Text className="text-[13px] font-semibold leading-4 text-[#191C1D]">
-            {item.user}
+            {item.nickname ?? "산책러"}
           </Text>
-          <Text className="text-[10px] text-[#6B756D]">{item.time}</Text>
+          <Text className="text-[10px] text-[#6B756D]">
+            {formatTime(item.walkedAt)}
+          </Text>
         </View>
-        <IconButton label="게시글 메뉴" icon="ellipsis-vertical" compact />
+        <Button
+          variant="ghost"
+          size="icon"
+          accessibilityLabel="게시글 메뉴"
+          className="h-8 w-8 rounded-full"
+        >
+          <Ionicons name="ellipsis-vertical" size={18} color="#087A3F" />
+        </Button>
       </View>
-
-      <Image
-        source={{ uri: item.image }}
-        className="h-64 w-full bg-[#E6E8E9]"
-        resizeMode="cover"
-      />
-
+      {item.photoUrl ? (
+        <Image
+          source={{ uri: item.photoUrl }}
+          className="h-64 w-full bg-[#E6E8E9]"
+          resizeMode="cover"
+        />
+      ) : (
+        <View className="h-52 items-center justify-center bg-muted">
+          <Ionicons name="image-outline" size={34} color="#94A09A" />
+        </View>
+      )}
       <PostActions
         liked={liked}
         likeCount={likeCount}
-        commentCount={item.comments}
-        onToggleLike={() => setLiked((value) => !value)}
+        commentCount={item.commentCount ?? 0}
+        onToggleLike={() => {
+          if (!likeMutation.isPending) likeMutation.mutate();
+        }}
         onOpenComments={onOpenComments}
         bookmarked={bookmarked}
-        onToggleBookmark={() => setBookmarked((value) => !value)}
+        onToggleBookmark={() => {
+          if (!bookmarkMutation.isPending) bookmarkMutation.mutate();
+        }}
       />
-
       <View className="flex-row items-end px-3 pb-4">
         <Text
           className="flex-1 text-[13px] leading-5 text-[#252A26]"
           numberOfLines={expanded ? undefined : 1}
         >
           <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
-            {item.user}{" "}
+            {item.nickname ?? "산책러"}{" "}
           </Text>
-          {item.text}
+          {item.caption}
         </Text>
         {!expanded && (
           <Button
@@ -145,7 +178,19 @@ function Post({
 }
 
 export default function CommunityScreen() {
-  const [commentCourse, setCommentCourse] = useState<PostItem | null>(null);
+  const [commentCourseId, setCommentCourseId] = useState<number | null>(null);
+  const postsQuery = useInfiniteQuery({
+    queryKey: ["posts", "latest"],
+    queryFn: ({ pageParam }) =>
+      getPosts({ page: pageParam, size: 20, sort: "latest" }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) =>
+      (lastPage.page + 1) * lastPage.size < lastPage.totalElements
+        ? lastPage.page + 1
+        : undefined,
+  });
+  const posts = postsQuery.data?.pages.flatMap((page) => page.content) ?? [];
+
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-3">
@@ -169,19 +214,43 @@ export default function CommunityScreen() {
           <IconButton label="알림" icon="notifications-outline" />
         </View>
       </View>
-      <FlatList
-        data={POSTS}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <Post item={item} onOpenComments={() => setCommentCourse(item)} />
-        )}
-        showsVerticalScrollIndicator={false}
-        contentContainerClassName="pb-6"
-        onEndReachedThreshold={0.6}
-      />
+      {postsQuery.isPending ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator color="#087A3F" />
+        </View>
+      ) : postsQuery.isError ? (
+        <ErrorState
+          message={postsQuery.error.message}
+          onRetry={() => void postsQuery.refetch()}
+        />
+      ) : (
+        <FlatList
+          data={posts}
+          keyExtractor={(item) => String(item.postId)}
+          renderItem={({ item }) => (
+            <FeedPost
+              item={item}
+              onOpenComments={() => setCommentCourseId(item.courseId)}
+            />
+          )}
+          showsVerticalScrollIndicator={false}
+          contentContainerClassName="grow pb-6"
+          ListEmptyComponent={<EmptyState title="아직 공유된 산책이 없어요" />}
+          onEndReached={() => {
+            if (postsQuery.hasNextPage && !postsQuery.isFetchingNextPage)
+              void postsQuery.fetchNextPage();
+          }}
+          onEndReachedThreshold={0.6}
+          ListFooterComponent={
+            postsQuery.isFetchingNextPage ? (
+              <ActivityIndicator color="#087A3F" className="my-4" />
+            ) : null
+          }
+        />
+      )}
       <CourseCommentSheet
-        courseId={commentCourse?.courseId ?? null}
-        onClose={() => setCommentCourse(null)}
+        courseId={commentCourseId}
+        onClose={() => setCommentCourseId(null)}
       />
     </SafeAreaView>
   );

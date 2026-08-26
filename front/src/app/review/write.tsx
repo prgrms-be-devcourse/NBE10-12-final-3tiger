@@ -1,34 +1,67 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Button } from "@/components/ui/button";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  Alert,
+  FlatList,
   Image,
+  Modal,
   Pressable,
   ScrollView,
-  Text,
   TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import { getMyBookmarks } from "@/api/course-api";
+import { createPost, getPhotoUploadUrl, uploadPostPhoto } from "@/api/post-api";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/data-state";
+import { Text } from "@/components/ui/text";
+import type { Course } from "@/types/domain";
+
 export default function WritePostScreen() {
-  const [image, setImage] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [asset, setAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [caption, setCaption] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [courseSheetOpen, setCourseSheetOpen] = useState(false);
+  const coursesQuery = useQuery({
+    queryKey: ["bookmarks", "post-picker"],
+    queryFn: () => getMyBookmarks({ page: 0, size: 50 }),
+  });
+  const submitMutation = useMutation({
+    mutationFn: async () => {
+      if (!asset || !selectedCourse)
+        throw new Error("사진과 코스를 선택해 주세요.");
+      const fileName = asset.fileName ?? `walk-${Date.now()}.jpg`;
+      const contentType = asset.mimeType ?? "image/jpeg";
+      const upload = await getPhotoUploadUrl(fileName, contentType);
+      const blob = await fetch(asset.uri).then((response) => response.blob());
+      await uploadPostPhoto(upload.uploadUrl, blob, contentType);
+      return createPost({
+        courseId: selectedCourse.courseId,
+        caption: caption.trim(),
+        photoUri: upload.photoUri,
+        walkedAt: new Date().toISOString(),
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["posts"] });
+      router.back();
+    },
+  });
   const pick = async () => {
-    const r = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.8,
       allowsEditing: true,
       aspect: [1, 1],
     });
-    if (!r.canceled) setImage(r.assets[0].uri);
+    if (!result.canceled) setAsset(result.assets[0]);
   };
-  const submit = () => {
-    Alert.alert("등록 완료", "게시글이 등록되었습니다.", [
-      { text: "확인", onPress: () => router.back() },
-    ]);
-  };
+  const canSubmit = Boolean(asset && selectedCourse && caption.trim());
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={["top"]}>
       <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
@@ -46,9 +79,12 @@ export default function WritePostScreen() {
           variant="ghost"
           size="sm"
           className="h-11 min-w-11 px-1"
-          onPress={submit}
+          disabled={!canSubmit || submitMutation.isPending}
+          onPress={() => submitMutation.mutate()}
         >
-          <Text className="text-[14px] font-semibold text-[#006E2F]">등록</Text>
+          <Text className="text-[14px] font-semibold text-[#006E2F]">
+            {submitMutation.isPending ? "등록 중" : "등록"}
+          </Text>
         </Button>
       </View>
       <ScrollView
@@ -57,10 +93,10 @@ export default function WritePostScreen() {
       >
         <Pressable
           className="h-[300px] items-center justify-center overflow-hidden rounded-xl border border-dashed border-[#BCCBB9] bg-white"
-          onPress={pick}
+          onPress={() => void pick()}
         >
-          {image ? (
-            <Image source={{ uri: image }} className="h-full w-full" />
+          {asset ? (
+            <Image source={{ uri: asset.uri }} className="h-full w-full" />
           ) : (
             <>
               <View className="h-[58px] w-[58px] items-center justify-center rounded-full bg-[#DDF8E5]">
@@ -75,46 +111,83 @@ export default function WritePostScreen() {
             </>
           )}
         </Pressable>
-        <Pressable className="min-h-[76px] flex-row items-center gap-3 rounded-xl bg-white p-3.5 shadow-sm">
+        <Pressable
+          className="min-h-[76px] flex-row items-center gap-3 rounded-xl bg-white p-3.5 shadow-sm"
+          onPress={() => setCourseSheetOpen(true)}
+        >
           <View className="h-11 w-11 items-center justify-center rounded-[14px] bg-[#DDF8E5]">
             <Ionicons name="map" size={23} color="#006E2F" />
           </View>
           <View className="flex-1">
             <Text className="mb-1 text-sm font-extrabold text-slate-900">
-              코스 선택하기
+              {selectedCourse?.name ?? "코스 선택하기"}
             </Text>
             <Text className="text-xs text-slate-500">
-              어떤 산책로를 다녀오셨나요?
+              {selectedCourse
+                ? `${(selectedCourse.distanceM / 1000).toFixed(1)}km`
+                : "저장한 코스 중 다녀온 곳을 선택하세요"}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={22} color="#64748B" />
         </Pressable>
-        <View className="flex-row gap-2.5">
-          {[
-            ["산책 날짜", "calendar-outline", "2024년 5월 12일"],
-            ["소요 시간", "time-outline", "45분"],
-          ].map(([label, icon, value]) => (
-            <View className="flex-1" key={label}>
-              <Text className="mb-2 text-sm font-extrabold text-slate-900">
-                {label}
-              </Text>
-              <View className="h-[52px] flex-row items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-3">
-                <Ionicons name={icon as any} size={20} color="#006E2F" />
-                <Text>{value}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
         <Text className="text-sm font-extrabold text-slate-900">
           산책 이야기
         </Text>
         <TextInput
+          value={caption}
+          onChangeText={setCaption}
           className="h-[120px] rounded-xl border border-slate-200 bg-white p-3.5"
           multiline
           placeholder="오늘의 산책은 어땠나요?"
           textAlignVertical="top"
         />
+        {submitMutation.isError && (
+          <Text className="text-sm text-destructive">
+            {submitMutation.error.message}
+          </Text>
+        )}
       </ScrollView>
+      <Modal
+        visible={courseSheetOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setCourseSheetOpen(false)}
+      >
+        <Pressable
+          className="flex-1 justify-end bg-black/40"
+          onPress={() => setCourseSheetOpen(false)}
+        >
+          <Pressable
+            className="h-[60%] rounded-t-[28px] bg-white p-5 pt-2.5"
+            onPress={(event) => event.stopPropagation()}
+          >
+            <View className="mb-4 h-[5px] w-[42px] self-center rounded-full bg-slate-300" />
+            <Text className="mb-4 text-xl font-black">코스 선택</Text>
+            <FlatList
+              data={coursesQuery.data?.content ?? []}
+              keyExtractor={(item) => String(item.courseId)}
+              ListEmptyComponent={<EmptyState title="저장한 코스가 없어요" />}
+              renderItem={({ item }) => (
+                <Pressable
+                  className="flex-row items-center border-b border-border py-4"
+                  onPress={() => {
+                    setSelectedCourse(item);
+                    setCourseSheetOpen(false);
+                  }}
+                >
+                  <View className="flex-1">
+                    <Text className="font-bold">{item.name}</Text>
+                    <Text className="mt-1 text-xs text-muted-foreground">
+                      {(item.distanceM / 1000).toFixed(1)}km
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#64748B" />
+                </Pressable>
+              )}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
