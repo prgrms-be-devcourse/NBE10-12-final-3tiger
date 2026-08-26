@@ -4,8 +4,10 @@ import com.back.global.api.ApiResponse;
 import com.back.global.error.ApiException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -30,7 +32,11 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.from(errorCode));
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ExceptionHandler({
+            MethodArgumentNotValidException.class,
+            HandlerMethodValidationException.class,
+            MissingServletRequestParameterException.class
+    })
     public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException() {
         ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
 
