@@ -7,6 +7,7 @@ import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.SecurityConfig;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -31,7 +32,9 @@ class CourseControllerTest {
     @MockitoBean CourseService courseService;
     @MockitoBean JwtProvider jwtProvider;
 
-    @Test void returnsCourseDetailWithGeoJsonPath() throws Exception {
+    @Test
+    @DisplayName("코스 상세 조회 시 경로를 GeoJSON LineString 형식으로 반환한다")
+    void returnsCourseDetailWithGeoJsonPath() throws Exception {
         var detail = new CourseService.CourseDetail(
                 101L,
                 "성수 서울숲 순환",
@@ -62,7 +65,9 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.data.isBookmarked").value(true));
     }
 
-    @Test void returnsCourseList() throws Exception {
+    @Test
+    @DisplayName("지역 코드로 코스 목록을 조회하면 페이징된 코스 정보를 반환한다")
+    void returnsCourseList() throws Exception {
         var item = new CourseService.CourseItem(
                 101L,
                 "성수 서울숲 순환",
@@ -98,7 +103,9 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.data.totalElements").value(37));
     }
 
-    @Test void acceptsCoordSearch() throws Exception {
+    @Test
+    @DisplayName("위도, 경도, 반경을 모두 입력하면 좌표 기반 코스 검색을 허용한다")
+    void acceptsCoordSearch() throws Exception {
         given(courseService.search(any())).willReturn(new PageResponse<>(List.of(), 0, 20, 0L));
 
         mvc.perform(get("/api/v1/courses")
@@ -110,14 +117,18 @@ class CourseControllerTest {
                 .andExpect(status().isOk());
     }
 
-    @Test void rejectsWhenNoSearchCriteria() throws Exception {
+    @Test
+    @DisplayName("지역 코드와 좌표가 모두 없으면 코스 검색 요청을 거부한다")
+    void rejectsWhenNoSearchCriteria() throws Exception {
         mvc.perform(get("/api/v1/courses").with(authenticatedAs(1L)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.resultCode").value("400-1"))
                 .andExpect(jsonPath("$.message").value("검색 조건(regionCode 또는 좌표)이 필요합니다."));
     }
 
-    @Test void rejectsWhenBothRegionAndCoord() throws Exception {
+    @Test
+    @DisplayName("지역 코드와 좌표 검색 조건을 함께 입력하면 요청을 거부한다")
+    void rejectsWhenBothRegionAndCoord() throws Exception {
         mvc.perform(get("/api/v1/courses")
                         .param("regionCode", "11500")
                         .param("lat", "37.5")
@@ -128,7 +139,9 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.message").value("regionCode와 좌표 검색은 함께 사용할 수 없습니다."));
     }
 
-    @Test void rejectsWhenPartialCoord() throws Exception {
+    @Test
+    @DisplayName("좌표 검색에 필요한 위도, 경도, 반경 중 일부가 없으면 요청을 거부한다")
+    void rejectsWhenPartialCoord() throws Exception {
         mvc.perform(get("/api/v1/courses")
                         .param("lat", "37.5")
                         .param("lng", "127.0")
@@ -137,7 +150,9 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.message").value("좌표 검색은 lat, lng, radiusM이 모두 필요합니다."));
     }
 
-    @Test void rejectsDistanceSortWithoutCoord() throws Exception {
+    @Test
+    @DisplayName("좌표 검색이 아닌 경우 거리순 정렬 요청을 거부한다")
+    void rejectsDistanceSortWithoutCoord() throws Exception {
         mvc.perform(get("/api/v1/courses")
                         .param("regionCode", "11500")
                         .param("sort", "distance")
@@ -146,7 +161,9 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.message").value("distance 정렬은 좌표 검색에서만 사용할 수 있습니다."));
     }
 
-    @Test void clampsSizeToHundred() throws Exception {
+    @Test
+    @DisplayName("코스 목록 크기가 100을 초과하면 최대 100으로 제한한다")
+    void clampsSizeToHundred() throws Exception {
         given(courseService.search(any())).willReturn(new PageResponse<>(List.of(), 0, 100, 0L));
 
         mvc.perform(get("/api/v1/courses")

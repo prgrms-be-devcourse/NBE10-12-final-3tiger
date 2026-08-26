@@ -7,6 +7,7 @@ import com.back.global.exception.GlobalExceptionHandler;
 import com.back.region.controller.RegionController;
 import com.back.region.service.RegionService;
 import com.back.global.jwt.JwtProvider;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -28,7 +29,9 @@ class RegionControllerTest {
     @MockitoBean RegionService regionService;
     @MockitoBean JwtProvider jwtProvider;
 
-    @Test void returnsRegionList() throws Exception {
+    @Test
+    @DisplayName("지역 목록 조회 시 중심 좌표와 코스 개수를 반환한다")
+    void returnsRegionList() throws Exception {
         given(regionService.list()).willReturn(List.of(
                 new RegionService.RegionItem("11500", "강서구", 37.5509, 126.8495, 15),
                 new RegionService.RegionItem("11470", "양천구", 37.5169, 126.8664, 15)
@@ -46,6 +49,7 @@ class RegionControllerTest {
     }
 
     @Test
+    @DisplayName("인증하지 않은 사용자도 지역 목록을 조회할 수 있다")
     void allowsAnonymousRegionList() throws Exception {
         given(regionService.list()).willReturn(List.of(
                 new RegionService.RegionItem(
