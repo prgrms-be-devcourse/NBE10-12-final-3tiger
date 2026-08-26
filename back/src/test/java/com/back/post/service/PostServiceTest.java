@@ -1,6 +1,7 @@
 package com.back.post.service;
 
 import com.back.comment.repository.CommentRepository;
+import com.back.comment.repository.CommentUpvoteRepository;
 import com.back.course.domain.Course;
 import com.back.course.repository.CourseRepository;
 import com.back.global.api.PageResponse;
@@ -29,9 +30,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class PostServiceTest {
@@ -41,6 +45,7 @@ class PostServiceTest {
     @Mock CourseRepository courses;
     @Mock PostLikeRepository postLikes;
     @Mock CommentRepository comments;
+    @Mock CommentUpvoteRepository commentUpvotes;
     @Mock PhotoStorage storage;
     @InjectMocks PostService postService;
 
@@ -61,6 +66,13 @@ class PostServiceTest {
                 "https://example.com/walk.jpg", LocalDateTime.of(2026, 8, 26, 9, 0));
         ReflectionTestUtils.setField(post, "id", id);
         return post;
+    }
+
+    private CommentRepository.PostCommentCount commentCount(Long postId, long count) {
+        var result = mock(CommentRepository.PostCommentCount.class);
+        given(result.getPostId()).willReturn(postId);
+        given(result.getCommentCount()).willReturn(count);
+        return result;
     }
 
     @Test
@@ -113,9 +125,10 @@ class PostServiceTest {
     void feed() {
         Post post = post(10L, user(2L), course(1L));
         post.increaseLikeCount();
+        var commentCount = commentCount(10L, 3L);
         given(posts.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of(post)));
-        given(postLikes.existsByPost_IdAndUser_Id(10L, 1L)).willReturn(true);
-        given(comments.countByPost_Id(10L)).willReturn(3L);
+        given(postLikes.findLikedPostIds(eq(1L), any())).willReturn(List.of(10L));
+        given(comments.countByPostIds(any())).willReturn(List.of(commentCount));
 
         PageResponse<PostService.FeedItem> result = postService.feed(1L, null, "latest", 0, 20);
 
@@ -136,7 +149,7 @@ class PostServiceTest {
         PostService.FeedItem item = postService.feed(null, null, "latest", 0, 20).content().getFirst();
 
         assertThat(item.isLiked()).isFalse();
-        verify(postLikes, never()).existsByPost_IdAndUser_Id(any(), any());
+        verify(postLikes, never()).findLikedPostIds(any(), any());
     }
 
     @Test
@@ -147,7 +160,11 @@ class PostServiceTest {
 
         postService.delete(1L, 10L);
 
-        verify(posts).delete(post);
+        var deletionOrder = inOrder(commentUpvotes, comments, postLikes, posts);
+        deletionOrder.verify(commentUpvotes).deleteAllByPostId(10L);
+        deletionOrder.verify(comments).deleteAllByPostId(10L);
+        deletionOrder.verify(postLikes).deleteAllByPostId(10L);
+        deletionOrder.verify(posts).delete(post);
     }
 
     @Test
@@ -159,6 +176,9 @@ class PostServiceTest {
         ApiException exception = catchThrowableOfType(() -> postService.delete(1L, 10L), ApiException.class);
 
         assertThat(exception.status()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(commentUpvotes, never()).deleteAllByPostId(any());
+        verify(comments, never()).deleteAllByPostId(any());
+        verify(postLikes, never()).deleteAllByPostId(any());
         verify(posts, never()).delete(any());
     }
 }

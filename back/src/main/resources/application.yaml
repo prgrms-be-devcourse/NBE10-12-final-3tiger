@@ -24,6 +24,7 @@ app:
     refresh-token-expiry: 1209600  # 14일
   storage:
     public-base-url: http://localhost:8080/local-uploads
+    local-directory: build/local-uploads
 
 springdoc:
   swagger-ui:
