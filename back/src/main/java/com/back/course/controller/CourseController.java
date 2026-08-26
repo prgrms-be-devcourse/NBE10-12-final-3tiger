@@ -6,6 +6,8 @@ import com.back.global.api.ApiResponse;
 import com.back.global.api.PageResponse;
 import com.back.global.auth.CurrentUserId;
 import com.back.global.error.ApiException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +20,7 @@ import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/v1/courses")
+@Tag(name = "Course", description = "산책 코스 발굴·검색 및 상세 조회 API")
 public class CourseController {
 
     private static final int MAX_PAGE_SIZE = 100;
@@ -29,6 +32,13 @@ public class CourseController {
     }
 
     @GetMapping("/{courseId}")
+    @Operation(
+            summary = "코스 상세 정보 조회",
+            description = """
+                    코스 ID로 경로, 거리, 예상 소요 시간, 고도, 점수 및 추천 정보를 조회합니다.
+                    인증 정보는 선택 사항이며, 로그인한 경우 해당 사용자의 북마크 여부를 함께 반환합니다.
+                    """
+    )
     ApiResponse<CourseService.CourseDetail> detail(
             @PathVariable Long courseId,
             @CurrentUserId(required = false) Long userId,
@@ -39,6 +49,13 @@ public class CourseController {
     }
 
     @GetMapping
+    @Operation(
+            summary = "코스 발굴·검색",
+            description = """
+                    지역 코드 또는 현재 위치의 좌표와 반경을 기준으로 산책 코스를 검색합니다.
+                    지역 코드 검색과 좌표 검색 중 하나만 사용할 수 있으며, 동행자·거리·순환 여부 필터와 정렬 및 페이징을 지원합니다.
+                    """
+    )
     ApiResponse<PageResponse<CourseService.CourseItem>> list(
             @RequestParam(required = false) String regionCode,
             @RequestParam(required = false) Double lat,

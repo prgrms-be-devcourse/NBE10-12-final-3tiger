@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.util.List;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,6 +38,7 @@ class GridRepositoryIntegrationTest {
     }
 
     @Test
+    @DisplayName("bbox 내부와 경계에 중심점이 위치한 그리드만 조회한다")
     void findsOnlyGridsWhoseCentroidIsInsideOrOnBboxBoundary() {
         List<GridOverlayProjection> grids = gridRepository.findAllByCentroidIn(
                 126.800,
