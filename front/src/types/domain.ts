@@ -39,7 +39,7 @@ export type Post = {
   postId: number;
   courseId: number;
   nickname?: string;
-  caption: string;
+  content: string;
   photoUrl?: string;
   likeCount: number;
   commentCount?: number;

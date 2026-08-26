@@ -24,7 +24,7 @@ import type { Course } from "@/types/domain";
 export default function WritePostScreen() {
   const queryClient = useQueryClient();
   const [asset, setAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
-  const [caption, setCaption] = useState("");
+  const [content, setContent] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [courseSheetOpen, setCourseSheetOpen] = useState(false);
   const coursesQuery = useQuery({
@@ -42,8 +42,8 @@ export default function WritePostScreen() {
       await uploadPostPhoto(upload.uploadUrl, blob, contentType);
       return createPost({
         courseId: selectedCourse.courseId,
-        caption: caption.trim(),
-        photoUri: upload.photoUri,
+        content: content.trim(),
+        photoUrl: upload.photoUrl,
         walkedAt: new Date().toISOString(),
       });
     },
@@ -61,7 +61,7 @@ export default function WritePostScreen() {
     });
     if (!result.canceled) setAsset(result.assets[0]);
   };
-  const canSubmit = Boolean(asset && selectedCourse && caption.trim());
+  const canSubmit = Boolean(asset && selectedCourse && content.trim());
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={["top"]}>
       <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
@@ -134,8 +134,8 @@ export default function WritePostScreen() {
           산책 이야기
         </Text>
         <TextInput
-          value={caption}
-          onChangeText={setCaption}
+          value={content}
+          onChangeText={setContent}
           className="h-[120px] rounded-xl border border-slate-200 bg-white p-3.5"
           multiline
           placeholder="오늘의 산책은 어땠나요?"

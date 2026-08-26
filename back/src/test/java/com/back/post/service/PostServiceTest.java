@@ -130,7 +130,7 @@ class PostServiceTest {
         given(postLikes.findLikedPostIds(eq(1L), any())).willReturn(List.of(10L));
         given(comments.countByPostIds(any())).willReturn(List.of(commentCount));
 
-        PageResponse<PostService.FeedItem> result = postService.feed(1L, null, "latest", 0, 20);
+        PageResponse<PostService.FeedItem> result = postService.feed(1L, "latest", 0, 20);
 
         PostService.FeedItem item = result.content().getFirst();
         assertThat(item.content()).isEqualTo("좋은 산책이었습니다.");
@@ -145,7 +145,7 @@ class PostServiceTest {
         Post post = post(10L, user(2L), course(1L));
         given(posts.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of(post)));
 
-        PostService.FeedItem item = postService.feed(null, null, "latest", 0, 20).content().getFirst();
+        PostService.FeedItem item = postService.feed(null, "latest", 0, 20).content().getFirst();
 
         assertThat(item.isLiked()).isFalse();
         verify(postLikes, never()).findLikedPostIds(any(), any());

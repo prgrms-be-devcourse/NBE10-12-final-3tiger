@@ -90,7 +90,7 @@ function LikedPostCard({
       <View className="px-5 pb-5">
         <Text className="text-[15px] leading-[22px] text-slate-900">
           <Text className="font-black">{item.nickname ?? "산책러"} </Text>
-          {item.caption}
+          {item.content}
         </Text>
       </View>
     </View>

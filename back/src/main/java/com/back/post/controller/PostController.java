@@ -18,10 +18,9 @@ public class PostController {
 
     @GetMapping
     ApiResponse<PageResponse<PostService.FeedItem>> feed(@CurrentUserId(required = false) Long userId,
-            @RequestParam(required = false) String regionCode,
             @RequestParam(defaultValue = "latest") String sort, @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("피드 조회 성공", service.feed(userId, regionCode, sort, page, size));
+        return ApiResponse.ok("피드 조회 성공", service.feed(userId, sort, page, size));
     }
     @GetMapping("/me")
     ApiResponse<PageResponse<PostService.MyPostItem>> mine(@CurrentUserId Long userId,

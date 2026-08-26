@@ -160,7 +160,7 @@ function FeedPost({
           <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
             {item.nickname ?? "산책러"}{" "}
           </Text>
-          {item.caption}
+          {item.content}
         </Text>
         {!expanded && (
           <Button

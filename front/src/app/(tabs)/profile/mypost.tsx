@@ -97,7 +97,7 @@ function PostDetailSheet({
                 </View>
               </View>
               <Text className="mt-5 text-[15px] leading-6 text-[#2D3931]">
-                {post.caption}
+                {post.content}
               </Text>
               <Separator className="my-5 bg-[#E6EBE7]" />
               <View className="flex-row items-center gap-6">

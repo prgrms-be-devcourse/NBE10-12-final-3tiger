@@ -27,10 +27,10 @@ public class PostService {
         this.posts = posts; this.users = users; this.courses = courses;
         this.postLikes = postLikes; this.comments = comments; this.storage = storage;
     }
-    public PageResponse<FeedItem> feed(Long userId, String regionCode, String sort, int page, int size) {
+    public PageResponse<FeedItem> feed(Long userId, String sort, int page, int size) {
         Sort sorting = "popularity".equalsIgnoreCase(sort) ? Sort.by(Sort.Direction.DESC, "likeCount", "createdAt") : Sort.by(Sort.Direction.DESC, "createdAt");
         Pageable pageable = PageRequest.of(page, size, sorting);
-        Page<Post> found = regionCode == null || regionCode.isBlank() ? posts.findAll(pageable) : posts.findByCourseRegionCode(regionCode, pageable);
+        Page<Post> found = posts.findAll(pageable);
         return PageResponse.from(found.map(post -> toFeedItem(post, userId)));
     }
     public PageResponse<MyPostItem> mine(Long userId, int page, int size) {

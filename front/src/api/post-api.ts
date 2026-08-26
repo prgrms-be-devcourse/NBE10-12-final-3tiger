@@ -4,7 +4,7 @@ import type { PageParams, PageResponse } from "@/types/api";
 import type { Post } from "@/types/domain";
 
 export const getPosts = (
-  params: PageParams & { regionCode?: string; sort?: "latest" | "popularity" },
+  params: PageParams & { sort?: "latest" | "popularity" },
 ) => apiRequest<PageResponse<Post>>({ url: "/api/v1/posts", params });
 export const getMyPosts = (params: PageParams) =>
   apiRequest<PageResponse<Post>>({ url: "/api/v1/posts/me", params });
@@ -23,7 +23,7 @@ export const unlikePost = (postId: number) =>
 export const deletePost = (postId: number) =>
   apiRequest<null>({ url: `/api/v1/posts/${postId}`, method: "DELETE" });
 export const getPhotoUploadUrl = (fileName: string, contentType: string) =>
-  apiRequest<{ uploadUrl: string; photoUri: string; expireInSeconds: number }>({
+  apiRequest<{ uploadUrl: string; photoUrl: string; expireInSeconds: number }>({
     url: "/api/v1/posts/photo-upload-url",
     method: "POST",
     data: { fileName, contentType },
@@ -35,8 +35,8 @@ export const uploadPostPhoto = (
 ) => axios.put(uploadUrl, body, { headers: { "Content-Type": contentType } });
 export const createPost = (data: {
   courseId: number;
-  caption: string;
-  photoUri: string;
+  content: string;
+  photoUrl?: string;
   walkedAt: string;
 }) =>
   apiRequest<{ postId: number }>({
