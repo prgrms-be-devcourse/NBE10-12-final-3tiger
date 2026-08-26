@@ -5,6 +5,7 @@ import com.back.global.api.PageResponse;
 import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.SecurityConfig;
 import com.back.global.config.WebConfig;
+import com.back.global.jwt.JwtProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +39,9 @@ class CommentControllerTest {
 
     @MockitoBean
     private CommentService commentService;
+
+    @MockitoBean
+    private JwtProvider jwtProvider;
 
     @Test
     @DisplayName("t1: GET /api/v1/posts/{postId}/comments 요청 시 200과 페이징 응답을 반환한다")
