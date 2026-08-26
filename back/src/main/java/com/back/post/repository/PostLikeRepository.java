@@ -15,7 +15,7 @@ import java.util.List;
 
 public interface PostLikeRepository extends JpaRepository<PostLike, PostLikeId> {
     boolean existsByPost_IdAndUser_Id(Long postId, Long userId);
-    void deleteByPost_IdAndUser_Id(Long postId, Long userId);
+    int deleteByPost_IdAndUser_Id(Long postId, Long userId);
 
     @EntityGraph(attributePaths = {"post", "post.user", "post.course"})
     Page<PostLike> findByUser_IdOrderByCreatedAtDesc(Long userId, Pageable pageable);
