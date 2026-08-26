@@ -53,11 +53,10 @@ public class AuthService {
         String jti = claims.getId();
         String redisKey = "RT:" + userId + ":" + jti;
 
-        if (Boolean.FALSE.equals(redisTemplate.hasKey(redisKey))) {
+        if (!Boolean.TRUE.equals(redisTemplate.delete(redisKey))) {
             throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
-        redisTemplate.delete(redisKey);
         return issueTokens(userId);
     }
 
