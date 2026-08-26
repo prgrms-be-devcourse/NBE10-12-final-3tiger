@@ -118,16 +118,6 @@ export default function LoginScreen() {
               {loginMutation.isPending ? "로그인 중..." : "로그인"}
             </Text>
           </Button>
-          <Button
-            variant="outline"
-            className="mt-3 h-14 rounded-xl border-[#087A3F] bg-white"
-            onPress={() => router.push("/(auth)/signup" as never)}
-          >
-            <Text className="text-base font-black text-[#087A3F]">
-              회원가입
-            </Text>
-          </Button>
-
           <View className="my-6 flex-row items-center gap-2.5">
             <View className="h-px flex-1 bg-[#D7DED8]" />
             <Text className="text-xs text-[#7B867E]">
@@ -149,6 +139,20 @@ export default function LoginScreen() {
           >
             <Text className="font-extrabold">G　Google로 시작하기</Text>
           </Button>
+          <View className="mt-5 flex-row justify-center">
+            <Text className="text-[13px] text-slate-500">
+              아직 계정이 없으신가요?{" "}
+            </Text>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="회원가입"
+              onPress={() => router.push("/(auth)/signup" as never)}
+            >
+              <Text className="text-[13px] font-extrabold text-[#006E2F]">
+                회원가입
+              </Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
