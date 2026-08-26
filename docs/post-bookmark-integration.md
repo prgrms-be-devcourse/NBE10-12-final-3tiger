@@ -1,4 +1,4 @@
-# POST / BOOKMARK 임시 연동 안내
+# POST / BOOKMARK 연동 안내
 
 ## 현재 구현 결정
 
@@ -7,22 +7,18 @@
 - 게시물 사진은 `share_post.photo_url`에 완성된 URL을 저장한다.
 - 사진 업로드 URL 발급은 `PhotoStorage` 인터페이스 뒤에 로컬 구현을 두었다. S3/R2 연동 시 구현체만 교체한다.
 
-## 팀 코드 병합 시 교체할 임시 요소
+## 현재 연동 상태
 
 ### 인증
 
-현재 인증 API가 없으므로 `app.auth.allow-dev-user=true`일 때 인증 헤더가 없는 요청은
-`app.auth.dev-user-id`(기본값 1)의 임시 사용자로 처리한다. 다른 사용자를 시험할 때만
-`X-User-Id` 헤더를 사용한다. 로컬 H2 실행 시 ID 1 사용자와 임시 코스도 자동 생성된다.
-
-운영 설정에서는 반드시 `app.auth.allow-dev-user=false`로 변경해야 한다. JWT가 병합되면
-`CurrentUserIdResolver`가 SecurityContext의 인증 사용자 ID를 반환하도록 교체하고
-`SecurityConfig`의 `permitAll` 설정을 실제 접근 정책으로 변경해야 한다.
+인증이 필요한 요청은 `Authorization: Bearer <access-token>`을 사용한다.
+JWT 필터가 검증한 사용자 ID를 SecurityContext에 저장하고 `CurrentUserIdResolver`가 이를 사용한다.
+`X-User-Id` 헤더와 개발용 기본 사용자는 더 이상 지원하지 않는다.
 
 ### User / Course
 
-POST와 BOOKMARK의 FK 및 테스트를 위해 최소 필드만 가진 임시 `User`, `Course` 엔티티를 추가했다.
-팀원의 정식 엔티티가 병합되면 패키지 import와 조회 Repository를 정식 도메인에 맞게 변경해야 한다.
+POST와 BOOKMARK는 정식 `User`, `Course` 엔티티를 참조한다. `Course`의 PK는 실제 스키마의
+`course_id` 컬럼에 매핑한다.
 
 ### 사진 저장소
 
@@ -31,5 +27,8 @@ POST와 BOOKMARK의 FK 및 테스트를 위해 최소 필드만 가진 임시 `U
 
 ## 요청 호환성
 
-게시물 작성 요청의 공식 필드는 `photoUrl`이다. 기존 명세의 `photoUri`도 `@JsonAlias`로 임시 허용한다.
+게시물 작성 요청의 사진 필드는 `photoUrl`이다.
 내 게시글 API에는 명세에 빠진 `page`, `size` 파라미터를 다른 목록 API와 동일한 기본값(0, 20)으로 지원한다.
+
+게시물 작성 요청은 `title`, `content`를 사용한다. 기존 DB의 `caption` 컬럼은 내용 저장 컬럼으로
+유지하며 `post-title-migration.sql`이 `title` 컬럼을 추가한다.

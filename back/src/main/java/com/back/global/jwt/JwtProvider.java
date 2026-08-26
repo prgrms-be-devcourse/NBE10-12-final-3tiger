@@ -14,6 +14,10 @@ import java.util.UUID;
 @Component
 public class JwtProvider {
 
+    private static final String TOKEN_TYPE_CLAIM = "token_type";
+    private static final String ACCESS_TOKEN = "access";
+    private static final String REFRESH_TOKEN = "refresh";
+
     private final SecretKey key;
     private final long accessTokenExpiry;
     private final long refreshTokenExpiry;
@@ -28,6 +32,7 @@ public class JwtProvider {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(userId))
+                .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(accessTokenExpiry)))
                 .signWith(key)
@@ -38,6 +43,7 @@ public class JwtProvider {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(userId))
+                .claim(TOKEN_TYPE_CLAIM, REFRESH_TOKEN)
                 .id(UUID.randomUUID().toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(refreshTokenExpiry)))
@@ -55,6 +61,14 @@ public class JwtProvider {
 
     public Long getUserId(String token) {
         return Long.valueOf(parseToken(token).getSubject());
+    }
+
+    public Long getAccessTokenUserId(String token) {
+        Claims claims = parseToken(token);
+        if (!ACCESS_TOKEN.equals(claims.get(TOKEN_TYPE_CLAIM, String.class))) {
+            throw new IllegalArgumentException("액세스 토큰이 아닙니다.");
+        }
+        return Long.valueOf(claims.getSubject());
     }
 
     public String getJti(String token) {

@@ -33,8 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = {
         "app.jwt.secret=dGVzdC1zZWNyZXQtdmFsdWUtZm9yLWp3dC10ZXN0aW5nLW9ubHktMjAyNCEh",
         "app.jwt.access-token-expiry=1800",
-        "app.jwt.refresh-token-expiry=1209600",
-        "app.auth.allow-dev-user=false"
+        "app.jwt.refresh-token-expiry=1209600"
 })
 class AuthControllerTest {
 

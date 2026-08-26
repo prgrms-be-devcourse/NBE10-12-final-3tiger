@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static com.back.TestAuthentication.authenticatedAs;
 
 @WebMvcTest(CommentController.class)
 @Import({SecurityConfig.class, WebConfig.class, CurrentUserIdResolver.class})
@@ -63,7 +64,7 @@ class CommentControllerTest {
 
         // when & then
         mockMvc.perform(post("/api/v1/posts/{postId}/comments", 1L)
-                        .header("X-User-Id", "1")
+                        .with(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"좋은 코스네요\"}"))
                 .andExpect(status().isOk())
@@ -75,7 +76,7 @@ class CommentControllerTest {
     void t3() throws Exception {
         // when & then
         mockMvc.perform(post("/api/v1/posts/{postId}/comments", 1L)
-                        .header("X-User-Id", "1")
+                        .with(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"\"}"))
                 .andExpect(status().isBadRequest());
@@ -88,7 +89,7 @@ class CommentControllerTest {
         given(commentService.toggleUpvote(1L, 1L)).willReturn(new CommentService.UpvoteResult(true, 3));
 
         // when & then
-        mockMvc.perform(post("/api/v1/comments/{commentId}/upvote", 1L).header("X-User-Id", "1"))
+        mockMvc.perform(post("/api/v1/comments/{commentId}/upvote", 1L).with(authenticatedAs(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.upvoted").value(true))
                 .andExpect(jsonPath("$.data.upvoteCount").value(3));
@@ -98,7 +99,7 @@ class CommentControllerTest {
     @DisplayName("t5: DELETE /api/v1/comments/{commentId} 요청 시 200을 반환한다")
     void t5() throws Exception {
         // when & then
-        mockMvc.perform(delete("/api/v1/comments/{commentId}", 1L).header("X-User-Id", "1"))
+        mockMvc.perform(delete("/api/v1/comments/{commentId}", 1L).with(authenticatedAs(1L)))
                 .andExpect(status().isOk());
     }
 }

@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
@@ -32,7 +31,7 @@ public class CourseController {
     @GetMapping("/{courseId}")
     ApiResponse<CourseService.CourseDetail> detail(
             @PathVariable Long courseId,
-            @RequestHeader(value = "X-User-Id", required = false) Long userId,
+            @CurrentUserId(required = false) Long userId,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime at
     ) {
@@ -41,7 +40,6 @@ public class CourseController {
 
     @GetMapping
     ApiResponse<PageResponse<CourseService.CourseItem>> list(
-            @CurrentUserId Long userId,
             @RequestParam(required = false) String regionCode,
             @RequestParam(required = false) Double lat,
             @RequestParam(required = false) Double lng,

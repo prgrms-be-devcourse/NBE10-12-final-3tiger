@@ -4,9 +4,9 @@ import com.back.global.api.*;
 import com.back.global.auth.CurrentUserId;
 import com.back.post.service.PostService;
 import com.back.post.storage.PhotoStorage;
-import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 
@@ -17,10 +17,11 @@ public class PostController {
     public PostController(PostService service) { this.service = service; }
 
     @GetMapping
-    ApiResponse<PageResponse<PostService.FeedItem>> feed(@RequestParam(required = false) String regionCode,
+    ApiResponse<PageResponse<PostService.FeedItem>> feed(@CurrentUserId(required = false) Long userId,
+            @RequestParam(required = false) String regionCode,
             @RequestParam(defaultValue = "latest") String sort, @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("피드 조회 성공", service.feed(regionCode, sort, page, size));
+        return ApiResponse.ok("피드 조회 성공", service.feed(userId, regionCode, sort, page, size));
     }
     @GetMapping("/me")
     ApiResponse<PageResponse<PostService.MyPostItem>> mine(@CurrentUserId Long userId,
@@ -33,7 +34,7 @@ public class PostController {
     }
     @PostMapping
     ApiResponse<PostService.CreatedPost> create(@CurrentUserId Long userId, @Valid @RequestBody CreateRequest request) {
-        var command = new PostService.CreateCommand(request.courseId(), request.caption(), request.photoUrl(), request.walkedAt());
+        var command = new PostService.CreateCommand(request.courseId(), request.title(), request.content(), request.photoUrl(), request.walkedAt());
         return ApiResponse.ok("게시물이 등록되었습니다.", service.create(userId, command));
     }
     @DeleteMapping("/{postId}")
@@ -44,8 +45,9 @@ public class PostController {
 
     record UploadRequest(@NotBlank(message = "파일명은 필수입니다.") String fileName,
                          @Pattern(regexp = "image/(jpeg|png|webp)", message = "지원하지 않는 이미지 형식입니다.") String contentType) {}
-    record CreateRequest(@NotNull(message = "코스 ID는 필수입니다.") Long courseId,
-                         @NotBlank(message = "내용은 필수입니다.") @Size(max = 1000, message = "내용은 1000자 이하여야 합니다.") String caption,
-                         @JsonAlias("photoUri") @Size(max = 2048, message = "사진 URL이 너무 깁니다.") String photoUrl,
-                         @NotNull(message = "산책 시각은 필수입니다.") LocalDateTime walkedAt) {}
+    record CreateRequest(@Schema(example = "1") @NotNull(message = "코스 ID는 필수입니다.") Long courseId,
+                         @Schema(example = "서울숲 산책 기록") @NotBlank(message = "제목은 필수입니다.") @Size(max = 200, message = "제목은 200자 이하여야 합니다.") String title,
+                         @Schema(example = "날씨가 좋아서 즐겁게 걸었습니다.") @NotBlank(message = "내용은 필수입니다.") @Size(max = 1000, message = "내용은 1000자 이하여야 합니다.") String content,
+                         @Schema(example = "https://example.com/walk.jpg") @Size(max = 2048, message = "사진 URL이 너무 깁니다.") String photoUrl,
+                         @Schema(example = "2026-08-26T09:50:00") @NotNull(message = "산책 시각은 필수입니다.") LocalDateTime walkedAt) {}
 }

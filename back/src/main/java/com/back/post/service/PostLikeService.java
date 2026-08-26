@@ -1,6 +1,7 @@
 package com.back.post.service;
 
 import com.back.global.api.PageResponse;
+import com.back.comment.repository.CommentRepository;
 import com.back.global.error.ApiException;
 import com.back.post.domain.Post;
 import com.back.post.domain.PostLike;
@@ -20,8 +21,9 @@ import java.time.LocalDateTime;
 @Transactional(readOnly = true)
 public class PostLikeService {
     private final PostRepository posts; private final UserRepository users; private final PostLikeRepository postLikes;
-    public PostLikeService(PostRepository posts, UserRepository users, PostLikeRepository postLikes) {
-        this.posts = posts; this.users = users; this.postLikes = postLikes;
+    private final CommentRepository comments;
+    public PostLikeService(PostRepository posts, UserRepository users, PostLikeRepository postLikes, CommentRepository comments) {
+        this.posts = posts; this.users = users; this.postLikes = postLikes; this.comments = comments;
     }
 
     @Transactional
@@ -57,10 +59,11 @@ public class PostLikeService {
 
     private LikedPostItem toLikedPostItem(PostLike postLike) {
         Post post = postLike.getPost();
-        return new LikedPostItem(post.getId(), post.getCourse().getId(), post.getUser().getNickname(), post.getCaption(),
-                post.getPhotoUrl(), post.getLikeCount(), postLike.getCreatedAt());
+        return new LikedPostItem(post.getId(), post.getCourse().getId(), post.getUser().getNickname(), post.getTitle(), post.getContent(),
+                post.getPhotoUrl(), post.getLikeCount(), comments.countByPost_Id(post.getId()), postLike.getCreatedAt());
     }
 
     public record LikeResult(boolean isLiked, int likeCount) {}
-    public record LikedPostItem(Long postId, Long courseId, String nickname, String caption, String photoUrl, int likeCount, LocalDateTime likedAt) {}
+    public record LikedPostItem(Long postId, Long courseId, String nickname, String title, String content, String photoUrl,
+                                int likeCount, long commentCount, LocalDateTime likedAt) {}
 }
