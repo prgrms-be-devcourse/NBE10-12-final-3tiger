@@ -17,6 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -64,14 +67,25 @@ public class PostLikeService {
     }
 
     public PageResponse<LikedPostItem> myLikes(Long userId, int page, int size) {
-        return PageResponse.from(postLikes.findByUser_IdOrderByCreatedAtDesc(userId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
-                .map(this::toLikedPostItem));
+        var found = postLikes.findByUser_IdOrderByCreatedAtDesc(userId,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+        List<Long> postIds = found.getContent().stream()
+                .map(postLike -> postLike.getPost().getId())
+                .toList();
+        Map<Long, Long> commentCounts = postIds.isEmpty()
+                ? Map.of()
+                : comments.countByPostIds(postIds).stream()
+                    .collect(Collectors.toMap(
+                        CommentRepository.PostCommentCount::getPostId,
+                        CommentRepository.PostCommentCount::getCommentCount));
+        return PageResponse.from(found.map(postLike -> toLikedPostItem(postLike, commentCounts)));
     }
 
-    private LikedPostItem toLikedPostItem(PostLike postLike) {
+    private LikedPostItem toLikedPostItem(PostLike postLike, Map<Long, Long> commentCounts) {
         Post post = postLike.getPost();
         return new LikedPostItem(post.getId(), post.getCourse().getId(), post.getUser().getNickname(), post.getContent(),
-                post.getPhotoUrl(), post.getLikeCount(), comments.countByPost_Id(post.getId()), postLike.getCreatedAt());
+                post.getPhotoUrl(), post.getLikeCount(),
+                commentCounts.getOrDefault(post.getId(), 0L), postLike.getCreatedAt());
     }
 
     public record LikeResult(boolean isLiked, int likeCount) {}

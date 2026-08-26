@@ -141,7 +141,7 @@ class BackApplicationTests {
     void concurrentSameUserLikesAreIdempotent() throws Exception {
         Post post = posts.save(new Post(
                 users.findById(userId).orElseThrow(), courses.findById(courseId).orElseThrow(),
-                "동시성 테스트", "같은 유저 동시 좋아요", null, LocalDateTime.now()
+                "동시성 테스트", null, LocalDateTime.now()
         ));
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
