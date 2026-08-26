@@ -24,16 +24,6 @@ public class AuthService {
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate redisTemplate;
 
-    @Transactional
-    public AuthResponse signup(String email, String password, String nickname) {
-        if (userRepository.existsByEmail(email)) {
-            throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
-        }
-        User user = userRepository.save(
-                User.createLocal(email, passwordEncoder.encode(password), nickname)
-        );
-        return issueTokens(user.getId());
-    }
 
     @Transactional(readOnly = true)
     public AuthResponse login(String email, String password) {
