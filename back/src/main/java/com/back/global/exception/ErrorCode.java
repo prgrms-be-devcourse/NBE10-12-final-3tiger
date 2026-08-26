@@ -33,6 +33,12 @@ public enum ErrorCode {
             HttpStatus.UNAUTHORIZED,
             "AUTH_401_1",
             "이메일 또는 비밀번호가 올바르지 않습니다."
+    ),
+
+    INVALID_REFRESH_TOKEN(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH_401_2",
+            "유효하지 않거나 만료된 리프레시 토큰입니다."
     );
 
     private final HttpStatus status;

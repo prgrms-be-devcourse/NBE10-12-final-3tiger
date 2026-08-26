@@ -75,6 +75,14 @@ public class JwtProvider {
         return parseToken(token).getId();
     }
 
+    public Claims parseRefreshToken(String token) {
+        Claims claims = parseToken(token);
+        if (!REFRESH_TOKEN.equals(claims.get(TOKEN_TYPE_CLAIM, String.class))) {
+            throw new IllegalArgumentException("리프레시 토큰이 아닙니다.");
+        }
+        return claims;
+    }
+
     public long getRefreshTokenExpiry() {
         return refreshTokenExpiry;
     }
