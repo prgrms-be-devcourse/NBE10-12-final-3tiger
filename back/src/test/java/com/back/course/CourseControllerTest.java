@@ -21,12 +21,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static com.back.TestAuthentication.authenticatedAs;
 
 @WebMvcTest(CourseController.class)
 @Import({CurrentUserIdResolver.class, SecurityConfig.class, GlobalExceptionHandler.class})
-@TestPropertySource(properties = {
-        "app.auth.allow-dev-user=false"
-})
 class CourseControllerTest {
 
     @Autowired MockMvc mvc;
@@ -54,7 +52,7 @@ class CourseControllerTest {
         );
         given(courseService.getDetail(101L, 1L, null)).willReturn(detail);
 
-        mvc.perform(get("/api/v1/courses/101").header("X-User-Id", "1"))
+        mvc.perform(get("/api/v1/courses/101").with(authenticatedAs(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("코스 상세 조회 성공"))
                 .andExpect(jsonPath("$.data.path.type").value("LineString"))
@@ -78,7 +76,7 @@ class CourseControllerTest {
         var page = new PageResponse<>(List.of(item), 0, 20, 37L);
         given(courseService.search(any())).willReturn(page);
 
-        mvc.perform(get("/api/v1/courses").param("regionCode", "11500").header("X-User-Id", "1"))
+        mvc.perform(get("/api/v1/courses").param("regionCode", "11500").with(authenticatedAs(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-1"))
                 .andExpect(jsonPath("$.message").value("코스 목록 조회 성공"))
@@ -107,12 +105,12 @@ class CourseControllerTest {
                         .param("lng", "127.0")
                         .param("radiusM", "1000")
                         .param("persona", "dog")
-                        .header("X-User-Id", "1"))
+                        .with(authenticatedAs(1L)))
                 .andExpect(status().isOk());
     }
 
     @Test void rejectsWhenNoSearchCriteria() throws Exception {
-        mvc.perform(get("/api/v1/courses").header("X-User-Id", "1"))
+        mvc.perform(get("/api/v1/courses").with(authenticatedAs(1L)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.resultCode").value("400-1"))
                 .andExpect(jsonPath("$.message").value("검색 조건(regionCode 또는 좌표)이 필요합니다."));
@@ -124,7 +122,7 @@ class CourseControllerTest {
                         .param("lat", "37.5")
                         .param("lng", "127.0")
                         .param("radiusM", "1000")
-                        .header("X-User-Id", "1"))
+                        .with(authenticatedAs(1L)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("regionCode와 좌표 검색은 함께 사용할 수 없습니다."));
     }
@@ -133,7 +131,7 @@ class CourseControllerTest {
         mvc.perform(get("/api/v1/courses")
                         .param("lat", "37.5")
                         .param("lng", "127.0")
-                        .header("X-User-Id", "1"))
+                        .with(authenticatedAs(1L)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("좌표 검색은 lat, lng, radiusM이 모두 필요합니다."));
     }
@@ -142,7 +140,7 @@ class CourseControllerTest {
         mvc.perform(get("/api/v1/courses")
                         .param("regionCode", "11500")
                         .param("sort", "distance")
-                        .header("X-User-Id", "1"))
+                        .with(authenticatedAs(1L)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("distance 정렬은 좌표 검색에서만 사용할 수 있습니다."));
     }
@@ -158,7 +156,7 @@ class CourseControllerTest {
         mvc.perform(get("/api/v1/courses")
                         .param("regionCode", "11500")
                         .param("size", "500")
-                        .header("X-User-Id", "1"))
+                        .with(authenticatedAs(1L)))
                 .andExpect(status().isOk());
         org.mockito.ArgumentCaptor<CourseService.CourseSearchQuery> captor =
                 org.mockito.ArgumentCaptor.forClass(CourseService.CourseSearchQuery.class);

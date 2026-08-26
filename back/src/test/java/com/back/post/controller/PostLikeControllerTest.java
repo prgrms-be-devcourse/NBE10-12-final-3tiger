@@ -16,6 +16,7 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static com.back.TestAuthentication.authenticatedAs;
 
 @WebMvcTest(PostLikeController.class)
 @Import({SecurityConfig.class, WebConfig.class, CurrentUserIdResolver.class})
@@ -34,7 +35,7 @@ class PostLikeControllerTest {
         given(postLikeService.like(1L, 1L)).willReturn(new PostLikeService.LikeResult(true, 5));
 
         // when & then
-        mockMvc.perform(put("/api/v1/posts/{postId}/likes", 1L).header("X-User-Id", "1"))
+        mockMvc.perform(put("/api/v1/posts/{postId}/likes", 1L).with(authenticatedAs(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.isLiked").value(true))
                 .andExpect(jsonPath("$.data.likeCount").value(5));

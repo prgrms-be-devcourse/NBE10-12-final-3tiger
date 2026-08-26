@@ -17,8 +17,7 @@ import org.testcontainers.utility.DockerImageName;
 
 @Testcontainers
 @SpringBootTest(properties = {
-        "spring.jpa.hibernate.ddl-auto=none",
-        "app.auth.allow-dev-user=false"
+        "spring.jpa.hibernate.ddl-auto=none"
 })
 @ActiveProfiles("test")
 @Sql("/grid/grid-score-test-data.sql")

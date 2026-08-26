@@ -9,6 +9,7 @@ spring:
       ddl-auto: create-drop
 
 app:
-  auth:
-    allow-dev-user: true
-    dev-user-id: 1
+  jwt:
+    secret: dGVzdC1zZWNyZXQtdmFsdWUtZm9yLWp3dC10ZXN0aW5nLW9ubHktMjAyNCEh
+    access-token-expiry: 1800
+    refresh-token-expiry: 1209600

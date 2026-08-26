@@ -21,9 +21,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(RegionController.class)
 @Import({CurrentUserIdResolver.class, SecurityConfig.class, GlobalExceptionHandler.class})
-@TestPropertySource(properties = {
-        "app.auth.allow-dev-user=false"
-})
 class RegionControllerTest {
 
     @Autowired MockMvc mvc;
@@ -35,7 +32,7 @@ class RegionControllerTest {
                 new RegionService.RegionItem("11470", "양천구", 37.5169, 126.8664, 15)
         ));
 
-        mvc.perform(get("/api/v1/regions").header("X-User-Id", "1"))
+        mvc.perform(get("/api/v1/regions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.resultCode").value("200-1"))
                 .andExpect(jsonPath("$.message").value("지역 목록 조회 성공"))
