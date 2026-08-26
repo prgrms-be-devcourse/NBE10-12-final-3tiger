@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -16,7 +16,12 @@ import {
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { getCourseDetail, getCourses } from "@/api/course-api";
+import {
+  bookmarkCourse,
+  getCourseDetail,
+  getCourses,
+  unbookmarkCourse,
+} from "@/api/course-api";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
@@ -28,6 +33,7 @@ import {
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
 
 export default function CourseScreen() {
+  const queryClient = useQueryClient();
   const [coords, setCoords] = useState(DEFAULT_COORDS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(true);
@@ -78,6 +84,23 @@ export default function CourseScreen() {
     enabled: selectedId !== null,
   });
   const detail = detailQuery.data;
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  useEffect(() => {
+    setIsBookmarked(detail?.isBookmarked ?? false);
+  }, [detail?.isBookmarked, selectedId]);
+  const bookmarkMutation = useMutation({
+    mutationFn: () =>
+      isBookmarked
+        ? unbookmarkCourse(selectedId!)
+        : bookmarkCourse(selectedId!),
+    onMutate: () => setIsBookmarked((value) => !value),
+    onError: () => setIsBookmarked((value) => !value),
+    onSuccess: (result) => setIsBookmarked(result.isBookmarked),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["course", selectedId] });
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+    },
+  });
   const route = useMemo(() => {
     const path = detail?.path;
     const values = Array.isArray(path) ? path : path?.coordinates;
@@ -190,9 +213,14 @@ export default function CourseScreen() {
                 size="icon"
                 accessibilityLabel="코스 저장"
                 className="rounded-2xl"
+                disabled={bookmarkMutation.isPending}
+                onPress={() => {
+                  if (selectedId !== null && !bookmarkMutation.isPending)
+                    bookmarkMutation.mutate();
+                }}
               >
                 <Ionicons
-                  name={detail.myFavorite ? "bookmark" : "bookmark-outline"}
+                  name={isBookmarked ? "bookmark" : "bookmark-outline"}
                   size={23}
                   color="#087A3F"
                 />

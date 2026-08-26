@@ -30,6 +30,7 @@ export type Course = {
   surfaceTempC?: number;
   personaBadges?: string[];
   myFavorite?: boolean;
+  isBookmarked?: boolean;
   imageUrl?: string;
   summary?: string;
   bookmarkedAt?: string;

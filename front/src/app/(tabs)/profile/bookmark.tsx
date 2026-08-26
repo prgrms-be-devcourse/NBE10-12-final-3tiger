@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, usePathname } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { getCourseDetail, getMyBookmarks } from "@/api/course-api";
+import { getCourseDetail, getMyBookmarks, unbookmarkCourse } from "@/api/course-api";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
@@ -31,6 +31,7 @@ const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1000";
 
 export default function ProfileBookmarkScreen() {
+  const queryClient = useQueryClient();
   const pathname = usePathname();
   const isTabRoot = pathname === "/bookmark";
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -60,6 +61,28 @@ export default function ProfileBookmarkScreen() {
   });
   const courses =
     bookmarksQuery.data?.pages.flatMap((page) => page.content) ?? [];
+  const removeBookmarkMutation = useMutation({
+    mutationFn: (courseId: number) => unbookmarkCourse(courseId),
+    onSuccess: (_result, courseId) => {
+      queryClient.setQueryData<{
+        pages: Array<{ content: Course[]; totalElements: number }>;
+        pageParams: unknown[];
+      }>(["bookmarks"], (data) => {
+        if (!data) return data;
+        return {
+          ...data,
+          pages: data.pages.map((page) => ({
+            ...page,
+            content: page.content.filter((course) => course.courseId !== courseId),
+            totalElements: page.totalElements -
+              (page.content.some((course) => course.courseId === courseId) ? 1 : 0),
+          })),
+        };
+      });
+    },
+    onSettled: () =>
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks"], refetchType: "all" }),
+  });
   const selected = detailQuery.data;
   useEffect(() => {
     if (selectedId === null) return;
@@ -124,6 +147,8 @@ export default function ProfileBookmarkScreen() {
             <CourseCard
               item={item}
               onPress={() => setSelectedId(item.courseId)}
+              onToggleBookmark={() => removeBookmarkMutation.mutate(item.courseId)}
+              bookmarkPending={removeBookmarkMutation.isPending && removeBookmarkMutation.variables === item.courseId}
             />
           )}
           onEndReached={() => {
@@ -220,7 +245,17 @@ export default function ProfileBookmarkScreen() {
   );
 }
 
-function CourseCard({ item, onPress }: { item: Course; onPress: () => void }) {
+function CourseCard({
+  item,
+  onPress,
+  onToggleBookmark,
+  bookmarkPending,
+}: {
+  item: Course;
+  onPress: () => void;
+  onToggleBookmark: () => void;
+  bookmarkPending: boolean;
+}) {
   return (
     <Pressable className="w-full" onPress={onPress}>
       <View>
@@ -229,9 +264,19 @@ function CourseCard({ item, onPress }: { item: Course; onPress: () => void }) {
           className="h-40 w-full rounded-2xl bg-slate-200"
           resizeMode="cover"
         />
-        <View className="absolute right-[9px] top-[9px] h-[34px] w-[34px] items-center justify-center rounded-full bg-white/85">
+        <Button
+          variant="ghost"
+          size="icon"
+          accessibilityLabel="북마크 취소"
+          className="absolute right-[9px] top-[9px] h-[34px] w-[34px] rounded-full bg-white/85"
+          disabled={bookmarkPending}
+          onPress={(event) => {
+            event.stopPropagation();
+            onToggleBookmark();
+          }}
+        >
           <Ionicons name="bookmark" size={21} color="#006E2F" />
-        </View>
+        </Button>
       </View>
       <View className="mt-3 flex-row items-center gap-2 px-1">
         <Text className="flex-1 text-[17px] font-bold text-[#191C1D]">

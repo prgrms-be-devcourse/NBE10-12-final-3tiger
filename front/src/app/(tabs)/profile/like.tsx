@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Image, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
 import { getMyLikedPosts, likePost, unlikePost } from "@/api/post-api";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
@@ -29,6 +30,7 @@ function LikedPostCard({
   const queryClient = useQueryClient();
   const [liked, setLiked] = useState(item.isLiked ?? true);
   const [likeCount, setLikeCount] = useState(item.likeCount);
+  const [bookmarked, setBookmarked] = useState(item.isBookmarked ?? false);
   const [expanded, setExpanded] = useState(false);
   const mutation = useMutation({
     mutationFn: ({ desiredLiked }: { desiredLiked: boolean }) =>
@@ -76,6 +78,26 @@ function LikedPostCard({
       });
     },
   });
+  const bookmarkMutation = useMutation({
+    mutationFn: ({ desiredBookmarked }: { desiredBookmarked: boolean }) =>
+      desiredBookmarked
+        ? bookmarkCourse(item.courseId)
+        : unbookmarkCourse(item.courseId),
+    onMutate: ({ desiredBookmarked }: { desiredBookmarked: boolean }) => {
+      const previous = bookmarked;
+      setBookmarked(desiredBookmarked);
+      return previous;
+    },
+    onError: (_error, _variables, previous) => {
+      if (previous !== undefined) setBookmarked(previous);
+    },
+    onSuccess: (result) => setBookmarked(result.isBookmarked),
+    onSettled: () =>
+      void queryClient.invalidateQueries({
+        queryKey: ["bookmarks"],
+        refetchType: "all",
+      }),
+  });
   return (
     <View className="bg-white">
       <View className="min-h-[52px] flex-row items-center gap-2 px-3 py-2">
@@ -121,6 +143,11 @@ function LikedPostCard({
             mutation.mutate({ desiredLiked: !liked });
         }}
         onOpenComments={onComments}
+        bookmarked={bookmarked}
+        onToggleBookmark={() => {
+          if (!bookmarkMutation.isPending)
+            bookmarkMutation.mutate({ desiredBookmarked: !bookmarked });
+        }}
       />
       <View className="px-3 pb-4">
         <View className="flex-row items-end">

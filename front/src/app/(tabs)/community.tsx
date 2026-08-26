@@ -115,12 +115,19 @@ function FeedPost({
     },
   });
   const bookmarkMutation = useMutation({
-    mutationFn: () =>
-      bookmarked
-        ? unbookmarkCourse(item.courseId)
-        : bookmarkCourse(item.courseId),
-    onMutate: () => setBookmarked((value) => !value),
-    onError: () => setBookmarked((value) => !value),
+    mutationFn: ({ desiredBookmarked }: { desiredBookmarked: boolean }) =>
+      desiredBookmarked
+        ? bookmarkCourse(item.courseId)
+        : unbookmarkCourse(item.courseId),
+    onMutate: ({ desiredBookmarked }: { desiredBookmarked: boolean }) => {
+      const previous = bookmarked;
+      setBookmarked(desiredBookmarked);
+      return previous;
+    },
+    onError: (_error, _variables, previous) => {
+      if (previous !== undefined) setBookmarked(previous);
+    },
+    onSuccess: (result) => setBookmarked(result.isBookmarked),
     onSettled: () =>
       void queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
   });
@@ -180,7 +187,8 @@ function FeedPost({
         onOpenComments={onOpenComments}
         bookmarked={bookmarked}
         onToggleBookmark={() => {
-          if (!bookmarkMutation.isPending) bookmarkMutation.mutate();
+          if (!bookmarkMutation.isPending)
+            bookmarkMutation.mutate({ desiredBookmarked: !bookmarked });
         }}
       />
       <View className="flex-row items-end px-3 pb-4">
