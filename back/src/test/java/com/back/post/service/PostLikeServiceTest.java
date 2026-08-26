@@ -61,7 +61,7 @@ class PostLikeServiceTest {
         Post post = newPost();
         Long postId = 1L;
         Long userId = 1L;
-        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(postRepository.findByIdForUpdate(postId)).willReturn(Optional.of(post));
         given(postLikeRepository.existsByPost_IdAndUser_Id(postId, userId)).willReturn(false);
         given(userRepository.findById(userId)).willReturn(Optional.of(User.createLocal("test@test.com", "dummy-hash", "산책러")));
 
@@ -82,7 +82,7 @@ class PostLikeServiceTest {
         for (int i = 0; i < 5; i++) post.increaseLikeCount();
         Long postId = 1L;
         Long userId = 1L;
-        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(postRepository.findByIdForUpdate(postId)).willReturn(Optional.of(post));
         given(postLikeRepository.existsByPost_IdAndUser_Id(postId, userId)).willReturn(true);
 
         // when
@@ -101,7 +101,7 @@ class PostLikeServiceTest {
         // given
         Long postId = 999L;
         Long userId = 1L;
-        given(postRepository.findById(postId)).willReturn(Optional.empty());
+        given(postRepository.findByIdForUpdate(postId)).willReturn(Optional.empty());
 
         // when
         ApiException exception = catchThrowableOfType(() -> postLikeService.like(postId, userId), ApiException.class);
@@ -119,7 +119,7 @@ class PostLikeServiceTest {
         for (int i = 0; i < 3; i++) post.increaseLikeCount();
         Long postId = 1L;
         Long userId = 1L;
-        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(postRepository.findByIdForUpdate(postId)).willReturn(Optional.of(post));
         given(postLikeRepository.existsByPost_IdAndUser_Id(postId, userId)).willReturn(true);
 
         // when
@@ -138,7 +138,7 @@ class PostLikeServiceTest {
         Post post = newPost();
         Long postId = 1L;
         Long userId = 1L;
-        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(postRepository.findByIdForUpdate(postId)).willReturn(Optional.of(post));
         given(postLikeRepository.existsByPost_IdAndUser_Id(postId, userId)).willReturn(false);
 
         // when
