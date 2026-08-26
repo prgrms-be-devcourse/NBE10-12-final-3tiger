@@ -1,15 +1,16 @@
 package com.back.region;
 
+import com.back.global.api.PageResponse;
 import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.SecurityConfig;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.region.controller.RegionController;
 import com.back.region.service.RegionService;
+import com.back.global.jwt.JwtProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -25,6 +26,7 @@ class RegionControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean RegionService regionService;
+    @MockitoBean JwtProvider jwtProvider;
 
     @Test void returnsRegionList() throws Exception {
         given(regionService.list()).willReturn(List.of(
@@ -43,8 +45,26 @@ class RegionControllerTest {
                 .andExpect(jsonPath("$.data[0].courseCount").value(15));
     }
 
-    @Test void requiresAuthenticationWhenDevUserDisabled() throws Exception {
+    @Test
+    void allowsAnonymousRegionList() throws Exception {
+        given(regionService.list()).willReturn(List.of(
+                new RegionService.RegionItem(
+                        "11500",
+                        "강서구",
+                        37.5509,
+                        126.8495,
+                        15
+                )
+        ));
+
         mvc.perform(get("/api/v1/regions"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-1"))
+                .andExpect(jsonPath("$.message").value("지역 목록 조회 성공"))
+                                .andExpect(jsonPath("$.data[0].regionCode").value("11500"))
+                                .andExpect(jsonPath("$.data[0].name").value("강서구"))
+                                .andExpect(jsonPath("$.data[0].centerLat").value(37.5509))
+                                .andExpect(jsonPath("$.data[0].centerLng").value(126.8495))
+                                .andExpect(jsonPath("$.data[0].courseCount").value(15));
     }
 }

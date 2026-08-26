@@ -20,7 +20,7 @@ public class RegionController {
     }
 
     @GetMapping
-    ApiResponse<List<RegionService.RegionItem>> list(@CurrentUserId Long userId) {
+    ApiResponse<List<RegionService.RegionItem>> list() {
         return ApiResponse.ok("지역 목록 조회 성공", service.list());
     }
 }
