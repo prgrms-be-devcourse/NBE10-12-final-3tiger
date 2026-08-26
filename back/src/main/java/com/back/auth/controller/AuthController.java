@@ -2,6 +2,7 @@ package com.back.auth.controller;
 
 import com.back.auth.dto.AuthResponse;
 import com.back.auth.dto.LoginRequest;
+import com.back.auth.dto.RefreshRequest;
 import com.back.auth.service.AuthService;
 import com.back.global.api.ApiResponse;
 import jakarta.validation.Valid;
@@ -24,5 +25,11 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request.email(), request.password());
         return ResponseEntity.ok(ApiResponse.ok("로그인이 완료되었습니다.", response));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshRequest request) {
+        AuthResponse response = authService.refresh(request.refreshToken());
+        return ResponseEntity.ok(ApiResponse.ok("토큰이 재발급되었습니다.", response));
     }
 }
