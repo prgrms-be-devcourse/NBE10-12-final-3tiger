@@ -10,9 +10,9 @@ public class Course {
     private Long id;
     @Column(nullable = false, length = 100)
     private String name;
-    @Column(nullable = false)
+    @Column(name = "region_code", nullable = false)
     private String regionCode;
-    @Column(nullable = false)
+    @Column(name = "distance_m", nullable = false)
     private int distanceM;
 
     protected Course() {}
