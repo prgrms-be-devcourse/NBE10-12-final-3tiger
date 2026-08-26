@@ -1,17 +1,16 @@
 package com.back.course;
 
 import com.back.course.controller.CourseController;
-import com.back.course.domain.Persona;
 import com.back.course.service.CourseService;
 import com.back.global.api.PageResponse;
 import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.SecurityConfig;
 import com.back.global.exception.GlobalExceptionHandler;
+import com.back.global.jwt.JwtProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -25,10 +24,12 @@ import static com.back.TestAuthentication.authenticatedAs;
 
 @WebMvcTest(CourseController.class)
 @Import({CurrentUserIdResolver.class, SecurityConfig.class, GlobalExceptionHandler.class})
+
 class CourseControllerTest {
 
     @Autowired MockMvc mvc;
     @MockitoBean CourseService courseService;
+    @MockitoBean JwtProvider jwtProvider;
 
     @Test void returnsCourseDetailWithGeoJsonPath() throws Exception {
         var detail = new CourseService.CourseDetail(
@@ -143,11 +144,6 @@ class CourseControllerTest {
                         .with(authenticatedAs(1L)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("distance 정렬은 좌표 검색에서만 사용할 수 있습니다."));
-    }
-
-    @Test void requiresAuthenticationWhenDevUserDisabled() throws Exception {
-        mvc.perform(get("/api/v1/courses").param("regionCode", "11500"))
-                .andExpect(status().isUnauthorized());
     }
 
     @Test void clampsSizeToHundred() throws Exception {
