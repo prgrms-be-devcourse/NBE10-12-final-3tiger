@@ -5,12 +5,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-
-import jakarta.persistence.LockModeType;
-import java.util.Optional;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
     @Override
@@ -23,7 +20,11 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @EntityGraph(attributePaths = {"user", "course"})
     Page<Post> findByUserId(Long userId, Pageable pageable);
 
-    @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select p from Post p where p.id = :postId")
-    Optional<Post> findByIdForUpdate(@Param("postId") Long postId);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Post p SET p.likeCount = p.likeCount + 1 WHERE p.id = :postId")
+    int increaseLikeCount(@Param("postId") Long postId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Post p SET p.likeCount = p.likeCount - 1 WHERE p.id = :postId AND p.likeCount > 0")
+    int decreaseLikeCount(@Param("postId") Long postId);
 }

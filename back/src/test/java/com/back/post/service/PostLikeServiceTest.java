@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -30,6 +31,7 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -44,6 +46,8 @@ class PostLikeServiceTest {
     private PostLikeRepository postLikeRepository;
     @Mock
     private CommentRepository commentRepository;
+    @Mock
+    private PostLikeWriter postLikeWriter;
 
     @InjectMocks
     private PostLikeService postLikeService;
@@ -61,7 +65,7 @@ class PostLikeServiceTest {
         Post post = newPost();
         Long postId = 1L;
         Long userId = 1L;
-        given(postRepository.findByIdForUpdate(postId)).willReturn(Optional.of(post));
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
         given(postLikeRepository.existsByPost_IdAndUser_Id(postId, userId)).willReturn(false);
         given(userRepository.findById(userId)).willReturn(Optional.of(User.createLocal("test@test.com", "dummy-hash", "산책러")));
 
@@ -71,7 +75,8 @@ class PostLikeServiceTest {
         // then
         assertThat(result.isLiked()).isTrue();
         assertThat(result.likeCount()).isEqualTo(1);
-        verify(postLikeRepository).save(any(PostLike.class));
+        verify(postLikeWriter).trySaveLike(eq(post), any());
+        verify(postRepository).increaseLikeCount(postId);
     }
 
     @Test
@@ -82,7 +87,7 @@ class PostLikeServiceTest {
         for (int i = 0; i < 5; i++) post.increaseLikeCount();
         Long postId = 1L;
         Long userId = 1L;
-        given(postRepository.findByIdForUpdate(postId)).willReturn(Optional.of(post));
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
         given(postLikeRepository.existsByPost_IdAndUser_Id(postId, userId)).willReturn(true);
 
         // when
@@ -91,8 +96,31 @@ class PostLikeServiceTest {
         // then
         assertThat(result.isLiked()).isTrue();
         assertThat(result.likeCount()).isEqualTo(5);
-        verify(postLikeRepository, never()).save(any());
+        verify(postLikeWriter, never()).trySaveLike(any(), any());
         verify(userRepository, never()).findById(any());
+        verify(postRepository, never()).increaseLikeCount(any());
+    }
+
+    @Test
+    @DisplayName("t2b: 동시 요청으로 유니크 제약에 걸리면(DataIntegrityViolationException) 이미 좋아요 상태로 간주하고 likeCount를 그대로 반환한다")
+    void t2b() {
+        // given
+        Post post = newPost();
+        for (int i = 0; i < 5; i++) post.increaseLikeCount();
+        Long postId = 1L;
+        Long userId = 1L;
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(postLikeRepository.existsByPost_IdAndUser_Id(postId, userId)).willReturn(false);
+        given(userRepository.findById(userId)).willReturn(Optional.of(User.createLocal("test@test.com", "dummy-hash", "산책러")));
+        willThrow(new DataIntegrityViolationException("duplicate key")).given(postLikeWriter).trySaveLike(any(), any());
+
+        // when
+        PostLikeService.LikeResult result = postLikeService.like(postId, userId);
+
+        // then
+        assertThat(result.isLiked()).isTrue();
+        assertThat(result.likeCount()).isEqualTo(5);
+        verify(postRepository, never()).increaseLikeCount(any());
     }
 
     @Test
@@ -101,7 +129,7 @@ class PostLikeServiceTest {
         // given
         Long postId = 999L;
         Long userId = 1L;
-        given(postRepository.findByIdForUpdate(postId)).willReturn(Optional.empty());
+        given(postRepository.findById(postId)).willReturn(Optional.empty());
 
         // when
         ApiException exception = catchThrowableOfType(() -> postLikeService.like(postId, userId), ApiException.class);
@@ -119,8 +147,8 @@ class PostLikeServiceTest {
         for (int i = 0; i < 3; i++) post.increaseLikeCount();
         Long postId = 1L;
         Long userId = 1L;
-        given(postRepository.findByIdForUpdate(postId)).willReturn(Optional.of(post));
-        given(postLikeRepository.existsByPost_IdAndUser_Id(postId, userId)).willReturn(true);
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(postLikeRepository.deleteByPost_IdAndUser_Id(postId, userId)).willReturn(1);
 
         // when
         PostLikeService.LikeResult result = postLikeService.unlike(postId, userId);
@@ -128,7 +156,7 @@ class PostLikeServiceTest {
         // then
         assertThat(result.isLiked()).isFalse();
         assertThat(result.likeCount()).isEqualTo(2);
-        verify(postLikeRepository).deleteByPost_IdAndUser_Id(postId, userId);
+        verify(postRepository).decreaseLikeCount(postId);
     }
 
     @Test
@@ -138,8 +166,8 @@ class PostLikeServiceTest {
         Post post = newPost();
         Long postId = 1L;
         Long userId = 1L;
-        given(postRepository.findByIdForUpdate(postId)).willReturn(Optional.of(post));
-        given(postLikeRepository.existsByPost_IdAndUser_Id(postId, userId)).willReturn(false);
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(postLikeRepository.deleteByPost_IdAndUser_Id(postId, userId)).willReturn(0);
 
         // when
         PostLikeService.LikeResult result = postLikeService.unlike(postId, userId);
@@ -147,7 +175,7 @@ class PostLikeServiceTest {
         // then
         assertThat(result.isLiked()).isFalse();
         assertThat(result.likeCount()).isEqualTo(0);
-        verify(postLikeRepository, never()).deleteByPost_IdAndUser_Id(any(), any());
+        verify(postRepository, never()).decreaseLikeCount(any());
     }
 
     @Test

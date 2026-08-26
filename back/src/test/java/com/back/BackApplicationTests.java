@@ -136,4 +136,34 @@ class BackApplicationTests {
         assertTrue(postLikes.existsByPost_IdAndUser_Id(post.getId(), userId));
         assertTrue(postLikes.existsByPost_IdAndUser_Id(post.getId(), secondUserId));
     }
+
+    @Test
+    void concurrentSameUserLikesAreIdempotent() throws Exception {
+        Post post = posts.save(new Post(
+                users.findById(userId).orElseThrow(), courses.findById(courseId).orElseThrow(),
+                "동시성 테스트", "같은 유저 동시 좋아요", null, LocalDateTime.now()
+        ));
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return postLikeService.like(post.getId(), userId);
+            });
+            var second = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return postLikeService.like(post.getId(), userId);
+            });
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+            first.get(10, TimeUnit.SECONDS);
+            second.get(10, TimeUnit.SECONDS);
+        }
+
+        assertEquals(1, posts.findById(post.getId()).orElseThrow().getLikeCount());
+        assertTrue(postLikes.existsByPost_IdAndUser_Id(post.getId(), userId));
+    }
 }
