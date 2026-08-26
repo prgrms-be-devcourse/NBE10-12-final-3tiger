@@ -72,17 +72,47 @@ function FeedPost({
   }, [item]);
 
   const likeMutation = useMutation({
-    mutationFn: () => (liked ? unlikePost(item.postId) : likePost(item.postId)),
-    onMutate: () => {
-      setLiked((value) => !value);
-      setLikeCount((count) => count + (liked ? -1 : 1));
+    mutationFn: ({ desiredLiked }: { desiredLiked: boolean }) =>
+      desiredLiked ? likePost(item.postId) : unlikePost(item.postId),
+    onMutate: ({ desiredLiked }: { desiredLiked: boolean }) => {
+      const previous = { liked, likeCount };
+      setLiked(desiredLiked);
+      setLikeCount((count) => count + (desiredLiked ? 1 : -1));
+      return previous;
     },
-    onError: () => {
-      setLiked((value) => !value);
-      setLikeCount((count) => count + (liked ? 1 : -1));
+    onError: (_error, _variables, context) => {
+      if (!context) return;
+      setLiked(context.liked);
+      setLikeCount(context.likeCount);
     },
-    onSettled: () =>
-      void queryClient.invalidateQueries({ queryKey: ["posts"] }),
+    onSuccess: (result) => {
+      setLiked(result.isLiked);
+      setLikeCount(result.likeCount);
+      if (!result.isLiked) {
+        queryClient.setQueriesData<{
+          pages: Array<{ content: PostType[] }>;
+          pageParams: unknown[];
+        }>({ queryKey: ["liked-posts"] }, (data) => {
+          if (!data) return data;
+          return {
+            ...data,
+            pages: data.pages.map((page) => ({
+              ...page,
+              content: page.content.filter(
+                (post) => post.postId !== item.postId,
+              ),
+            })),
+          };
+        });
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["posts"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["liked-posts"],
+        refetchType: "all",
+      });
+    },
   });
   const bookmarkMutation = useMutation({
     mutationFn: () =>
@@ -144,7 +174,8 @@ function FeedPost({
         likeCount={likeCount}
         commentCount={item.commentCount ?? 0}
         onToggleLike={() => {
-          if (!likeMutation.isPending) likeMutation.mutate();
+          if (!likeMutation.isPending)
+            likeMutation.mutate({ desiredLiked: !liked });
         }}
         onOpenComments={onOpenComments}
         bookmarked={bookmarked}

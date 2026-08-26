@@ -2,14 +2,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Animated,
+  Easing,
   FlatList,
   Image,
   Modal,
   Pressable,
   ScrollView,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -17,7 +21,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getMyBookmarks } from "@/api/course-api";
 import { createPost, getPhotoUploadUrl, uploadPostPhoto } from "@/api/post-api";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/data-state";
+import { EmptyState, ErrorState } from "@/components/ui/data-state";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
 import { Text } from "@/components/ui/text";
 import type { Course } from "@/types/domain";
 
@@ -27,6 +35,22 @@ export default function WritePostScreen() {
   const [content, setContent] = useState("");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [courseSheetOpen, setCourseSheetOpen] = useState(false);
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
+  const dismissCourseSheet = () =>
+    dismissBottomSheet(sheetTranslateY, windowHeight, () =>
+      setCourseSheetOpen(false),
+    );
+  useEffect(() => {
+    if (!courseSheetOpen) return;
+    sheetTranslateY.setValue(windowHeight);
+    Animated.timing(sheetTranslateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [courseSheetOpen, sheetTranslateY, windowHeight]);
   const coursesQuery = useQuery({
     queryKey: ["bookmarks", "post-picker"],
     queryFn: () => getMyBookmarks({ page: 0, size: 50 }),
@@ -150,43 +174,85 @@ export default function WritePostScreen() {
       <Modal
         visible={courseSheetOpen}
         transparent
-        animationType="slide"
-        onRequestClose={() => setCourseSheetOpen(false)}
+        animationType="none"
+        onRequestClose={dismissCourseSheet}
       >
-        <Pressable
-          className="flex-1 justify-end bg-black/40"
-          onPress={() => setCourseSheetOpen(false)}
-        >
+        <View className="flex-1 justify-end">
           <Pressable
-            className="h-[60%] rounded-t-[28px] bg-white p-5 pt-2.5"
-            onPress={(event) => event.stopPropagation()}
+            className="absolute inset-0 bg-black/40"
+            onPress={dismissCourseSheet}
           >
-            <View className="mb-4 h-[5px] w-[42px] self-center rounded-full bg-slate-300" />
-            <Text className="mb-4 text-xl font-black">코스 선택</Text>
-            <FlatList
-              data={coursesQuery.data?.content ?? []}
-              keyExtractor={(item) => String(item.courseId)}
-              ListEmptyComponent={<EmptyState title="저장한 코스가 없어요" />}
-              renderItem={({ item }) => (
-                <Pressable
-                  className="flex-row items-center border-b border-border py-4"
-                  onPress={() => {
-                    setSelectedCourse(item);
-                    setCourseSheetOpen(false);
-                  }}
-                >
-                  <View className="flex-1">
-                    <Text className="font-bold">{item.name}</Text>
-                    <Text className="mt-1 text-xs text-muted-foreground">
-                      {(item.distanceM / 1000).toFixed(1)}km
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color="#64748B" />
-                </Pressable>
-              )}
-            />
           </Pressable>
-        </Pressable>
+          <Animated.View
+            className="h-[78%] rounded-t-[30px] bg-background pt-2.5"
+            style={{ transform: [{ translateY: sheetTranslateY }] }}
+          >
+            <BottomSheetHandle
+              onDismiss={() => setCourseSheetOpen(false)}
+              translateY={sheetTranslateY}
+              dismissDistance={windowHeight}
+            />
+            <View className="h-10 items-center justify-center px-5">
+              <Text className="text-[17px] font-black text-foreground">
+                코스 선택
+              </Text>
+            </View>
+            {coursesQuery.isPending ? (
+              <View className="flex-1 items-center justify-center">
+                <ActivityIndicator color="#087A3F" />
+              </View>
+            ) : coursesQuery.isError ? (
+              <ErrorState
+                message={coursesQuery.error.message}
+                onRetry={() => void coursesQuery.refetch()}
+              />
+            ) : (
+              <FlatList
+                className="flex-1"
+                data={coursesQuery.data?.content ?? []}
+                keyExtractor={(item) => String(item.courseId)}
+                contentContainerClassName="grow gap-3 px-5 py-4 pb-8"
+                showsVerticalScrollIndicator
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled"
+                ListEmptyComponent={
+                  <EmptyState
+                    title="저장한 코스가 없어요"
+                    description="먼저 마음에 드는 코스를 저장해 보세요."
+                  />
+                }
+                renderItem={({ item }) => (
+                  <Button
+                    variant="ghost"
+                    accessibilityLabel={`${item.name} 선택`}
+                    className="min-h-[72px] flex-row items-center justify-start gap-3 rounded-2xl border border-[#E5ECE5] bg-white px-4 py-3"
+                    onPress={() => {
+                      setSelectedCourse(item);
+                      dismissCourseSheet();
+                    }}
+                  >
+                    <View className="h-11 w-11 items-center justify-center rounded-xl bg-[#E9F5EC]">
+                      <Ionicons name="map-outline" size={22} color="#087A3F" />
+                    </View>
+                    <View className="flex-1 items-start">
+                      <Text className="text-sm font-black text-foreground">
+                        {item.name}
+                      </Text>
+                      <Text className="mt-1 text-xs text-muted-foreground">
+                        {(item.distanceM / 1000).toFixed(1)}km · 약 {item.estimatedMinutes ?? "-"}분
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name={selectedCourse?.courseId === item.courseId ? "checkmark-circle" : "chevron-forward"}
+                      size={22}
+                      color={selectedCourse?.courseId === item.courseId ? "#087A3F" : "#64748B"}
+                    />
+                  </Button>
+                )}
+              />
+            )}
+          </Animated.View>
+        </View>
       </Modal>
     </SafeAreaView>
   );

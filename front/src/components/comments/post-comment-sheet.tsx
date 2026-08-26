@@ -43,8 +43,12 @@ import type { PostComment } from "@/types/domain";
 function CommentRow({ item }: { item: PostComment }) {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const [upvoted, setUpvoted] = useState(false);
+  const [upvoted, setUpvoted] = useState(item.upvoted ?? false);
   const [upvoteCount, setUpvoteCount] = useState(item.upvoteCount);
+  useEffect(() => {
+    setUpvoted(item.upvoted ?? false);
+    setUpvoteCount(item.upvoteCount);
+  }, [item.upvoted, item.upvoteCount]);
   const scale = useRef(new Animated.Value(1)).current;
   const burst = useRef(new Animated.Value(0)).current;
   const mutation = useMutation({
@@ -52,7 +56,29 @@ function CommentRow({ item }: { item: PostComment }) {
     onSuccess: (result) => {
       setUpvoted(result.upvoted);
       setUpvoteCount(result.upvoteCount);
-      void queryClient.invalidateQueries({ queryKey: ["post-comments"] });
+      // FlatList는 화면 밖의 행을 언마운트할 수 있으므로, 행 내부 state만
+      // 바꾸지 않고 댓글 목록 캐시에도 결과를 기록해 스크롤 후 복원한다.
+      queryClient.setQueriesData<{
+        pages: Array<{ content: PostComment[] }>;
+        pageParams: unknown[];
+      }>({ queryKey: ["post-comments"] }, (data) => {
+        if (!data) return data;
+        return {
+          ...data,
+          pages: data.pages.map((page) => ({
+            ...page,
+            content: page.content.map((comment) =>
+              comment.commentId === item.commentId
+                ? {
+                    ...comment,
+                    upvoted: result.upvoted,
+                    upvoteCount: result.upvoteCount,
+                  }
+                : comment,
+            ),
+          })),
+        };
+      });
     },
   });
   const handleUpvote = () => {

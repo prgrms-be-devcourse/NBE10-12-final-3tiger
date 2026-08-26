@@ -27,21 +27,54 @@ function LikedPostCard({
   onComments: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [liked, setLiked] = useState(true);
+  const [liked, setLiked] = useState(item.isLiked ?? true);
   const [likeCount, setLikeCount] = useState(item.likeCount);
   const [expanded, setExpanded] = useState(false);
   const mutation = useMutation({
-    mutationFn: () => (liked ? unlikePost(item.postId) : likePost(item.postId)),
-    onMutate: () => {
-      setLiked((value) => !value);
-      setLikeCount((count) => count + (liked ? -1 : 1));
+    mutationFn: ({ desiredLiked }: { desiredLiked: boolean }) =>
+      desiredLiked ? likePost(item.postId) : unlikePost(item.postId),
+    onMutate: ({ desiredLiked }: { desiredLiked: boolean }) => {
+      const previous = { liked, likeCount };
+      setLiked(desiredLiked);
+      setLikeCount((count) => count + (desiredLiked ? 1 : -1));
+      return previous;
     },
-    onError: () => {
-      setLiked((value) => !value);
-      setLikeCount((count) => count + (liked ? 1 : -1));
+    onError: (_error, _variables, context) => {
+      if (!context) return;
+      setLiked(context.liked);
+      setLikeCount(context.likeCount);
     },
-    onSettled: () =>
-      void queryClient.invalidateQueries({ queryKey: ["liked-posts"] }),
+    onSuccess: (result) => {
+      setLiked(result.isLiked);
+      setLikeCount(result.likeCount);
+      if (!result.isLiked) {
+        queryClient.setQueriesData<{
+          pages: Array<{ content: Post[] }>;
+          pageParams: unknown[];
+        }>({ queryKey: ["liked-posts"] }, (data) => {
+          if (!data) return data;
+          return {
+            ...data,
+            pages: data.pages.map((page) => ({
+              ...page,
+              content: page.content.filter(
+                (post) => post.postId !== item.postId,
+              ),
+            })),
+          };
+        });
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["liked-posts"],
+        refetchType: "all",
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["posts"],
+        refetchType: "all",
+      });
+    },
   });
   return (
     <View className="bg-white">
@@ -84,7 +117,8 @@ function LikedPostCard({
         likeCount={likeCount}
         commentCount={item.commentCount ?? 0}
         onToggleLike={() => {
-          if (!mutation.isPending) mutation.mutate();
+          if (!mutation.isPending)
+            mutation.mutate({ desiredLiked: !liked });
         }}
         onOpenComments={onComments}
       />

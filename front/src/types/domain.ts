@@ -56,6 +56,8 @@ export type PostComment = {
   nickname: string;
   content: string;
   upvoteCount: number;
+  /** 현재 로그인한 사용자가 공감했는지 여부(백엔드가 제공하는 경우) */
+  upvoted?: boolean;
   createdAt: string;
 };
 
