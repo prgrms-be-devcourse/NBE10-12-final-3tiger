@@ -336,14 +336,12 @@ function CourseCard({
         <Text className="mr-[9px] text-[13px] text-slate-600">
           {(item.distanceM / 1000).toFixed(1)}km
         </Text>
-        {item.estimatedMinutes !== undefined && (
-          <>
-            <Ionicons name="timer-outline" size={17} color="#475569" />
-            <Text className="text-[13px] text-slate-600">
-              {item.estimatedMinutes}분
-            </Text>
-          </>
-        )}
+        <Ionicons name="timer-outline" size={17} color="#475569" />
+        <Text className="text-[13px] text-slate-600">
+          {item.estimatedMinutes ??
+            Math.max(1, Math.round(item.distanceM / 80))}
+          분
+        </Text>
       </View>
     </Pressable>
   );

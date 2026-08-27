@@ -269,6 +269,9 @@ function FeedPost({
             </Button>
           )}
         </View>
+        <Text className="mt-1 text-[10px] text-[#758078]">
+          댓글 {item.commentCount ?? 0}개 모두 보기
+        </Text>
       </View>
     </View>
   );
