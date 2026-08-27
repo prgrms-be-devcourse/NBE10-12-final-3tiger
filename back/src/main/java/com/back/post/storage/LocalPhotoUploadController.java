@@ -1,8 +1,8 @@
 package com.back.post.storage;
 
-import com.back.global.auth.CurrentUserId;
 import com.back.global.error.ApiException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +23,7 @@ import java.nio.file.Path;
 
 @RestController
 @RequestMapping("/local-uploads/posts")
+@ConditionalOnProperty(name = "app.storage.type", havingValue = "local", matchIfMissing = true)
 public class LocalPhotoUploadController {
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -33,8 +34,7 @@ public class LocalPhotoUploadController {
     }
 
     @PutMapping(value = "/{fileName}", consumes = {MediaType.IMAGE_JPEG_VALUE, MediaType.IMAGE_PNG_VALUE, "image/webp"})
-    public ResponseEntity<Void> upload(@CurrentUserId Long userId,
-                                       @PathVariable String fileName,
+    public ResponseEntity<Void> upload(@PathVariable String fileName,
                                        @RequestHeader("Content-Type") String contentType,
                                        @RequestBody byte[] content) {
         if (content.length == 0 || content.length > MAX_FILE_SIZE) {

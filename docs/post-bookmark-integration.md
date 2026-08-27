@@ -5,7 +5,7 @@
 - 코스 저장은 `bookmark(user_id, course_id, created_at)` 독립 테이블을 사용한다.
 - 게시물 좋아요는 `share_post_like(post_id, user_id, created_at)` 독립 테이블을 사용한다.
 - 게시물 사진은 `share_post.photo_url`에 완성된 URL을 저장한다.
-- 사진 업로드 URL 발급은 `PhotoStorage` 인터페이스 뒤에 로컬 구현을 두었다. S3/R2 연동 시 구현체만 교체한다.
+- 사진 업로드 URL 발급은 `PhotoStorage` 인터페이스로 로컬과 S3 구현을 분리한다.
 
 ## 현재 연동 상태
 
@@ -22,13 +22,18 @@ POST와 BOOKMARK는 정식 `User`, `Course` 엔티티를 참조한다. `Course`�
 
 ### 사진 저장소
 
-로컬 `LocalPhotoStorage`가 반환하는 URL은 계약 확인용이며 실제 파일 업로드를 수행하지 않는다.
-운영에서는 R2/S3 SDK 기반 presigned PUT URL과 공개 `photoUrl`을 반환하는 구현체를 추가한다.
+기본값인 `STORAGE_TYPE=local`에서는 `build/local-uploads`에 파일을 저장한다.
+운영에서 `STORAGE_TYPE=s3`로 설정하면 AWS SDK가 5분 유효한 presigned PUT URL을 발급하고,
+클라이언트가 애플리케이션 서버를 거치지 않고 S3에 직접 업로드한다.
+
+S3 모드에는 `S3_BUCKET`, `AWS_REGION`, `S3_PUBLIC_BASE_URL`과 AWS SDK 기본 자격 증명 체인이
+인식할 자격 증명이 필요하다. 운영에서는 액세스 키보다 IAM Role 사용을 권장한다.
+`S3_PUBLIC_BASE_URL`에서 객체를 읽을 수 있도록 CloudFront OAC 또는 버킷 정책을 별도로 설정해야 한다.
+웹 클라이언트에서도 업로드한다면 버킷 CORS에 해당 Origin의 `PUT`과 `Content-Type` 헤더를 허용한다.
 
 ## 요청 호환성
 
 게시물 작성 요청의 사진 필드는 `photoUrl`이다.
 내 게시글 API에는 명세에 빠진 `page`, `size` 파라미터를 다른 목록 API와 동일한 기본값(0, 20)으로 지원한다.
 
-게시물 작성 요청은 `title`, `content`를 사용한다. 기존 DB의 `caption` 컬럼은 내용 저장 컬럼으로
-유지하며 `post-title-migration.sql`이 `title` 컬럼을 추가한다.
+게시물 작성 요청의 본문 필드는 `content`이며, DB의 `caption` 컬럼에 저장한다.

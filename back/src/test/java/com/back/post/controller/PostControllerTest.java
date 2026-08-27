@@ -106,7 +106,7 @@ class PostControllerTest {
     @Test
     @DisplayName("사진 업로드 대상 URL 발급 결과를 반환한다")
     void uploadUrl() throws Exception {
-        given(postService.uploadUrl("walk.jpg", "image/jpeg"))
+        given(postService.uploadUrl(1L, "walk.jpg", "image/jpeg"))
                 .willReturn(new PhotoStorage.UploadTarget("upload-url", "photo-url", 300));
 
         mvc.perform(post("/api/v1/posts/photo-upload-url")
@@ -117,6 +117,32 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.uploadUrl").value("upload-url"))
                 .andExpect(jsonPath("$.data.photoUrl").value("photo-url"))
                 .andExpect(jsonPath("$.data.expireInSeconds").value(300));
+
+        verify(postService).uploadUrl(1L, "walk.jpg", "image/jpeg");
+    }
+
+    @Test
+    @DisplayName("지원하지 않는 사진 형식은 업로드 URL을 발급하지 않는다")
+    void rejectsUnsupportedPhotoContentType() throws Exception {
+        mvc.perform(post("/api/v1/posts/photo-upload-url")
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fileName\":\"walk.pdf\",\"contentType\":\"application/pdf\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(postService, never()).uploadUrl(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("사진 형식이 누락되면 업로드 URL을 발급하지 않는다")
+    void requiresPhotoContentType() throws Exception {
+        mvc.perform(post("/api/v1/posts/photo-upload-url")
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fileName\":\"walk.jpg\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(postService, never()).uploadUrl(any(), any(), any());
     }
 
     @Test

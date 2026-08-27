@@ -29,7 +29,7 @@ public class PostController {
     }
     @PostMapping("/photo-upload-url")
     ApiResponse<PhotoStorage.UploadTarget> uploadUrl(@CurrentUserId Long userId, @Valid @RequestBody UploadRequest request) {
-        return ApiResponse.ok("업로드 URL 발급 성공", service.uploadUrl(request.fileName(), request.contentType()));
+        return ApiResponse.ok("업로드 URL 발급 성공", service.uploadUrl(userId, request.fileName(), request.contentType()));
     }
     @PostMapping
     ApiResponse<PostService.CreatedPost> create(@CurrentUserId Long userId, @Valid @RequestBody CreateRequest request) {
@@ -43,6 +43,7 @@ public class PostController {
     }
 
     record UploadRequest(@NotBlank(message = "파일명은 필수입니다.") String fileName,
+                         @NotBlank(message = "이미지 형식은 필수입니다.")
                          @Pattern(regexp = "image/(jpeg|png|webp)", message = "지원하지 않는 이미지 형식입니다.") String contentType) {}
     record CreateRequest(@Schema(example = "1") @NotNull(message = "코스 ID는 필수입니다.") Long courseId,
                          @Schema(example = "날씨가 좋아서 즐겁게 걸었습니다.") @NotBlank(message = "내용은 필수입니다.") @Size(max = 1000, message = "내용은 1000자 이하여야 합니다.") String content,
