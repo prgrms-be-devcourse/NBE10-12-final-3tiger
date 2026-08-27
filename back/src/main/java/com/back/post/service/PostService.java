@@ -53,7 +53,9 @@ public class PostService {
                 .map(p -> new MyPostItem(p.getId(), p.getCourse().getId(), p.getTitle(), p.getContent(), p.getPhotoUrl(),
                         p.getLikeCount(), commentCounts.getOrDefault(p.getId(), 0L), p.getWalkedAt())));
     }
-    public PhotoStorage.UploadTarget uploadUrl(String fileName, String contentType) { return storage.createUploadTarget(fileName, contentType); }
+    public PhotoStorage.UploadTarget uploadUrl(Long userId, String fileName, String contentType) {
+        return storage.createUploadTarget(userId, fileName, contentType);
+    }
     @Transactional public CreatedPost create(Long userId, CreateCommand command) {
         User user = users.findById(userId).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "존재하지 않는 사용자입니다."));
         Course course = courses.findById(command.courseId()).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 코스입니다."));

@@ -1,9 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Button } from "@/components/ui/button";
+import { apiRequest, resolveApiUrl } from "@/lib/api";
+import { getAccessToken } from "@/lib/auth";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Pressable,
@@ -14,20 +17,90 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 export default function WritePostScreen() {
-  const [image, setImage] = useState<string | null>(null);
+  const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
   const pick = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("권한 필요", "사진을 선택하려면 사진 보관함 권한이 필요합니다.");
+      return;
+    }
     const r = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.8,
       allowsEditing: true,
       aspect: [1, 1],
     });
-    if (!r.canceled) setImage(r.assets[0].uri);
+    if (!r.canceled) {
+      const selected = r.assets[0];
+      if (selected.fileSize && selected.fileSize > 10 * 1024 * 1024) {
+        Alert.alert("파일 크기 초과", "10MB 이하의 이미지를 선택해주세요.");
+        return;
+      }
+      setImage(selected);
+    }
   };
-  const submit = () => {
-    Alert.alert("등록 완료", "게시글이 등록되었습니다.", [
-      { text: "확인", onPress: () => router.back() },
-    ]);
+
+  const submit = async () => {
+    if (!image || !title.trim() || !content.trim()) {
+      Alert.alert("입력 확인", "사진, 제목, 산책 이야기를 모두 입력해주세요.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const token = await getAccessToken();
+      if (!token) throw new Error("로그인이 필요합니다.");
+
+      const contentType = image.mimeType ?? "image/jpeg";
+      const fileName = image.fileName ?? `walk-${Date.now()}.jpg`;
+      const authorization = { Authorization: `Bearer ${token}` };
+      const target = await apiRequest<{
+        uploadUrl: string;
+        photoUrl: string;
+        expireInSeconds: number;
+      }>("/api/v1/posts/photo-upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authorization },
+        body: JSON.stringify({ fileName, contentType }),
+      });
+
+      const imageBlob = await (await fetch(image.uri)).blob();
+      const uploadUrl = resolveApiUrl(target.uploadUrl);
+      const uploadHeaders: Record<string, string> = { "Content-Type": contentType };
+      if (uploadUrl.startsWith(resolveApiUrl("/local-uploads/"))) {
+        uploadHeaders.Authorization = `Bearer ${token}`;
+      }
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: uploadHeaders,
+        body: imageBlob,
+      });
+      if (!uploadResponse.ok) throw new Error("이미지 업로드에 실패했습니다.");
+
+      await apiRequest<{ postId: number }>("/api/v1/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authorization },
+        body: JSON.stringify({
+          courseId: 1,
+          title: title.trim(),
+          content: content.trim(),
+          photoUrl: target.photoUrl,
+          walkedAt: new Date().toISOString(),
+        }),
+      });
+
+      Alert.alert("등록 완료", "게시글이 등록되었습니다.", [
+        { text: "확인", onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      Alert.alert("등록 실패", error instanceof Error ? error.message : "게시글 등록에 실패했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
   };
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={["top"]}>
@@ -47,8 +120,11 @@ export default function WritePostScreen() {
           size="sm"
           className="h-11 min-w-11 px-1"
           onPress={submit}
+          disabled={submitting}
         >
-          <Text className="text-[14px] font-semibold text-[#006E2F]">등록</Text>
+          {submitting ? <ActivityIndicator color="#006E2F" /> : (
+            <Text className="text-[14px] font-semibold text-[#006E2F]">등록</Text>
+          )}
         </Button>
       </View>
       <ScrollView
@@ -60,7 +136,7 @@ export default function WritePostScreen() {
           onPress={pick}
         >
           {image ? (
-            <Image source={{ uri: image }} className="h-full w-full" />
+            <Image source={{ uri: image.uri }} className="h-full w-full" />
           ) : (
             <>
               <View className="h-[58px] w-[58px] items-center justify-center rounded-full bg-[#DDF8E5]">
@@ -109,10 +185,20 @@ export default function WritePostScreen() {
           산책 이야기
         </Text>
         <TextInput
+          className="h-[52px] rounded-xl border border-slate-200 bg-white px-3.5"
+          placeholder="게시글 제목"
+          value={title}
+          onChangeText={setTitle}
+          maxLength={200}
+        />
+        <TextInput
           className="h-[120px] rounded-xl border border-slate-200 bg-white p-3.5"
           multiline
           placeholder="오늘의 산책은 어땠나요?"
           textAlignVertical="top"
+          value={content}
+          onChangeText={setContent}
+          maxLength={1000}
         />
       </ScrollView>
     </SafeAreaView>

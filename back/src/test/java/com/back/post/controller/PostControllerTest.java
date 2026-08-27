@@ -107,7 +107,7 @@ class PostControllerTest {
     @Test
     @DisplayName("사진 업로드 대상 URL 발급 결과를 반환한다")
     void uploadUrl() throws Exception {
-        given(postService.uploadUrl("walk.jpg", "image/jpeg"))
+        given(postService.uploadUrl(1L, "walk.jpg", "image/jpeg"))
                 .willReturn(new PhotoStorage.UploadTarget("upload-url", "photo-url", 300));
 
         mvc.perform(post("/api/v1/posts/photo-upload-url")
@@ -118,6 +118,8 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.uploadUrl").value("upload-url"))
                 .andExpect(jsonPath("$.data.photoUrl").value("photo-url"))
                 .andExpect(jsonPath("$.data.expireInSeconds").value(300));
+
+        verify(postService).uploadUrl(1L, "walk.jpg", "image/jpeg");
     }
 
     @Test

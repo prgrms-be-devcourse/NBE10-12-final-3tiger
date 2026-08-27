@@ -3,6 +3,7 @@ package com.back.post.storage;
 import com.back.global.auth.CurrentUserId;
 import com.back.global.error.ApiException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,7 @@ import java.nio.file.Path;
 
 @RestController
 @RequestMapping("/local-uploads/posts")
+@ConditionalOnProperty(name = "app.storage.type", havingValue = "local", matchIfMissing = true)
 public class LocalPhotoUploadController {
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
 

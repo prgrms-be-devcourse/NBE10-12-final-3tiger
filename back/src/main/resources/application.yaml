@@ -23,8 +23,13 @@ app:
     access-token-expiry: 1800      # 30분
     refresh-token-expiry: 1209600  # 14일
   storage:
+    type: ${STORAGE_TYPE:local}
     public-base-url: http://localhost:8080/local-uploads
     local-directory: build/local-uploads
+    s3:
+      bucket: ${S3_BUCKET:}
+      region: ${AWS_REGION:ap-northeast-2}
+      public-base-url: ${S3_PUBLIC_BASE_URL:}
 
 springdoc:
   swagger-ui:
