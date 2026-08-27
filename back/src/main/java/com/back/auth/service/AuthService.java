@@ -60,6 +60,19 @@ public class AuthService {
         return issueTokens(userId);
     }
 
+    public void logout(String refreshToken) {
+        Claims claims;
+        try {
+            claims = jwtProvider.parseRefreshToken(refreshToken);
+        } catch (JwtException | IllegalArgumentException e) {
+            return;
+        }
+
+        Long userId = Long.valueOf(claims.getSubject());
+        String jti = claims.getId();
+        redisTemplate.delete("RT:" + userId + ":" + jti);
+    }
+
     private AuthResponse issueTokens(Long userId) {
         String accessToken = jwtProvider.generateAccessToken(userId);
         String refreshToken = jwtProvider.generateRefreshToken(userId);
