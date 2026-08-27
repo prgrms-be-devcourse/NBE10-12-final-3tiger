@@ -145,8 +145,8 @@ export default function ProfileScreen() {
             <Text className="font-extrabold text-white">로그인하기</Text>
           </Button>
           <Button
-            variant="outline"
-            className="mt-2.5 h-12 w-full rounded-xl border-[#8DDFA4] bg-[#BDF4CB]"
+            variant="secondary"
+            className="mt-2.5 h-12 w-full rounded-xl bg-[#BDF4CB]"
             onPress={() => router.push("/(auth)/signup" as never)}
           >
             <Text className="font-bold text-[#075E34]">회원가입</Text>
@@ -204,7 +204,7 @@ export default function ProfileScreen() {
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-10 flex-1 rounded-lg border-0 bg-white px-3"
+                className="h-10 flex-1 rounded-lg border-0 bg-[#EEF0EE] px-3"
                 disabled={logoutMutation.isPending}
                 onPress={() => logoutMutation.mutate()}
               >

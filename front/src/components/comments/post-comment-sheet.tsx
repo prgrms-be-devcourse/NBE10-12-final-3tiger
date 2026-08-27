@@ -46,10 +46,14 @@ function CommentRow({ item }: { item: PostComment }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [upvoted, setUpvoted] = useState(item.upvoted ?? false);
   const [upvoteCount, setUpvoteCount] = useState(item.upvoteCount);
+  const [profileImageReady, setProfileImageReady] = useState(false);
   useEffect(() => {
     setUpvoted(item.upvoted ?? false);
     setUpvoteCount(item.upvoteCount);
   }, [item.upvoted, item.upvoteCount]);
+  useEffect(() => {
+    setProfileImageReady(false);
+  }, [item.profileImageUrl]);
   const scale = useRef(new Animated.Value(1)).current;
   const burst = useRef(new Animated.Value(0)).current;
   const mutation = useMutation({
@@ -123,9 +127,19 @@ function CommentRow({ item }: { item: PostComment }) {
   };
 
   return (
-    <View className="w-full flex-row items-start gap-3 px-5">
+    <View
+      className={`w-full flex-row items-start gap-3 px-5 ${profileImageReady ? "opacity-100" : "opacity-0"}`}
+    >
       <Avatar alt={`${item.nickname} 프로필`} className="h-10 w-10">
-        <AvatarImage source={DEFAULT_PROFILE_IMAGE} />
+        <AvatarImage
+          source={
+            item.profileImageUrl
+              ? { uri: item.profileImageUrl }
+              : DEFAULT_PROFILE_IMAGE
+          }
+          onLoad={() => setProfileImageReady(true)}
+          onError={() => setProfileImageReady(true)}
+        />
         <AvatarFallback className="bg-[#E9F5EC]" />
       </Avatar>
       <View className="flex-1 pt-0.5">

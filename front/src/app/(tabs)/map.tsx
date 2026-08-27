@@ -2,9 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Keyboard,
   Modal,
   Pressable,
@@ -12,6 +14,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import MapView, { type Region as MapRegion } from "react-native-maps";
@@ -20,15 +23,24 @@ import { getRegions } from "@/api/course-api";
 import { getMyProfile } from "@/api/user-api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Region as ServiceRegion } from "@/types/domain";
 
+// 위도 약 0.009도는 남북 약 1km로, 화면 중심 기준 반경 약 500m다.
+const FIVE_HUNDRED_METER_VIEW = {
+  latitudeDelta: 0.009,
+  longitudeDelta: 0.009,
+} as const;
+
 const DEFAULT_REGION: MapRegion = {
   latitude: 37.5445,
   longitude: 127.0374,
-  latitudeDelta: 0.025,
-  longitudeDelta: 0.018,
+  ...FIVE_HUNDRED_METER_VIEW,
 };
 
 const CURRENT_LOCATION_TIMEOUT_MS = 3_000;
@@ -39,8 +51,7 @@ const isValidCoordinate = (latitude?: number, longitude?: number) =>
 const toRegion = (location: Location.LocationObject): MapRegion => ({
   latitude: location.coords.latitude,
   longitude: location.coords.longitude,
-  latitudeDelta: 0.018,
-  longitudeDelta: 0.014,
+  ...FIVE_HUNDRED_METER_VIEW,
 });
 
 async function getCurrentLocationWithin(
@@ -128,6 +139,10 @@ export default function MapScreen() {
   const [showLocationLoading, setShowLocationLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [regionsOpen, setRegionsOpen] = useState(false);
+  const { height: windowHeight } = useWindowDimensions();
+  const regionsSheetTranslateY = useRef(
+    new Animated.Value(windowHeight),
+  ).current;
   const [message, setMessage] = useState<string | null>(null);
   const profileQuery = useQuery({
     queryKey: ["my-profile"],
@@ -140,6 +155,23 @@ export default function MapScreen() {
     enabled: regionsOpen,
     staleTime: 5 * 60 * 1000,
   });
+  const dismissRegionsSheet = useCallback(
+    () =>
+      dismissBottomSheet(regionsSheetTranslateY, windowHeight, () =>
+        setRegionsOpen(false),
+      ),
+    [regionsSheetTranslateY, windowHeight],
+  );
+  useEffect(() => {
+    if (!regionsOpen) return;
+    regionsSheetTranslateY.setValue(windowHeight);
+    Animated.timing(regionsSheetTranslateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [regionsOpen, regionsSheetTranslateY, windowHeight]);
 
   const moveTo = useCallback((next: MapRegion) => {
     if (!isValidCoordinate(next.latitude, next.longitude)) return;
@@ -215,8 +247,7 @@ export default function MapScreen() {
       moveTo({
         latitude: result.latitude,
         longitude: result.longitude,
-        latitudeDelta: 0.018,
-        longitudeDelta: 0.014,
+        ...FIVE_HUNDRED_METER_VIEW,
       });
     } catch {
       setMessage("장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.");
@@ -250,12 +281,11 @@ export default function MapScreen() {
       moveTo({
         latitude: item.centerLat,
         longitude: item.centerLng,
-        latitudeDelta: 0.08,
-        longitudeDelta: 0.06,
+        ...FIVE_HUNDRED_METER_VIEW,
       });
-      setRegionsOpen(false);
+      dismissRegionsSheet();
     },
-    [moveTo],
+    [dismissRegionsSheet, moveTo],
   );
 
   return (
@@ -342,9 +372,9 @@ export default function MapScreen() {
             </Text>
           </View>
           <Button
-            variant="outline"
+            variant="secondary"
             accessibilityLabel="탐색 가능 구역 보기"
-            className="h-[38px] rounded-full border-[#B8C8BA] bg-white px-3"
+            className="h-[38px] rounded-full bg-white px-3"
             onPress={() => setRegionsOpen(true)}
           >
             <Ionicons name="map-outline" size={16} color="#087A3F" />
@@ -400,22 +430,24 @@ export default function MapScreen() {
       <Modal
         visible={regionsOpen}
         transparent
-        animationType="slide"
-        onRequestClose={() => setRegionsOpen(false)}
+        animationType="none"
+        onRequestClose={dismissRegionsSheet}
       >
         <View className="flex-1 justify-end">
           <Pressable
             accessibilityLabel="탐색 가능 구역 닫기"
-            className="absolute inset-0 bg-black/35"
-            onPress={() => setRegionsOpen(false)}
+            className="absolute inset-0 bg-black/40"
+            onPress={dismissRegionsSheet}
           />
-          <SafeAreaView
-            edges={["bottom"]}
-            className="max-h-[68%] rounded-t-[30px] bg-[#FCFDFC]"
+          <Animated.View
+            className="h-[78%] rounded-t-[30px] bg-[#FCFDFC] pt-2.5"
+            style={{ transform: [{ translateY: regionsSheetTranslateY }] }}
           >
-            <View className="h-8 items-center justify-center">
-              <View className="h-[5px] w-[42px] rounded-full bg-slate-300" />
-            </View>
+            <BottomSheetHandle
+              onDismiss={() => setRegionsOpen(false)}
+              translateY={regionsSheetTranslateY}
+              dismissDistance={windowHeight}
+            />
             <View className="px-5 pb-3">
               <Text className="text-xl font-extrabold text-[#191C1D]">
                 탐색 가능 구역
@@ -451,8 +483,10 @@ export default function MapScreen() {
               </View>
             ) : (
               <ScrollView
+                className="flex-1"
                 contentContainerClassName="gap-2 px-5 pb-6"
                 showsVerticalScrollIndicator
+                nestedScrollEnabled
               >
                 {regionsQuery.data?.map((item) => (
                   <View
@@ -483,7 +517,7 @@ export default function MapScreen() {
                 ))}
               </ScrollView>
             )}
-          </SafeAreaView>
+          </Animated.View>
         </View>
       </Modal>
     </View>

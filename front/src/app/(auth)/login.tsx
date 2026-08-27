@@ -75,6 +75,7 @@ export default function LoginScreen() {
               onChangeText={setEmail}
               className="flex-1 text-[15px] text-[#0B1C30]"
               placeholder="이메일을 입력하세요"
+              placeholderTextColor="#94A3B8"
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
@@ -90,6 +91,7 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               className="flex-1 text-[15px] text-[#0B1C30]"
               placeholder="비밀번호를 입력하세요"
+              placeholderTextColor="#94A3B8"
               secureTextEntry={secure}
               autoComplete="password"
               onSubmitEditing={submit}
@@ -120,8 +122,8 @@ export default function LoginScreen() {
             </Text>
           </Button>
           <Button
-            variant="outline"
-            className="mt-3 h-12 rounded-xl border-[#8FB69A] bg-white"
+            variant="secondary"
+            className="mt-3 h-12 rounded-xl bg-white"
             onPress={() => router.replace("/(tabs)/map" as never)}
           >
             <Ionicons name="compass-outline" size={19} color="#365F49" />
@@ -144,11 +146,13 @@ export default function LoginScreen() {
             <Text className="font-extrabold text-black">카카오로 시작하기</Text>
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             className="mb-2.5 h-[54px] rounded-xl bg-white"
             disabled
           >
-            <Text className="font-extrabold">G　Google로 시작하기</Text>
+            <Text className="font-extrabold text-black">
+              G　Google로 시작하기
+            </Text>
           </Button>
           <View className="mt-5 flex-row justify-center">
             <Text className="text-[13px] text-slate-500">
