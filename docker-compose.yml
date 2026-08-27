@@ -1,6 +1,9 @@
 services:
   postgres:
-    image: postgis/postgis:17-3.5
+    build:
+      context: ./docker
+      dockerfile: Dockerfile
+    image: walking-mvp-postgis-pgrouting:17-3.5
     platform: linux/amd64
     container_name: walking-mvp-postgres
     environment:

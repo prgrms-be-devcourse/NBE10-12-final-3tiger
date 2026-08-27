@@ -8,5 +8,9 @@ back/build/local-uploads/
 
 .claude/
 
+.DS_Store
+**/.DS_Store
+
 drafts/
 final-2026-08-gs-yc-v1/
+final-2026-08-gs-yc-v1.zip

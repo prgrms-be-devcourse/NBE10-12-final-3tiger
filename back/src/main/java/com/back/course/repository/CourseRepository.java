@@ -65,7 +65,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                   + COALESCE(cs.bench_density, 0)
                   + COALESCE(cs.restroom_proximity, 0)
                   + COALESCE(cs.water_facility, 0)
-                  + COALESCE(cs.loop_bonus, 0)) / 9.0
+                  + COALESCE(cs.pavement_quality, 0)
+                  + COALESCE(cs.loop_bonus, 0)) / 10.0
                  ELSE NULL END DESC NULLS LAST,
                CASE WHEN :sort = 'popularity' THEN c.like_count ELSE NULL END DESC NULLS LAST,
                c.course_id ASC
@@ -123,7 +124,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                   + COALESCE(cs.bench_density, 0)
                   + COALESCE(cs.restroom_proximity, 0)
                   + COALESCE(cs.water_facility, 0)
-                  + COALESCE(cs.loop_bonus, 0)) / 9.0
+                  + COALESCE(cs.pavement_quality, 0)
+                  + COALESCE(cs.loop_bonus, 0)) / 10.0
                  ELSE NULL END DESC NULLS LAST,
                CASE WHEN :sort = 'popularity' THEN c.like_count ELSE NULL END DESC NULLS LAST,
                CASE WHEN :sort = 'distance' THEN
