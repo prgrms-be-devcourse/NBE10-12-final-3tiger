@@ -11,8 +11,8 @@ public interface RegionRepository extends JpaRepository<Region, String> {
     @Query(value = """
             SELECT r.region_code                                                   AS regionCode,
                    r.name                                                          AS name,
-                   ST_Y(r.center)                                                  AS centerLat,
-                   ST_X(r.center)                                                  AS centerLng,
+                   ST_Y(r.center::geometry)                                                  AS centerLat,
+                   ST_X(r.center::geometry)                                                  AS centerLng,
                    (SELECT COUNT(*)::int FROM course c WHERE c.region_code = r.region_code) AS courseCount
               FROM region r
              ORDER BY r.name

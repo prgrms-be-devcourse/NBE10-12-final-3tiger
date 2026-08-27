@@ -5,6 +5,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.Serializable;
 import java.util.List;
 
 @Service
@@ -35,5 +36,5 @@ public class RegionService {
             double centerLat,
             double centerLng,
             int courseCount
-    ) {}
+    ) implements Serializable {}
 }
