@@ -1,6 +1,7 @@
 package com.back.course;
 
 import com.back.bookmark.repository.BookmarkRepository;
+import com.back.course.domain.Persona;
 import com.back.course.repository.CourseDetailView;
 import com.back.course.repository.CourseRepository;
 import com.back.course.service.CourseService;
@@ -10,12 +11,18 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class CourseServiceTest {
 
@@ -58,5 +65,76 @@ class CourseServiceTest {
                 999L, null, LocalDateTime.of(2026, 1, 1, 12, 0)))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("존재하지 않는 코스입니다.");
+    }
+
+    @Test void searchByRegion_forwardsPersonaAsStringToRepository() {
+        given(courses.searchByRegion(
+                eq("11500"), any(), any(), any(),
+                anyBoolean(), eq("score"), eq("dog"),
+                anyInt(), anyInt()))
+                .willReturn(List.of());
+        given(courses.countByRegion("11500", null, null, null)).willReturn(0L);
+
+        service.search(new CourseService.CourseSearchQuery(
+                "11500", null, null, null,
+                Persona.dog,
+                null, null, null,
+                LocalDateTime.of(2026, 7, 1, 12, 0),
+                "score",
+                0, 20
+        ));
+
+        verify(courses).searchByRegion(
+                eq("11500"), any(), any(), any(),
+                anyBoolean(), eq("score"), eq("dog"),
+                anyInt(), anyInt());
+    }
+
+    @Test void searchByRegion_passesNullPersonaWhenNotProvided() {
+        given(courses.searchByRegion(
+                eq("11500"), any(), any(), any(),
+                anyBoolean(), eq("score"), eq(null),
+                anyInt(), anyInt()))
+                .willReturn(List.of());
+        given(courses.countByRegion("11500", null, null, null)).willReturn(0L);
+
+        service.search(new CourseService.CourseSearchQuery(
+                "11500", null, null, null,
+                null,
+                null, null, null,
+                LocalDateTime.of(2026, 7, 1, 12, 0),
+                "score",
+                0, 20
+        ));
+
+        verify(courses).searchByRegion(
+                eq("11500"), any(), any(), any(),
+                anyBoolean(), eq("score"), eq(null),
+                anyInt(), anyInt());
+    }
+
+    @Test void searchByLocation_forwardsPersonaAsStringToRepository() {
+        given(courses.searchByLocation(
+                eq(37.5), eq(127.0), eq(1000),
+                any(), any(), any(),
+                anyBoolean(), eq("score"), eq("senior"),
+                anyInt(), anyInt()))
+                .willReturn(List.of());
+        given(courses.countByLocation(37.5, 127.0, 1000, null, null, null)).willReturn(0L);
+
+        service.search(new CourseService.CourseSearchQuery(
+                null, 37.5, 127.0, 1000,
+                Persona.senior,
+                null, null, null,
+                LocalDateTime.of(2026, 7, 1, 12, 0),
+                "score",
+                0, 20
+        ));
+
+        verify(courses).searchByLocation(
+                eq(37.5), eq(127.0), eq(1000),
+                any(), any(), any(),
+                anyBoolean(), eq("score"), eq("senior"),
+                anyInt(), anyInt());
     }
 }

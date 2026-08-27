@@ -27,10 +27,11 @@ public class CourseGenerationService {
     /** 후보 3개 계산 (DB 저장 X) */
     public GenerateResponse generate(GenerateRequest req) {
         List<GenerateCandidate> ok = new ArrayList<>();
+        String persona = req.persona() != null ? req.persona().name() : null;
 
         for (int idx = 0; idx < MAX_CANDIDATES && ok.size() < TARGET_COUNT; idx++) {
             var row = repo.generateOnly(
-                    req.lng(), req.lat(), req.distanceM(), req.atOrNow(), idx
+                    req.lng(), req.lat(), req.distanceM(), req.atOrNow(), idx, persona
             );
             if (row.isEmpty()) continue;
 

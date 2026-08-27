@@ -57,16 +57,22 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                AND (CAST(:distanceMaxM AS integer) IS NULL OR c.distance_m <= CAST(:distanceMaxM AS integer))
              ORDER BY
                CASE WHEN :sort = 'score' THEN
-                 (COALESCE(cs.flatness, 0)
-                  + COALESCE(CASE WHEN :useSummer THEN cs.shade_summer ELSE cs.shade_winter_sun END, 0)
-                  + COALESCE(cs.traffic_low, 0)
-                  + COALESCE(cs.wheelchair, 0)
-                  + COALESCE(cs.surface_natural, 0)
-                  + COALESCE(cs.bench_density, 0)
-                  + COALESCE(cs.restroom_proximity, 0)
-                  + COALESCE(cs.water_facility, 0)
-                  + COALESCE(cs.pavement_quality, 0)
-                  + COALESCE(cs.loop_bonus, 0)) / 10.0
+                 CASE
+                   WHEN :persona = 'walker'   THEN cs.score_walker
+                   WHEN :persona = 'senior'   THEN cs.score_senior
+                   WHEN :persona = 'stroller' THEN cs.score_stroller
+                   WHEN :persona = 'dog'      THEN cs.score_dog
+                   ELSE (COALESCE(cs.flatness, 0)
+                       + COALESCE(CASE WHEN :useSummer THEN cs.shade_summer ELSE cs.shade_winter_sun END, 0)
+                       + COALESCE(cs.traffic_low, 0)
+                       + COALESCE(cs.wheelchair, 0)
+                       + COALESCE(cs.surface_natural, 0)
+                       + COALESCE(cs.bench_density, 0)
+                       + COALESCE(cs.restroom_proximity, 0)
+                       + COALESCE(cs.water_facility, 0)
+                       + COALESCE(cs.pavement_quality, 0)
+                       + COALESCE(cs.loop_bonus, 0)) / 10.0
+                 END
                  ELSE NULL END DESC NULLS LAST,
                CASE WHEN :sort = 'popularity' THEN c.like_count ELSE NULL END DESC NULLS LAST,
                c.course_id ASC
@@ -78,6 +84,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                                         @Param("distanceMaxM") Integer distanceMaxM,
                                         @Param("useSummer") boolean useSummer,
                                         @Param("sort") String sort,
+                                        @Param("persona") String persona,
                                         @Param("size") int size,
                                         @Param("offset") int offset);
 
@@ -116,16 +123,22 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                AND (CAST(:distanceMaxM AS integer) IS NULL OR c.distance_m <= CAST(:distanceMaxM AS integer))
              ORDER BY
                CASE WHEN :sort = 'score' THEN
-                 (COALESCE(cs.flatness, 0)
-                  + COALESCE(CASE WHEN :useSummer THEN cs.shade_summer ELSE cs.shade_winter_sun END, 0)
-                  + COALESCE(cs.traffic_low, 0)
-                  + COALESCE(cs.wheelchair, 0)
-                  + COALESCE(cs.surface_natural, 0)
-                  + COALESCE(cs.bench_density, 0)
-                  + COALESCE(cs.restroom_proximity, 0)
-                  + COALESCE(cs.water_facility, 0)
-                  + COALESCE(cs.pavement_quality, 0)
-                  + COALESCE(cs.loop_bonus, 0)) / 10.0
+                 CASE
+                   WHEN :persona = 'walker'   THEN cs.score_walker
+                   WHEN :persona = 'senior'   THEN cs.score_senior
+                   WHEN :persona = 'stroller' THEN cs.score_stroller
+                   WHEN :persona = 'dog'      THEN cs.score_dog
+                   ELSE (COALESCE(cs.flatness, 0)
+                       + COALESCE(CASE WHEN :useSummer THEN cs.shade_summer ELSE cs.shade_winter_sun END, 0)
+                       + COALESCE(cs.traffic_low, 0)
+                       + COALESCE(cs.wheelchair, 0)
+                       + COALESCE(cs.surface_natural, 0)
+                       + COALESCE(cs.bench_density, 0)
+                       + COALESCE(cs.restroom_proximity, 0)
+                       + COALESCE(cs.water_facility, 0)
+                       + COALESCE(cs.pavement_quality, 0)
+                       + COALESCE(cs.loop_bonus, 0)) / 10.0
+                 END
                  ELSE NULL END DESC NULLS LAST,
                CASE WHEN :sort = 'popularity' THEN c.like_count ELSE NULL END DESC NULLS LAST,
                CASE WHEN :sort = 'distance' THEN
@@ -143,6 +156,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                                           @Param("distanceMaxM") Integer distanceMaxM,
                                           @Param("useSummer") boolean useSummer,
                                           @Param("sort") String sort,
+                                          @Param("persona") String persona,
                                           @Param("size") int size,
                                           @Param("offset") int offset);
 
