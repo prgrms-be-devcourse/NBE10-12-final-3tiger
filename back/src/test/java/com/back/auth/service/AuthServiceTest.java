@@ -39,37 +39,6 @@ class AuthServiceTest {
 
     @InjectMocks AuthService authService;
 
-    @Test
-    void signup_성공() {
-        given(redisTemplate.opsForValue()).willReturn(valueOps);
-        given(userRepository.existsByEmail("test@test.com")).willReturn(false);
-        given(passwordEncoder.encode("password123")).willReturn("encoded");
-        User savedUser = mock(User.class);
-        given(savedUser.getId()).willReturn(1L);
-        given(userRepository.save(any(User.class))).willReturn(savedUser);
-        given(jwtProvider.generateAccessToken(1L)).willReturn("at");
-        given(jwtProvider.generateRefreshToken(1L)).willReturn("rt");
-        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
-        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
-
-        AuthResponse result = authService.signup("test@test.com", "password123", "닉네임");
-
-        assertThat(result.accessToken()).isEqualTo("at");
-        assertThat(result.refreshToken()).isEqualTo("rt");
-        verify(valueOps).set("RT:1:jti-uuid", "1", 1209600L, TimeUnit.SECONDS);
-    }
-
-    @Test
-    void signup_이메일중복_409() {
-        given(userRepository.existsByEmail("test@test.com")).willReturn(true);
-
-        assertThatThrownBy(() -> authService.signup("test@test.com", "password123", "닉네임"))
-                .isInstanceOf(BusinessException.class)
-                .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS);
-
-        verify(userRepository, never()).save(any());
-    }
 
     @Test
     void login_성공() {

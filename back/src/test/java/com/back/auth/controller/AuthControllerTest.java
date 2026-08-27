@@ -2,7 +2,6 @@ package com.back.auth.controller;
 
 import com.back.auth.dto.AuthResponse;
 import com.back.auth.dto.LoginRequest;
-import com.back.auth.dto.SignupRequest;
 import com.back.auth.service.AuthService;
 import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.PasswordEncoderConfig;
@@ -44,41 +43,6 @@ class AuthControllerTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Test
-    void signup_성공_201() throws Exception {
-        given(authService.signup(anyString(), anyString(), anyString()))
-                .willReturn(new AuthResponse("at", "rt"));
-
-        mvc.perform(post("/api/v1/auth/signup")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new SignupRequest("test@test.com", "password123", "닉네임"))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.accessToken").value("at"))
-                .andExpect(jsonPath("$.data.refreshToken").value("rt"));
-    }
-
-    @Test
-    void signup_이메일중복_409() throws Exception {
-        given(authService.signup(anyString(), anyString(), anyString()))
-                .willThrow(new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS));
-
-        mvc.perform(post("/api/v1/auth/signup")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new SignupRequest("dupe@test.com", "password123", "닉네임"))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("AUTH_409_1"));
-    }
-
-    @Test
-    void signup_유효성실패_400() throws Exception {
-        mvc.perform(post("/api/v1/auth/signup")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(
-                                new SignupRequest("not-an-email", "short", "닉"))))
-                .andExpect(status().isBadRequest());
-    }
 
     @Test
     void login_성공_200() throws Exception {

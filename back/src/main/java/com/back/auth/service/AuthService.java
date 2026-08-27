@@ -7,6 +7,8 @@ import com.back.global.jwt.JwtProvider;
 import com.back.user.domain.Provider;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,16 +26,6 @@ public class AuthService {
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate redisTemplate;
 
-    @Transactional
-    public AuthResponse signup(String email, String password, String nickname) {
-        if (userRepository.existsByEmail(email)) {
-            throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
-        }
-        User user = userRepository.save(
-                User.createLocal(email, passwordEncoder.encode(password), nickname)
-        );
-        return issueTokens(user.getId());
-    }
 
     @Transactional(readOnly = true)
     public AuthResponse login(String email, String password) {
@@ -47,6 +39,25 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
         return issueTokens(user.getId());
+    }
+
+    public AuthResponse refresh(String refreshToken) {
+        Claims claims;
+        try {
+            claims = jwtProvider.parseRefreshToken(refreshToken);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        Long userId = Long.valueOf(claims.getSubject());
+        String jti = claims.getId();
+        String redisKey = "RT:" + userId + ":" + jti;
+
+        if (!Boolean.TRUE.equals(redisTemplate.delete(redisKey))) {
+            throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        return issueTokens(userId);
     }
 
     private AuthResponse issueTokens(Long userId) {

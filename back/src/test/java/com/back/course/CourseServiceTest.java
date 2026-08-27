@@ -6,6 +6,7 @@ import com.back.course.repository.CourseRepository;
 import com.back.course.service.CourseService;
 import com.back.global.error.ApiException;
 import tools.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -22,7 +23,9 @@ class CourseServiceTest {
     private final BookmarkRepository bookmarks = mock(BookmarkRepository.class);
     private final CourseService service = new CourseService(courses, bookmarks, new ObjectMapper());
 
-    @Test void convertsDatabaseGeoJsonToResponseObject() {
+    @Test
+    @DisplayName("DB의 GeoJSON 경로 문자열을 코스 상세 응답 객체로 변환한다")
+    void convertsDatabaseGeoJsonToResponseObject() {
         CourseDetailView view = mock(CourseDetailView.class);
         given(view.getCourseId()).willReturn(101L);
         given(view.getName()).willReturn("성수 서울숲 순환");
@@ -46,7 +49,9 @@ class CourseServiceTest {
         assertThat(result.isBookmarked()).isTrue();
     }
 
-    @Test void throwsNotFoundForUnknownCourse() {
+    @Test
+    @DisplayName("존재하지 않는 코스 상세 조회 시 예외를 발생시킨다")
+    void throwsNotFoundForUnknownCourse() {
         given(courses.findDetailById(999L, false)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getDetail(

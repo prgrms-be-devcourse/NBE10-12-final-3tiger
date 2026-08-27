@@ -11,6 +11,6 @@ public class LocalPhotoStorage implements PhotoStorage {
     @Override public UploadTarget createUploadTarget(String fileName, String contentType) {
         String safeName = fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
         String photoUrl = publicBaseUrl + "/posts/" + UUID.randomUUID() + "-" + safeName;
-        return new UploadTarget(photoUrl + "?local-presigned=true", photoUrl, 300);
+        return new UploadTarget(photoUrl, photoUrl, 300);
     }
 }

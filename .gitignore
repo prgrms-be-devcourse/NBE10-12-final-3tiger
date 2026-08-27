@@ -3,6 +3,7 @@
 .gradle-task/
 **/build/
 **/out/
+back/build/local-uploads/
 *.iml
 
 .claude/

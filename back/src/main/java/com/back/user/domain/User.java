@@ -1,5 +1,6 @@
 package com.back.user.domain;
 
+import com.back.course.domain.Persona;
 import com.back.global.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -10,8 +11,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 @Entity
@@ -46,6 +51,14 @@ public class User extends BaseEntity {
 
     @Column(name = "profile_image_url", length = 2048)
     private String profileImageUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "persona_pref", length = 20)
+    private Persona primaryPersona;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "persona_tags", columnDefinition = "jsonb")
+    private List<Persona> personaTags = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -144,6 +157,14 @@ public class User extends BaseEntity {
 
     public String getProfileImageUrl() {
         return profileImageUrl;
+    }
+
+    public Persona getPrimaryPersona() {
+        return primaryPersona;
+    }
+
+    public List<Persona> getPersonaTags() {
+        return personaTags == null ? List.of() : List.copyOf(personaTags);
     }
 
     public Provider getProvider() {
