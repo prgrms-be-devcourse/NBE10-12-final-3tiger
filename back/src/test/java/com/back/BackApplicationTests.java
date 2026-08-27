@@ -71,7 +71,7 @@ class BackApplicationTests {
     }
 
     @Test void createReadAndDeletePost() throws Exception {
-        String body = "{\"courseId\":" + courseId + ",\"title\":\"산책 기록\",\"content\":\"오늘 산책\",\"photoUrl\":\"https://cdn.example/walk.jpg\",\"walkedAt\":\"2026-08-19T17:30:00\"}";
+        String body = "{\"courseId\":" + courseId + ",\"content\":\"오늘 산책\",\"photoUrl\":\"https://cdn.example/walk.jpg\",\"walkedAt\":\"2026-08-19T17:30:00\"}";
         String response = mvc.perform(post("/api/v1/posts").with(authenticatedAs(userId))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.postId").isNumber())
@@ -110,7 +110,7 @@ class BackApplicationTests {
         )).getId();
         Post post = posts.save(new Post(
                 users.findById(userId).orElseThrow(), courses.findById(courseId).orElseThrow(),
-                "동시성 테스트", "동시에 좋아요", null, LocalDateTime.now()
+                "동시에 좋아요", null, LocalDateTime.now()
         ));
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
@@ -141,7 +141,7 @@ class BackApplicationTests {
     void concurrentSameUserLikesAreIdempotent() throws Exception {
         Post post = posts.save(new Post(
                 users.findById(userId).orElseThrow(), courses.findById(courseId).orElseThrow(),
-                "동시성 테스트", "같은 유저 동시 좋아요", null, LocalDateTime.now()
+                "동시성 테스트", null, LocalDateTime.now()
         ));
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);

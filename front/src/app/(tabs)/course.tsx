@@ -1,40 +1,73 @@
 import { Ionicons } from "@expo/vector-icons";
-import {
-  BottomSheetHandle,
-  dismissBottomSheet,
-} from "@/components/ui/bottom-sheet-handle";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Easing,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
-const ROUTE = [
-  { latitude: 37.5445, longitude: 127.0374 },
-  { latitude: 37.5462, longitude: 127.0396 },
-  { latitude: 37.5482, longitude: 127.0378 },
-  { latitude: 37.5471, longitude: 127.0348 },
-  { latitude: 37.5445, longitude: 127.0374 },
-];
+
+import {
+  bookmarkCourse,
+  getCourseDetail,
+  getCourses,
+  unbookmarkCourse,
+} from "@/api/course-api";
+import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/data-state";
+import { Text } from "@/components/ui/text";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
+
+const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
+
 export default function CourseScreen() {
+  const queryClient = useQueryClient();
+  const [coords, setCoords] = useState(DEFAULT_COORDS);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(true);
   const { height: windowHeight } = useWindowDimensions();
   const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
-  const openDetails = () => {
-    setShowDetails(true);
-  };
   const dismissDetails = () =>
     dismissBottomSheet(sheetTranslateY, windowHeight, () =>
       setShowDetails(false),
     );
+  useEffect(() => {
+    void Location.getLastKnownPositionAsync().then((position) => {
+      if (position)
+        setCoords({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+    });
+  }, []);
+  const coursesQuery = useQuery({
+    queryKey: ["courses", coords],
+    queryFn: () =>
+      getCourses({
+        lat: coords.latitude,
+        lng: coords.longitude,
+        radiusM: 5000,
+        sort: "score",
+        page: 0,
+        size: 10,
+      }),
+  });
+  const courses = coursesQuery.data?.content ?? [];
+  useEffect(() => {
+    if (selectedId === null && courses[0]) setSelectedId(courses[0].courseId);
+  }, [courses, selectedId]);
   useEffect(() => {
     if (!showDetails) return;
     sheetTranslateY.setValue(windowHeight);
@@ -44,31 +77,73 @@ export default function CourseScreen() {
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [sheetTranslateY, showDetails, windowHeight]);
+  }, [showDetails, sheetTranslateY, windowHeight]);
+  const detailQuery = useQuery({
+    queryKey: ["course", selectedId],
+    queryFn: () => getCourseDetail(selectedId!),
+    enabled: selectedId !== null,
+  });
+  const detail = detailQuery.data;
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  useEffect(() => {
+    setIsBookmarked(detail?.isBookmarked ?? false);
+  }, [detail?.isBookmarked, selectedId]);
+  const bookmarkMutation = useMutation({
+    mutationFn: () =>
+      isBookmarked
+        ? unbookmarkCourse(selectedId!)
+        : bookmarkCourse(selectedId!),
+    onMutate: () => setIsBookmarked((value) => !value),
+    onError: () => setIsBookmarked((value) => !value),
+    onSuccess: (result) => setIsBookmarked(result.isBookmarked),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["course", selectedId] });
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+    },
+  });
+  const route = useMemo(() => {
+    const path = detail?.path;
+    const values = Array.isArray(path) ? path : path?.coordinates;
+    return (
+      values?.map(([lng, lat]) => ({ latitude: lat, longitude: lng })) ?? []
+    );
+  }, [detail]);
+
+  if (coursesQuery.isError)
+    return (
+      <SafeAreaView className="flex-1">
+        <ErrorState
+          message={coursesQuery.error.message}
+          onRetry={() => void coursesQuery.refetch()}
+        />
+      </SafeAreaView>
+    );
   return (
     <View className="flex-1 bg-[#E8F0E5]">
       <MapView
         style={StyleSheet.absoluteFill}
         onPress={dismissDetails}
-        initialRegion={{
-          latitude: 37.5462,
-          longitude: 127.0372,
-          latitudeDelta: 0.014,
-          longitudeDelta: 0.012,
-        }}
+        region={{ ...coords, latitudeDelta: 0.014, longitudeDelta: 0.012 }}
       >
-        <Polyline coordinates={ROUTE} strokeColor="#087A3F" strokeWidth={7} />
-        <Marker
-          coordinate={ROUTE[0]}
-          onPress={(event) => {
-            event.stopPropagation();
-            openDetails();
-          }}
-        >
-          <View className="h-[42px] w-[42px] items-center justify-center rounded-full border-[3px] border-white bg-[#087A3F]">
-            <Ionicons name="walk" size={19} color="white" />
-          </View>
-        </Marker>
+        {route.length > 1 && (
+          <Polyline coordinates={route} strokeColor="#087A3F" strokeWidth={7} />
+        )}
+        {courses.map(
+          (course) =>
+            course.startPoint && (
+              <Marker
+                key={course.courseId}
+                coordinate={{
+                  latitude: course.startPoint.lat,
+                  longitude: course.startPoint.lng,
+                }}
+                onPress={() => setSelectedId(course.courseId)}
+                pinColor={
+                  course.courseId === selectedId ? "#087A3F" : "#94A09A"
+                }
+              />
+            ),
+        )}
       </MapView>
       <SafeAreaView
         edges={["top"]}
@@ -76,113 +151,132 @@ export default function CourseScreen() {
         pointerEvents="box-none"
       >
         <View className="mt-1 flex-row items-center justify-between">
-          <Pressable
-            className="h-12 w-12 items-center justify-center rounded-[17px] bg-white shadow"
+          <Button
+            variant="secondary"
+            size="icon"
+            accessibilityLabel="뒤로 가기"
+            className="h-12 w-12 rounded-[17px] bg-white"
             onPress={() => router.back()}
           >
             <Ionicons name="arrow-back" size={23} color="#203126" />
-          </Pressable>
+          </Button>
           <Text className="rounded-2xl bg-white px-[18px] py-[13px] text-lg font-black text-[#1A2B20]">
             추천 코스
           </Text>
-          <Pressable className="h-12 w-12 items-center justify-center rounded-[17px] bg-white shadow">
-            <Ionicons name="options-outline" size={23} color="#203126" />
-          </Pressable>
+          <View className="h-12 w-12" />
         </View>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="gap-2 pt-3"
         >
-          <View className="h-10 flex-row items-center gap-1.5 rounded-full bg-[#22C55E] px-[15px]">
-            <Ionicons name="leaf" size={16} color="white" />
-            <Text className="text-[13px] font-extrabold text-white">
-              가장 쾌적한 길
-            </Text>
-          </View>
-          {["그늘 많은 길", "평탄한 길"].map((x) => (
-            <View
-              key={x}
-              className="h-10 justify-center rounded-full bg-white px-[15px]"
+          {courses.map((course) => (
+            <Pressable
+              key={course.courseId}
+              className={`h-10 justify-center rounded-full px-[15px] ${course.courseId === selectedId ? "bg-[#087A3F]" : "bg-white"}`}
+              onPress={() => setSelectedId(course.courseId)}
             >
-              <Text className="text-[13px] font-extrabold text-[#536158]">
-                {x}
+              <Text
+                className={`text-[13px] font-extrabold ${course.courseId === selectedId ? "text-white" : "text-[#536158]"}`}
+              >
+                {course.name}
               </Text>
-            </View>
+            </Pressable>
           ))}
         </ScrollView>
       </SafeAreaView>
-      {showDetails && (
-        <Animated.View
-          className="absolute inset-x-0 bottom-0 h-[68%] rounded-t-[30px] bg-white pt-2.5 shadow-2xl"
-          style={{ transform: [{ translateY: sheetTranslateY }] }}
-        >
-          <BottomSheetHandle
-            onDismiss={() => setShowDetails(false)}
-            translateY={sheetTranslateY}
-            dismissDistance={windowHeight}
-          />
-          <ScrollView
-            className="flex-1"
-            contentContainerClassName="px-5 pb-[22px]"
-            nestedScrollEnabled
-            showsVerticalScrollIndicator
-          >
+      {showDetails && <Animated.View
+        className="absolute inset-x-0 bottom-0 h-[68%] rounded-t-[30px] bg-white px-5 pb-[22px] pt-2.5 shadow-2xl"
+        style={{ transform: [{ translateY: sheetTranslateY }] }}
+      >
+        <BottomSheetHandle
+          onDismiss={() => setShowDetails(false)}
+          translateY={sheetTranslateY}
+          dismissDistance={windowHeight}
+        />
+        <ScrollView className="flex-1" contentContainerClassName="px-0 pb-2" nestedScrollEnabled showsVerticalScrollIndicator>
+        {coursesQuery.isPending || detailQuery.isPending ? (
+          <ActivityIndicator color="#087A3F" className="my-12" />
+        ) : detail ? (
+          <>
             <View className="flex-row items-center">
               <View className="flex-1">
                 <Text className="text-[11px] font-black text-[#087A3F]">
-                  오늘 걷기 좋은 1순위
+                  현재 위치 추천 코스
                 </Text>
                 <Text className="mt-1 text-[22px] font-black text-[#18271D]">
-                  서울숲 그린 순환길
+                  {detail.name}
                 </Text>
               </View>
-              <Pressable className="h-[46px] w-[46px] items-center justify-center rounded-2xl bg-[#E6F8EB]">
-                <Ionicons name="bookmark-outline" size={23} color="#087A3F" />
-              </Pressable>
+              <Button
+                variant="secondary"
+                size="icon"
+                accessibilityLabel="코스 저장"
+                className="rounded-2xl"
+                disabled={bookmarkMutation.isPending}
+                onPress={() => {
+                  if (selectedId !== null && !bookmarkMutation.isPending)
+                    bookmarkMutation.mutate();
+                }}
+              >
+                <Ionicons
+                  name={isBookmarked ? "bookmark" : "bookmark-outline"}
+                  size={23}
+                  color="#087A3F"
+                />
+              </Button>
             </View>
             <Text className="mt-1.5 text-[13px] text-[#78837B]">
-              2.5km · 약 35분 · 순환 코스
+              {(detail.distanceM / 1000).toFixed(1)}km · 약{" "}
+              {detail.estimatedMinutes ?? "-"}분{" "}
+              {detail.isLoop ? "· 순환 코스" : ""}
             </Text>
             <View className="mt-[15px] flex-row rounded-[18px] bg-[#F2F8F2] py-3">
               {[
-                ["leaf", "82%", "그늘"],
-                ["trending-down", "완만", "경사"],
-                ["thermometer", "24°", "체감"],
-              ].map(([icon, v, l]) => (
-                <View key={l} className="flex-1 items-center">
-                  <Ionicons name={icon as any} size={18} color="#087A3F" />
-                  <Text className="mt-1 text-sm font-black text-[#25352B]">
-                    {v}
+                [
+                  `${Math.round((detail.scores?.shadeSummer ?? 0) * 100)}%`,
+                  "그늘",
+                ],
+                [`${detail.scores?.avgSlopeDegree ?? "-"}°`, "평균 경사"],
+                [detail.scores?.surfaceType ?? "-", "노면"],
+              ].map(([value, label]) => (
+                <View key={label} className="flex-1 items-center">
+                  <Text className="text-sm font-black text-[#25352B]">
+                    {value}
                   </Text>
-                  <Text className="mt-0.5 text-[10px] text-slate-500">{l}</Text>
+                  <Text className="mt-0.5 text-[10px] text-slate-500">
+                    {label}
+                  </Text>
                 </View>
               ))}
             </View>
-            <Pressable className="mt-[15px] h-14 flex-row items-center justify-center gap-2 rounded-[18px] bg-[#22C55E]">
-              <Ionicons name="navigate" size={20} color="white" />
-              <Text className="text-base font-black text-white">안내 시작</Text>
-            </Pressable>
-          </ScrollView>
-        </Animated.View>
-      )}
+            <Button
+              className="mt-[15px] h-14 rounded-[18px]"
+              onPress={() => router.push(`/course/${detail.courseId}` as never)}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color="white"
+              />
+              <Text className="text-base font-black text-white">
+                코스 상세 보기
+              </Text>
+            </Button>
+          </>
+        ) : (
+          <Text className="py-12 text-center text-muted-foreground">
+            주변 추천 코스가 없어요.
+          </Text>
+        )}
+        </ScrollView>
+      </Animated.View>}
       {!showDetails && (
-        <SafeAreaView
-          edges={["bottom"]}
-          className="absolute inset-x-0 bottom-5 items-center"
-          pointerEvents="box-none"
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="코스 정보 다시 열기"
-            className="h-14 flex-row items-center gap-2 rounded-full bg-[#22C55E] px-6 shadow-lg"
-            onPress={openDetails}
-          >
+        <SafeAreaView edges={["bottom"]} className="absolute inset-x-0 bottom-5 items-center" pointerEvents="box-none">
+          <Button className="h-14 flex-row gap-2 rounded-full px-6 shadow-lg" onPress={() => setShowDetails(true)}>
             <Ionicons name="chevron-up" size={20} color="white" />
-            <Text className="text-[15px] font-black text-white">
-              코스 정보 보기
-            </Text>
-          </Pressable>
+            <Text className="text-[15px] font-black text-white">코스 정보 보기</Text>
+          </Button>
         </SafeAreaView>
       )}
     </View>

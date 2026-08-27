@@ -53,7 +53,7 @@ public class User extends BaseEntity {
     private String profileImageUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "persona_pref", length = 20)
+    @Column(name = "persona_pref", nullable = false, length = 20)
     private Persona primaryPersona;
 
     @JdbcTypeCode(SqlTypes.JSON)
@@ -85,6 +85,7 @@ public class User extends BaseEntity {
         this.nickname = nickname;
         this.provider = provider;
         this.providerUid = providerUid;
+        this.primaryPersona = Persona.walker;
     }
 
     public static User createLocal(
