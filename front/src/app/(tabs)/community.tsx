@@ -20,7 +20,7 @@ import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
-import type { Post as PostType } from "@/types/domain";
+import type { PostFeedItem } from "@/types/domain";
 
 function formatTime(value: string) {
   const date = new Date(value);
@@ -61,24 +61,26 @@ function FeedPost({
   onOpenComments,
   onRequireLogin,
 }: {
-  item: PostType;
+  item: PostFeedItem;
   onOpenComments: () => void;
   onRequireLogin: () => void;
 }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
-  const [liked, setLiked] = useState(item.isLiked ?? false);
+  const [liked, setLiked] = useState(item.isLiked);
   const [likeCount, setLikeCount] = useState(item.likeCount);
-  const [bookmarked, setBookmarked] = useState(item.isBookmarked ?? false);
+  const [bookmarked, setBookmarked] = useState(item.isBookmarked);
   const [expanded, setExpanded] = useState(false);
   const [contentLineCount, setContentLineCount] = useState(0);
   useEffect(() => {
-    setLiked(item.isLiked ?? false);
+    setLiked(item.isLiked);
     setLikeCount(item.likeCount);
-    setBookmarked(item.isBookmarked ?? false);
+    setBookmarked(item.isBookmarked);
+  }, [item.isBookmarked, item.isLiked, item.likeCount]);
+  useEffect(() => {
     setExpanded(false);
     setContentLineCount(0);
-  }, [item]);
+  }, [item.postId]);
 
   const likeMutation = useMutation({
     mutationFn: ({ desiredLiked }: { desiredLiked: boolean }) =>
@@ -99,7 +101,7 @@ function FeedPost({
       setLikeCount(result.likeCount);
       if (!result.isLiked) {
         queryClient.setQueriesData<{
-          pages: Array<{ content: PostType[] }>;
+          pages: Array<{ content: PostFeedItem[] }>;
           pageParams: unknown[];
         }>({ queryKey: ["liked-posts"] }, (data) => {
           if (!data) return data;
@@ -136,9 +138,33 @@ function FeedPost({
     onError: (_error, _variables, previous) => {
       if (previous !== undefined) setBookmarked(previous);
     },
-    onSuccess: (result) => setBookmarked(result.isBookmarked),
-    onSettled: () =>
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
+    onSuccess: (result) => {
+      setBookmarked(result.isBookmarked);
+      queryClient.setQueriesData<{
+        pages: Array<{ content: PostFeedItem[] }>;
+        pageParams: unknown[];
+      }>({ queryKey: ["posts"] }, (data) => {
+        if (!data) return data;
+        return {
+          ...data,
+          pages: data.pages.map((page) => ({
+            ...page,
+            content: page.content.map((post) =>
+              post.courseId === item.courseId
+                ? { ...post, isBookmarked: result.isBookmarked }
+                : post,
+            ),
+          })),
+        };
+      });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["liked-posts"],
+        refetchType: "all",
+      });
+    },
   });
 
   return (

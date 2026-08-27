@@ -1,15 +1,23 @@
 import axios from "axios";
 import { apiRequest } from "./client";
 import type { PageParams, PageResponse } from "@/types/api";
-import type { Post, PostComment } from "@/types/domain";
+import type {
+  LikedPostItem,
+  Post,
+  PostComment,
+  PostFeedItem,
+} from "@/types/domain";
 
 export const getPosts = (
   params: PageParams & { sort?: "latest" | "popularity" },
-) => apiRequest<PageResponse<Post>>({ url: "/api/v1/posts", params });
+) => apiRequest<PageResponse<PostFeedItem>>({ url: "/api/v1/posts", params });
 export const getMyPosts = (params: PageParams) =>
   apiRequest<PageResponse<Post>>({ url: "/api/v1/posts/me", params });
 export const getMyLikedPosts = (params: PageParams) =>
-  apiRequest<PageResponse<Post>>({ url: "/api/v1/users/me/likes", params });
+  apiRequest<PageResponse<LikedPostItem>>({
+    url: "/api/v1/users/me/likes",
+    params,
+  });
 export const getPostComments = (postId: number, params: PageParams) =>
   apiRequest<PageResponse<PostComment>>({
     url: `/api/v1/posts/${postId}/comments`,

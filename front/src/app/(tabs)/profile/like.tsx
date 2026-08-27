@@ -19,20 +19,24 @@ import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
-import type { Post } from "@/types/domain";
+import type { LikedPostItem } from "@/types/domain";
 
 function LikedPostCard({
   item,
   onComments,
 }: {
-  item: Post;
+  item: LikedPostItem;
   onComments: () => void;
 }) {
   const queryClient = useQueryClient();
   const [liked, setLiked] = useState(item.isLiked ?? true);
   const [likeCount, setLikeCount] = useState(item.likeCount);
-  const [bookmarked, setBookmarked] = useState(item.isBookmarked ?? false);
+  const [bookmarked, setBookmarked] = useState(item.isBookmarked);
   const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    setBookmarked(item.isBookmarked);
+    setLikeCount(item.likeCount);
+  }, [item.isBookmarked, item.likeCount]);
   const mutation = useMutation({
     mutationFn: ({ desiredLiked }: { desiredLiked: boolean }) =>
       desiredLiked ? likePost(item.postId) : unlikePost(item.postId),
@@ -52,7 +56,7 @@ function LikedPostCard({
       setLikeCount(result.likeCount);
       if (!result.isLiked) {
         queryClient.setQueriesData<{
-          pages: Array<{ content: Post[] }>;
+          pages: Array<{ content: LikedPostItem[] }>;
           pageParams: unknown[];
         }>({ queryKey: ["liked-posts"] }, (data) => {
           if (!data) return data;
@@ -93,11 +97,20 @@ function LikedPostCard({
       if (previous !== undefined) setBookmarked(previous);
     },
     onSuccess: (result) => setBookmarked(result.isBookmarked),
-    onSettled: () =>
+    onSettled: () => {
       void queryClient.invalidateQueries({
         queryKey: ["bookmarks"],
         refetchType: "all",
-      }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["posts"],
+        refetchType: "all",
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["liked-posts"],
+        refetchType: "all",
+      });
+    },
   });
   return (
     <View className="bg-white">

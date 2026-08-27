@@ -1,5 +1,6 @@
 package com.back.post.service;
 
+import com.back.bookmark.repository.BookmarkRepository;
 import com.back.global.api.PageResponse;
 import com.back.comment.repository.CommentRepository;
 import com.back.global.error.ApiException;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,11 +30,14 @@ import java.util.stream.Collectors;
 public class PostLikeService {
     private final PostRepository posts; private final UserRepository users; private final PostLikeRepository postLikes;
     private final CommentRepository comments; private final PostLikeWriter postLikeWriter;
+    private final BookmarkRepository bookmarks;
     private final ApplicationEventPublisher eventPublisher;
     public PostLikeService(PostRepository posts, UserRepository users, PostLikeRepository postLikes,
-                           CommentRepository comments, PostLikeWriter postLikeWriter, ApplicationEventPublisher eventPublisher) {
+                           CommentRepository comments, PostLikeWriter postLikeWriter,
+                           ApplicationEventPublisher eventPublisher, BookmarkRepository bookmarks) {
         this.posts = posts; this.users = users; this.postLikes = postLikes; this.comments = comments;
         this.postLikeWriter = postLikeWriter; this.eventPublisher = eventPublisher;
+        this.bookmarks = bookmarks;
     }
 
     @Transactional
@@ -86,17 +91,26 @@ public class PostLikeService {
                     .collect(Collectors.toMap(
                         CommentRepository.PostCommentCount::getPostId,
                         CommentRepository.PostCommentCount::getCommentCount));
-        return PageResponse.from(found.map(postLike -> toLikedPostItem(postLike, commentCounts)));
+        List<Long> courseIds = found.getContent().stream()
+                .map(postLike -> postLike.getPost().getCourse().getId())
+                .distinct()
+                .toList();
+        Set<Long> bookmarkedCourseIds = courseIds.isEmpty()
+                ? Set.of()
+                : bookmarks.findBookmarkedCourseIds(userId, courseIds);
+        return PageResponse.from(found.map(postLike -> toLikedPostItem(postLike, commentCounts, bookmarkedCourseIds)));
     }
 
-    private LikedPostItem toLikedPostItem(PostLike postLike, Map<Long, Long> commentCounts) {
+    private LikedPostItem toLikedPostItem(PostLike postLike, Map<Long, Long> commentCounts,
+                                          Set<Long> bookmarkedCourseIds) {
         Post post = postLike.getPost();
         return new LikedPostItem(post.getId(), post.getCourse().getId(), post.getUser().getNickname(), post.getContent(),
                 post.getPhotoUrl(), post.getLikeCount(),
-                commentCounts.getOrDefault(post.getId(), 0L), postLike.getCreatedAt());
+                commentCounts.getOrDefault(post.getId(), 0L),
+                bookmarkedCourseIds.contains(post.getCourse().getId()), postLike.getCreatedAt());
     }
 
     public record LikeResult(boolean isLiked, int likeCount) {}
     public record LikedPostItem(Long postId, Long courseId, String nickname, String content, String photoUrl,
-                                int likeCount, long commentCount, LocalDateTime likedAt) {}
+                                int likeCount, long commentCount, boolean isBookmarked, LocalDateTime likedAt) {}
 }

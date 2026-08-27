@@ -36,6 +36,10 @@ export type Course = {
   bookmarkedAt?: string;
 };
 
+export type BookmarkedCourse = Course & {
+  isBookmarked: boolean;
+};
+
 export type Post = {
   postId: number;
   courseId: number;
@@ -49,6 +53,15 @@ export type Post = {
   isLiked?: boolean;
   isBookmarked?: boolean;
   profileImageUrl?: string;
+};
+
+export type PostFeedItem = Post & {
+  isLiked: boolean;
+  isBookmarked: boolean;
+};
+
+export type LikedPostItem = Post & {
+  isBookmarked: boolean;
 };
 
 export type PostComment = {

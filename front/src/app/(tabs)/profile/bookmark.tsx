@@ -34,7 +34,7 @@ import {
   dismissBottomSheet,
 } from "@/components/ui/bottom-sheet-handle";
 import { useAuthStore } from "@/stores/auth-store";
-import type { Course } from "@/types/domain";
+import type { BookmarkedCourse } from "@/types/domain";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1000";
@@ -76,7 +76,10 @@ export default function ProfileBookmarkScreen() {
     mutationFn: (courseId: number) => unbookmarkCourse(courseId),
     onSuccess: (_result, courseId) => {
       queryClient.setQueryData<{
-        pages: Array<{ content: Course[]; totalElements: number }>;
+        pages: Array<{
+          content: BookmarkedCourse[];
+          totalElements: number;
+        }>;
         pageParams: unknown[];
       }>(["bookmarks"], (data) => {
         if (!data) return data;
@@ -96,11 +99,20 @@ export default function ProfileBookmarkScreen() {
         };
       });
     },
-    onSettled: () =>
+    onSettled: () => {
       void queryClient.invalidateQueries({
         queryKey: ["bookmarks"],
         refetchType: "all",
-      }),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["posts"],
+        refetchType: "all",
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["liked-posts"],
+        refetchType: "all",
+      });
+    },
   });
   const selected = detailQuery.data;
   useEffect(() => {
@@ -280,7 +292,7 @@ function CourseCard({
   onToggleBookmark,
   bookmarkPending,
 }: {
-  item: Course;
+  item: BookmarkedCourse;
   onPress: () => void;
   onToggleBookmark: () => void;
   bookmarkPending: boolean;
