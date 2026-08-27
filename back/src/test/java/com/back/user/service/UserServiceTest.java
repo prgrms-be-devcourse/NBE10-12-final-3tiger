@@ -1,14 +1,18 @@
 package com.back.user.service;
 
+import com.back.auth.service.AuthService;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.course.domain.Persona;
 import com.back.user.domain.Provider;
 import com.back.user.domain.User;
+import com.back.user.dto.MyPageUpdateRequest;
 import com.back.user.dto.MyPageResponse;
+import com.back.user.dto.ProfileImageResponse;
 import com.back.user.dto.SignupRequest;
 import com.back.user.dto.SignupResponse;
 import com.back.user.repository.UserRepository;
+import com.back.user.storage.ProfileImageStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -16,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
 import java.util.Optional;
@@ -37,6 +42,12 @@ class UserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private AuthService authService;
+
+    @Mock
+    private ProfileImageStorage profileImageStorage;
 
     @InjectMocks
     private UserService userService;
@@ -153,5 +164,228 @@ class UserServiceTest {
 
         verify(userRepository, never()).save(any());
         verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void updateMyPageUpdatesAllFields() {
+        Long userId = 1L;
+        User user = User.createLocal("walker@example.com", "encoded-password", "기존 닉네임");
+        MyPageUpdateRequest request = new MyPageUpdateRequest(
+                "새 닉네임",
+                Persona.senior,
+                List.of(Persona.senior, Persona.stroller)
+        );
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        userService.updateMyPage(userId, request);
+
+        assertThat(user.getNickname()).isEqualTo("새 닉네임");
+        assertThat(user.getPrimaryPersona()).isEqualTo(Persona.senior);
+        assertThat(user.getPersonaTags()).containsExactly(Persona.senior, Persona.stroller);
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void updateMyPageUpdatesOnlyNicknameAndKeepsPersona() {
+        Long userId = 1L;
+        User user = userWithProfile();
+        MyPageUpdateRequest request = new MyPageUpdateRequest("새 닉네임", null, null);
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        userService.updateMyPage(userId, request);
+
+        assertThat(user.getNickname()).isEqualTo("새 닉네임");
+        assertThat(user.getPrimaryPersona()).isEqualTo(Persona.dog);
+        assertThat(user.getPersonaTags()).containsExactly(Persona.dog, Persona.walker);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMyPageUpdatesPersonaAndKeepsNickname() {
+        Long userId = 1L;
+        User user = userWithProfile();
+        MyPageUpdateRequest request = new MyPageUpdateRequest(
+                null,
+                Persona.senior,
+                List.of(Persona.senior, Persona.stroller)
+        );
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        userService.updateMyPage(userId, request);
+
+        assertThat(user.getNickname()).isEqualTo("기존 닉네임");
+        assertThat(user.getPrimaryPersona()).isEqualTo(Persona.senior);
+        assertThat(user.getPersonaTags()).containsExactly(Persona.senior, Persona.stroller);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMyPageKeepsPersonaTagsWhenTheyAreNull() {
+        Long userId = 1L;
+        User user = userWithProfile();
+        MyPageUpdateRequest request = new MyPageUpdateRequest(null, Persona.senior, null);
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        userService.updateMyPage(userId, request);
+
+        assertThat(user.getPrimaryPersona()).isEqualTo(Persona.senior);
+        assertThat(user.getPersonaTags()).containsExactly(Persona.dog, Persona.walker);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMyPageClearsPersonaTagsWithEmptyList() {
+        Long userId = 1L;
+        User user = userWithProfile();
+        MyPageUpdateRequest request = new MyPageUpdateRequest(null, null, List.of());
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        userService.updateMyPage(userId, request);
+
+        assertThat(user.getPersonaTags()).isEmpty();
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMyPageRejectsMissingOrWithdrawnUser() {
+        Long userId = 1L;
+        MyPageUpdateRequest request = new MyPageUpdateRequest("새 닉네임", null, null);
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.updateMyPage(userId, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.USER_NOT_FOUND);
+
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void updateProfileImageUploadsFileAndChangesUserProfileImage() {
+        Long userId = 1L;
+        User user = User.createLocal("walker@example.com", "encoded-password", "산책러");
+        MockMultipartFile file = imageFile("profile.jpg", "image/jpeg", new byte[]{1, 2, 3});
+        String profileImageUrl = "https://cdn.example.com/profile-images/1/profile.jpg";
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+        given(profileImageStorage.upload(userId, file)).willReturn(profileImageUrl);
+
+        ProfileImageResponse response = userService.updateProfileImage(userId, file);
+
+        assertThat(response.profileImageUrl()).isEqualTo(profileImageUrl);
+        assertThat(user.getProfileImageUrl()).isEqualTo(profileImageUrl);
+        verify(profileImageStorage).upload(userId, file);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateProfileImageRejectsMissingOrWithdrawnUserBeforeUpload() {
+        Long userId = 1L;
+        MockMultipartFile file = imageFile("profile.jpg", "image/jpeg", new byte[]{1});
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.updateProfileImage(userId, file))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.USER_NOT_FOUND);
+
+        verifyNoInteractions(profileImageStorage);
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void updateProfileImageRejectsNullFile() {
+        assertInvalidProfileImage(null);
+    }
+
+    @Test
+    void updateProfileImageRejectsEmptyFile() {
+        assertInvalidProfileImage(imageFile("profile.jpg", "image/jpeg", new byte[0]));
+    }
+
+    @Test
+    void updateProfileImageRejectsUnsupportedContentType() {
+        assertInvalidProfileImage(imageFile("profile.gif", "image/gif", new byte[]{1}));
+    }
+
+    @Test
+    void updateProfileImageRejectsFileLargerThanTenMegabytes() {
+        assertInvalidProfileImage(imageFile(
+                "profile.jpg",
+                "image/jpeg",
+                new byte[10 * 1024 * 1024 + 1]
+        ));
+    }
+
+    @Test
+    void withdrawSoftDeletesActiveUserWithoutExplicitSave() {
+        Long userId = 1L;
+        User user = User.createLocal("walker@example.com", "encoded-password", "산책러");
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        userService.withdraw(userId);
+
+        assertThat(user.getDeletedAt()).isNotNull();
+        verify(userRepository).findByIdAndDeletedAtIsNull(userId);
+        verify(authService).revokeAllRefreshTokens(userId);
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void withdrawRejectsMissingUser() {
+        Long userId = 1L;
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.withdraw(userId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.USER_NOT_FOUND);
+
+        verify(userRepository).findByIdAndDeletedAtIsNull(userId);
+        verifyNoInteractions(authService);
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void withdrawRejectsAlreadyWithdrawnUser() {
+        Long userId = 1L;
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.withdraw(userId))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.USER_NOT_FOUND);
+
+        verify(userRepository).findByIdAndDeletedAtIsNull(userId);
+        verifyNoInteractions(authService);
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    private User userWithProfile() {
+        User user = User.createLocal("walker@example.com", "encoded-password", "기존 닉네임");
+        user.updateProfile("기존 닉네임", Persona.dog, List.of(Persona.dog, Persona.walker));
+        return user;
+    }
+
+    private void assertInvalidProfileImage(MockMultipartFile file) {
+        Long userId = 1L;
+        User user = User.createLocal("walker@example.com", "encoded-password", "산책러");
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.updateProfileImage(userId, file))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+        verifyNoInteractions(profileImageStorage);
+        verify(userRepository, never()).save(any());
+    }
+
+    private MockMultipartFile imageFile(String fileName, String contentType, byte[] content) {
+        return new MockMultipartFile("file", fileName, contentType, content);
     }
 }

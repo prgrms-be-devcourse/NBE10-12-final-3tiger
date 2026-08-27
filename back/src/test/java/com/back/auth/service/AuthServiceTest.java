@@ -7,24 +7,31 @@ import com.back.global.jwt.JwtProvider;
 import com.back.user.domain.Provider;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import io.jsonwebtoken.Claims;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import io.jsonwebtoken.JwtException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -38,6 +45,7 @@ class AuthServiceTest {
     @Mock JwtProvider jwtProvider;
     @Mock StringRedisTemplate redisTemplate;
     @Mock ValueOperations<String, String> valueOps;
+    @Mock Cursor<String> cursor;
 
     @InjectMocks AuthService authService;
 
@@ -126,5 +134,96 @@ class AuthServiceTest {
         authService.logout("bad-rt");
 
         verify(redisTemplate, never()).delete(anyString());
+    }
+
+    @Test
+    void revokeAllRefreshTokens_해당사용자의모든토큰만삭제() {
+        given(redisTemplate.scan(any(ScanOptions.class))).willReturn(cursor);
+        given(cursor.hasNext()).willReturn(true, true, true, false);
+        given(cursor.next()).willReturn(
+                "RT:1:first-jti",
+                "RT:2:other-user-jti",
+                "RT:1:second-jti"
+        );
+
+        authService.revokeAllRefreshTokens(1L);
+
+        var optionsCaptor = org.mockito.ArgumentCaptor.forClass(ScanOptions.class);
+        verify(redisTemplate).scan(optionsCaptor.capture());
+        assertThat(optionsCaptor.getValue().getPattern()).isEqualTo("RT:1:*");
+        verify(redisTemplate).delete(List.of("RT:1:first-jti", "RT:1:second-jti"));
+        verify(cursor).close();
+    }
+
+    @Test
+    void revokeAllRefreshTokens_토큰이없어도정상종료() {
+        given(redisTemplate.scan(any(ScanOptions.class))).willReturn(cursor);
+        given(cursor.hasNext()).willReturn(false);
+
+        assertThatCode(() -> authService.revokeAllRefreshTokens(1L))
+                .doesNotThrowAnyException();
+
+        verify(redisTemplate, never()).delete(anyCollection());
+        verify(cursor).close();
+    }
+
+    @Test
+    void refresh_활성사용자는토큰재발급() {
+        Claims claims = refreshClaims(1L, "old-jti");
+        given(jwtProvider.parseRefreshToken("old-rt")).willReturn(claims);
+        given(redisTemplate.delete("RT:1:old-jti")).willReturn(true);
+        given(userRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.of(mock(User.class)));
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(1L)).willReturn("new-at");
+        given(jwtProvider.generateRefreshToken(1L)).willReturn("new-rt");
+        given(jwtProvider.getJti("new-rt")).willReturn("new-jti");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        AuthResponse response = authService.refresh("old-rt");
+
+        assertThat(response).isEqualTo(new AuthResponse("new-at", "new-rt"));
+        verify(userRepository).findByIdAndDeletedAtIsNull(1L);
+        verify(valueOps).set("RT:1:new-jti", "1", 1209600L, TimeUnit.SECONDS);
+    }
+
+    @Test
+    void refresh_탈퇴사용자는토큰재발급실패() {
+        Claims claims = refreshClaims(1L, "old-jti");
+        given(jwtProvider.parseRefreshToken("old-rt")).willReturn(claims);
+        given(redisTemplate.delete("RT:1:old-jti")).willReturn(true);
+        given(userRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.refresh("old-rt"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_REFRESH_TOKEN);
+
+        verify(jwtProvider, never()).generateAccessToken(anyLong());
+        verify(jwtProvider, never()).generateRefreshToken(anyLong());
+        verify(redisTemplate, never()).opsForValue();
+    }
+
+    @Test
+    void refresh_존재하지않는사용자는토큰재발급실패() {
+        Claims claims = refreshClaims(1L, "old-jti");
+        given(jwtProvider.parseRefreshToken("old-rt")).willReturn(claims);
+        given(redisTemplate.delete("RT:1:old-jti")).willReturn(true);
+        given(userRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.refresh("old-rt"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_REFRESH_TOKEN);
+
+        verify(jwtProvider, never()).generateAccessToken(anyLong());
+        verify(jwtProvider, never()).generateRefreshToken(anyLong());
+        verify(redisTemplate, never()).opsForValue();
+    }
+
+    private Claims refreshClaims(Long userId, String jti) {
+        Claims claims = mock(Claims.class);
+        given(claims.getSubject()).willReturn(String.valueOf(userId));
+        given(claims.getId()).willReturn(jti);
+        return claims;
     }
 }

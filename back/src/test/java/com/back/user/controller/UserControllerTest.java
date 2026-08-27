@@ -6,7 +6,10 @@ import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
+import com.back.course.domain.Persona;
+import com.back.user.dto.MyPageUpdateRequest;
 import com.back.user.dto.MyPageResponse;
+import com.back.user.dto.ProfileImageResponse;
 import com.back.user.dto.SignupResponse;
 import com.back.user.service.UserService;
 import org.junit.jupiter.api.Test;
@@ -16,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,12 +28,16 @@ import java.util.List;
 
 import static com.back.TestAuthentication.authenticatedAs;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -185,5 +193,209 @@ class UserControllerTest {
     void getMyPageRejectsUnauthenticatedRequest() throws Exception {
         mvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updateMyPageUpdatesAllFields() throws Exception {
+        mvc.perform(patch("/api/v1/users/me")
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "nickname": "새 닉네임",
+                                  "primaryPersona": "senior",
+                                  "personaTags": ["senior", "stroller"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-1"))
+                .andExpect(jsonPath("$.message").value("마이페이지 수정 성공"))
+                .andExpect(jsonPath("$.data").value(nullValue()));
+
+        verify(userService).updateMyPage(
+                1L,
+                new MyPageUpdateRequest(
+                        "새 닉네임",
+                        Persona.senior,
+                        List.of(Persona.senior, Persona.stroller)
+                )
+        );
+    }
+
+    @Test
+    void updateMyPageAcceptsPartialRequest() throws Exception {
+        mvc.perform(patch("/api/v1/users/me")
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nickname": "새 닉네임"}
+                                """))
+                .andExpect(status().isOk());
+
+        verify(userService).updateMyPage(
+                1L,
+                new MyPageUpdateRequest("새 닉네임", null, null)
+        );
+    }
+
+    @Test
+    void updateMyPageAcceptsEmptyRequest() throws Exception {
+        mvc.perform(patch("/api/v1/users/me")
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(nullValue()));
+
+        verify(userService).updateMyPage(1L, new MyPageUpdateRequest(null, null, null));
+    }
+
+    @Test
+    void updateMyPageRejectsUnauthenticatedRequest() throws Exception {
+        mvc.perform(patch("/api/v1/users/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(userService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   ", "123456789012345678901234567890123456789012345678901"})
+    void updateMyPageRejectsInvalidNickname(String nickname) throws Exception {
+        mvc.perform(patch("/api/v1/users/me")
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"" + nickname + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON_400"));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    void updateMyPageRejectsInvalidPersona() throws Exception {
+        mvc.perform(patch("/api/v1/users/me")
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"primaryPersona": "SENIOR"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON_400"));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    void updateMyPageAcceptsEmptyPersonaTags() throws Exception {
+        mvc.perform(patch("/api/v1/users/me")
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"personaTags": []}
+                                """))
+                .andExpect(status().isOk());
+
+        verify(userService).updateMyPage(1L, new MyPageUpdateRequest(null, null, List.of()));
+    }
+
+    @Test
+    void updateMyPageRejectsNullPersonaTag() throws Exception {
+        mvc.perform(patch("/api/v1/users/me")
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"personaTags": ["senior", null]}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON_400"));
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    void updateProfileImageReturnsUploadedImageUrl() throws Exception {
+        MockMultipartFile file = imageFile("profile.jpg", "image/jpeg", new byte[]{1, 2, 3});
+        String profileImageUrl = "https://cdn.example.com/profile-images/1/profile.jpg";
+        given(userService.updateProfileImage(eq(1L), any()))
+                .willReturn(new ProfileImageResponse(profileImageUrl));
+
+        mvc.perform(multipart("/api/v1/users/me/profile-image")
+                        .file(file)
+                        .with(authenticatedAs(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-1"))
+                .andExpect(jsonPath("$.message").value("프로필 사진이 변경되었습니다."))
+                .andExpect(jsonPath("$.data.profileImageUrl").value(profileImageUrl));
+
+        verify(userService).updateProfileImage(eq(1L), any());
+    }
+
+    @Test
+    void updateProfileImageRejectsUnauthenticatedRequest() throws Exception {
+        mvc.perform(multipart("/api/v1/users/me/profile-image")
+                        .file(imageFile("profile.jpg", "image/jpeg", new byte[]{1})))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(userService);
+    }
+
+    @Test
+    void updateProfileImageRejectsMissingFilePart() throws Exception {
+        given(userService.updateProfileImage(1L, null))
+                .willThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
+
+        mvc.perform(multipart("/api/v1/users/me/profile-image")
+                        .with(authenticatedAs(1L)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON_400"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"empty", "unsupported", "oversized"})
+    void updateProfileImageRejectsInvalidFile(String caseName) throws Exception {
+        MockMultipartFile file = switch (caseName) {
+            case "empty" -> imageFile("profile.jpg", "image/jpeg", new byte[0]);
+            case "unsupported" -> imageFile("profile.gif", "image/gif", new byte[]{1});
+            case "oversized" -> imageFile(
+                    "profile.jpg",
+                    "image/jpeg",
+                    new byte[10 * 1024 * 1024 + 1]
+            );
+            default -> throw new IllegalArgumentException(caseName);
+        };
+        given(userService.updateProfileImage(eq(1L), any()))
+                .willThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
+
+        mvc.perform(multipart("/api/v1/users/me/profile-image")
+                        .file(file)
+                        .with(authenticatedAs(1L)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON_400"));
+    }
+
+    @Test
+    void withdrawReturnsSuccessForAuthenticatedUser() throws Exception {
+        mvc.perform(patch("/api/v1/users/withdraw")
+                        .with(authenticatedAs(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resultCode").value("200-1"))
+                .andExpect(jsonPath("$.message").value("회원 탈퇴가 정상적으로 완료되었습니다."))
+                .andExpect(jsonPath("$.data").value(nullValue()));
+
+        verify(userService).withdraw(1L);
+    }
+
+    @Test
+    void withdrawRejectsUnauthenticatedRequest() throws Exception {
+        mvc.perform(patch("/api/v1/users/withdraw"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(userService);
+    }
+
+    private MockMultipartFile imageFile(String fileName, String contentType, byte[] content) {
+        return new MockMultipartFile("file", fileName, contentType, content);
     }
 }

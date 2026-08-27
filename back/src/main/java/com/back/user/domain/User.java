@@ -123,11 +123,20 @@ public class User extends BaseEntity {
         );
     }
 
-    public void updateProfile(String nickname) {
-        this.nickname = Objects.requireNonNull(
-                nickname,
-                "닉네임은 필수입니다."
-        );
+    public void updateProfile(
+            String nickname,
+            Persona primaryPersona,
+            List<Persona> personaTags
+    ) {
+        if (nickname != null) {
+            this.nickname = nickname;
+        }
+        if (primaryPersona != null) {
+            this.primaryPersona = primaryPersona;
+        }
+        if (personaTags != null) {
+            this.personaTags = new ArrayList<>(personaTags);
+        }
     }
 
     public void changeProfileImage(String profileImageUrl) {
