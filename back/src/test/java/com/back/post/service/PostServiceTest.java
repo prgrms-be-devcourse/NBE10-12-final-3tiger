@@ -94,6 +94,18 @@ class PostServiceTest {
     }
 
     @Test
+    @DisplayName("사진 업로드 대상은 인증 사용자별 저장 경로로 발급한다")
+    void uploadUrl() {
+        var target = new PhotoStorage.UploadTarget("upload-url", "photo-url", 300);
+        given(storage.createUploadTarget(1L, "walk.jpg", "image/jpeg")).willReturn(target);
+
+        PhotoStorage.UploadTarget result = postService.uploadUrl(1L, "walk.jpg", "image/jpeg");
+
+        assertThat(result).isEqualTo(target);
+        verify(storage).createUploadTarget(1L, "walk.jpg", "image/jpeg");
+    }
+
+    @Test
     @DisplayName("존재하지 않는 사용자로 작성하면 401을 반환한다")
     void createRejectsUnknownUser() {
         given(users.findById(99L)).willReturn(Optional.empty());
