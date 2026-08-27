@@ -77,11 +77,10 @@ class CourseControllerTest {
                 new CourseService.Point(37.544, 127.037),
                 new CourseService.Scores(0.82, 5.4, 0.78, null, 0.90, null),
                 null,
-                List.of(),
-                true
+                List.of()
         );
         var page = new PageResponse<>(List.of(item), 0, 20, 37L);
-        given(courseService.search(any(), any())).willReturn(page);
+        given(courseService.search(any())).willReturn(page);
 
         mvc.perform(get("/api/v1/courses").param("regionCode", "11500").with(authenticatedAs(1L)))
                 .andExpect(status().isOk())
@@ -99,7 +98,6 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.data.content[0].scores.shadeSummer").value(0.78))
                 .andExpect(jsonPath("$.data.content[0].scores.wheelchair").value(0.90))
                 .andExpect(jsonPath("$.data.content[0].personaBadges").isArray())
-                .andExpect(jsonPath("$.data.content[0].isBookmarked").value(true))
                 .andExpect(jsonPath("$.data.page").value(0))
                 .andExpect(jsonPath("$.data.size").value(20))
                 .andExpect(jsonPath("$.data.totalElements").value(37));
@@ -108,7 +106,7 @@ class CourseControllerTest {
     @Test
     @DisplayName("위도, 경도, 반경을 모두 입력하면 좌표 기반 코스 검색을 허용한다")
     void acceptsCoordSearch() throws Exception {
-        given(courseService.search(any(), any())).willReturn(new PageResponse<>(List.of(), 0, 20, 0L));
+        given(courseService.search(any())).willReturn(new PageResponse<>(List.of(), 0, 20, 0L));
 
         mvc.perform(get("/api/v1/courses")
                         .param("lat", "37.5")
@@ -166,7 +164,7 @@ class CourseControllerTest {
     @Test
     @DisplayName("코스 목록 크기가 100을 초과하면 최대 100으로 제한한다")
     void clampsSizeToHundred() throws Exception {
-        given(courseService.search(any(), any())).willReturn(new PageResponse<>(List.of(), 0, 100, 0L));
+        given(courseService.search(any())).willReturn(new PageResponse<>(List.of(), 0, 100, 0L));
 
         mvc.perform(get("/api/v1/courses")
                         .param("regionCode", "11500")
@@ -175,7 +173,7 @@ class CourseControllerTest {
                 .andExpect(status().isOk());
         org.mockito.ArgumentCaptor<CourseService.CourseSearchQuery> captor =
                 org.mockito.ArgumentCaptor.forClass(CourseService.CourseSearchQuery.class);
-        org.mockito.Mockito.verify(courseService).search(captor.capture(), org.mockito.ArgumentMatchers.eq(1L));
+        org.mockito.Mockito.verify(courseService).search(captor.capture());
         org.junit.jupiter.api.Assertions.assertEquals(100, captor.getValue().size());
     }
 }

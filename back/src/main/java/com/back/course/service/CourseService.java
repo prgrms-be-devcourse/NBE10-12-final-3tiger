@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
@@ -61,7 +60,7 @@ public class CourseService {
         }
     }
 
-    public PageResponse<CourseItem> search(CourseSearchQuery q, Long userId) {
+    public PageResponse<CourseItem> search(CourseSearchQuery q) {
         boolean useSummer = isSummer(q.at() != null ? q.at() : LocalDateTime.now());
         int offset = q.page() * q.size();
         String persona = q.persona() != null ? q.persona().name() : null;
@@ -79,14 +78,7 @@ public class CourseService {
                     q.distanceMinM(), q.distanceMaxM());
         }
 
-        List<Long> courseIds = rows.stream().map(CourseListView::getCourseId).toList();
-        Set<Long> bookmarkedCourseIds = userId == null || courseIds.isEmpty()
-                ? Set.of()
-                : bookmarks.findBookmarkedCourseIds(userId, courseIds);
-
-        List<CourseItem> items = rows.stream()
-                .map(row -> toItem(row, bookmarkedCourseIds.contains(row.getCourseId())))
-                .toList();
+        List<CourseItem> items = rows.stream().map(CourseService::toItem).toList();
         return new PageResponse<>(items, q.page(), q.size(), total);
     }
 
@@ -95,7 +87,7 @@ public class CourseService {
         return month >= 6 && month <= 8;
     }
 
-    private static CourseItem toItem(CourseListView v, boolean isBookmarked) {
+    private static CourseItem toItem(CourseListView v) {
         Double flatness = v.getFlatness();
         Double avgSlopeDegree = flatness == null ? null : (1.0 - flatness) * 30.0;
         return new CourseItem(
@@ -107,8 +99,7 @@ public class CourseService {
                 new Point(v.getStartLat(), v.getStartLng()),
                 new Scores(flatness, avgSlopeDegree, v.getShadeScore(), null, v.getWheelchair(), null),
                 null,
-                List.of(),
-                isBookmarked
+                List.of()
         );
     }
 
@@ -132,8 +123,7 @@ public class CourseService {
             Point startPoint,
             Scores scores,
             Double surfaceTempC,
-            List<String> personaBadges,
-            boolean isBookmarked
+            List<String> personaBadges
     ) {}
 
     public record Point(double lat, double lng) {}

@@ -57,7 +57,6 @@ public class CourseController {
                     """
     )
     ApiResponse<PageResponse<CourseService.CourseItem>> list(
-            @CurrentUserId(required = false) Long userId,
             @RequestParam(required = false) String regionCode,
             @RequestParam(required = false) Double lat,
             @RequestParam(required = false) Double lng,
@@ -104,6 +103,6 @@ public class CourseController {
                 sort,
                 safePage, clampedSize
         );
-        return ApiResponse.ok("코스 목록 조회 성공", service.search(query, userId));
+        return ApiResponse.ok("코스 목록 조회 성공", service.search(query));
     }
 }

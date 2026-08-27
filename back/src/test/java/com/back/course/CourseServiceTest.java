@@ -3,7 +3,6 @@ package com.back.course;
 import com.back.bookmark.repository.BookmarkRepository;
 import com.back.course.domain.Persona;
 import com.back.course.repository.CourseDetailView;
-import com.back.course.repository.CourseListView;
 import com.back.course.repository.CourseRepository;
 import com.back.course.service.CourseService;
 import com.back.global.error.ApiException;
@@ -14,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -84,7 +82,7 @@ class CourseServiceTest {
                 LocalDateTime.of(2026, 7, 1, 12, 0),
                 "score",
                 0, 20
-        ), null);
+        ));
 
         verify(courses).searchByRegion(
                 eq("11500"), any(), any(), any(),
@@ -107,7 +105,7 @@ class CourseServiceTest {
                 LocalDateTime.of(2026, 7, 1, 12, 0),
                 "score",
                 0, 20
-        ), null);
+        ));
 
         verify(courses).searchByRegion(
                 eq("11500"), any(), any(), any(),
@@ -131,7 +129,7 @@ class CourseServiceTest {
                 LocalDateTime.of(2026, 7, 1, 12, 0),
                 "score",
                 0, 20
-        ), null);
+        ));
 
         verify(courses).searchByLocation(
                 eq(37.5), eq(127.0), eq(1000),
@@ -140,29 +138,4 @@ class CourseServiceTest {
                 anyInt(), anyInt());
     }
 
-    @Test
-    @DisplayName("로그인 사용자의 코스 목록에 북마크 여부를 일괄 반영한다")
-    void includesBookmarkStateInCourseList() {
-        CourseListView first = mock(CourseListView.class);
-        CourseListView second = mock(CourseListView.class);
-        given(first.getCourseId()).willReturn(101L);
-        given(second.getCourseId()).willReturn(102L);
-        given(courses.searchByRegion(
-                eq("11500"), any(), any(), any(), anyBoolean(), eq("score"), eq(null),
-                anyInt(), anyInt()))
-                .willReturn(List.of(first, second));
-        given(courses.countByRegion("11500", null, null, null)).willReturn(2L);
-        given(bookmarks.findBookmarkedCourseIds(1L, List.of(101L, 102L)))
-                .willReturn(Set.of(102L));
-
-        var result = service.search(new CourseService.CourseSearchQuery(
-                "11500", null, null, null, null,
-                null, null, null,
-                LocalDateTime.of(2026, 7, 1, 12, 0), "score", 0, 20
-        ), 1L);
-
-        assertThat(result.content()).extracting(CourseService.CourseItem::isBookmarked)
-                .containsExactly(false, true);
-        verify(bookmarks).findBookmarkedCourseIds(1L, List.of(101L, 102L));
-    }
 }

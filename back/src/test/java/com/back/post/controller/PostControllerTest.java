@@ -44,7 +44,8 @@ class PostControllerTest {
     @DisplayName("피드는 인증 없이 내용·좋아요·댓글 정보를 조회할 수 있다")
     void feed() throws Exception {
         var item = new PostService.FeedItem(10L, 1L, "산책러", "좋은 산책이었습니다.",
-                "https://example.com/walk.jpg", 3, 2, false, LocalDateTime.of(2026, 8, 26, 9, 0));
+                "https://example.com/walk.jpg", 3, 2, false, false,
+                LocalDateTime.of(2026, 8, 26, 9, 0));
         given(postService.feed(null, "latest", 0, 20))
                 .willReturn(new PageResponse<>(List.of(item), 0, 20, 1));
 
@@ -54,7 +55,8 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.content[0].content").value("좋은 산책이었습니다."))
                 .andExpect(jsonPath("$.data.content[0].likeCount").value(3))
                 .andExpect(jsonPath("$.data.content[0].commentCount").value(2))
-                .andExpect(jsonPath("$.data.content[0].isLiked").value(false));
+                .andExpect(jsonPath("$.data.content[0].isLiked").value(false))
+                .andExpect(jsonPath("$.data.content[0].isBookmarked").value(false));
     }
 
     @Test
