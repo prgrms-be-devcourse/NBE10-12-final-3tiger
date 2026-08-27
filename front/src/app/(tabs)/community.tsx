@@ -11,12 +11,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
 import { getPosts, likePost, unlikePost } from "@/api/post-api";
+import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
+import { useAuthStore } from "@/stores/auth-store";
 import type { Post as PostType } from "@/types/domain";
 
 function formatTime(value: string) {
@@ -56,10 +59,13 @@ function IconButton({
 function FeedPost({
   item,
   onOpenComments,
+  onRequireLogin,
 }: {
   item: PostType;
   onOpenComments: () => void;
+  onRequireLogin: () => void;
 }) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const [liked, setLiked] = useState(item.isLiked ?? false);
   const [likeCount, setLikeCount] = useState(item.likeCount);
@@ -142,14 +148,14 @@ function FeedPost({
           alt={`${item.nickname ?? "사용자"} 프로필`}
           className="h-8 w-8 border border-[#E4EAE5]"
         >
-          {item.profileImageUrl && (
-            <AvatarImage source={{ uri: item.profileImageUrl }} />
-          )}
-          <AvatarFallback className="bg-[#E9F5EC]">
-            <Text className="text-xs font-bold text-[#087A3F]">
-              {(item.nickname ?? "산").slice(0, 1)}
-            </Text>
-          </AvatarFallback>
+          <AvatarImage
+            source={
+              item.profileImageUrl
+                ? { uri: item.profileImageUrl }
+                : DEFAULT_PROFILE_IMAGE
+            }
+          />
+          <AvatarFallback className="bg-[#E9F5EC]" />
         </Avatar>
         <View className="flex-1">
           <Text className="text-[13px] font-semibold leading-4 text-[#191C1D]">
@@ -184,12 +190,20 @@ function FeedPost({
         likeCount={likeCount}
         commentCount={item.commentCount ?? 0}
         onToggleLike={() => {
+          if (!isAuthenticated) {
+            onRequireLogin();
+            return;
+          }
           if (!likeMutation.isPending)
             likeMutation.mutate({ desiredLiked: !liked });
         }}
         onOpenComments={onOpenComments}
         bookmarked={bookmarked}
         onToggleBookmark={() => {
+          if (!isAuthenticated) {
+            onRequireLogin();
+            return;
+          }
           if (!bookmarkMutation.isPending)
             bookmarkMutation.mutate({ desiredBookmarked: !bookmarked });
         }}
@@ -236,6 +250,7 @@ function FeedPost({
 
 export default function CommunityScreen() {
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
+  const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const postsQuery = useInfiniteQuery({
     queryKey: ["posts", "latest"],
     queryFn: ({ pageParam }) =>
@@ -288,6 +303,7 @@ export default function CommunityScreen() {
             <FeedPost
               item={item}
               onOpenComments={() => setCommentPostId(item.postId)}
+              onRequireLogin={() => setLoginRequiredOpen(true)}
             />
           )}
           showsVerticalScrollIndicator={false}
@@ -308,6 +324,10 @@ export default function CommunityScreen() {
       <PostCommentSheet
         postId={commentPostId}
         onClose={() => setCommentPostId(null)}
+      />
+      <LoginRequiredModal
+        visible={loginRequiredOpen}
+        onClose={() => setLoginRequiredOpen(false)}
       />
     </SafeAreaView>
   );

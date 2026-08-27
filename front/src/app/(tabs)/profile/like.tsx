@@ -13,10 +13,11 @@ import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
 import { getMyLikedPosts, likePost, unlikePost } from "@/api/post-api";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Post } from "@/types/domain";
 
@@ -105,11 +106,14 @@ function LikedPostCard({
           alt={`${item.nickname ?? "사용자"} 프로필`}
           className="h-8 w-8 border border-[#E4EAE5]"
         >
-          <AvatarFallback className="bg-[#E9F5EC]">
-            <Text className="text-xs font-bold text-[#087A3F]">
-              {(item.nickname ?? "산").slice(0, 1)}
-            </Text>
-          </AvatarFallback>
+          <AvatarImage
+            source={
+              item.profileImageUrl
+                ? { uri: item.profileImageUrl }
+                : DEFAULT_PROFILE_IMAGE
+            }
+          />
+          <AvatarFallback className="bg-[#E9F5EC]" />
         </Avatar>
         <View className="flex-1">
           <Text className="text-[13px] font-semibold leading-4 text-[#191C1D]">
@@ -139,8 +143,7 @@ function LikedPostCard({
         likeCount={likeCount}
         commentCount={item.commentCount ?? 0}
         onToggleLike={() => {
-          if (!mutation.isPending)
-            mutation.mutate({ desiredLiked: !liked });
+          if (!mutation.isPending) mutation.mutate({ desiredLiked: !liked });
         }}
         onOpenComments={onComments}
         bookmarked={bookmarked}
@@ -151,12 +154,22 @@ function LikedPostCard({
       />
       <View className="px-3 pb-4">
         <View className="flex-row items-end">
-          <Text className="flex-1 text-[13px] leading-5 text-[#252A26]" numberOfLines={expanded ? undefined : 1}>
-            <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">{item.nickname ?? "산책러"} </Text>
+          <Text
+            className="flex-1 text-[13px] leading-5 text-[#252A26]"
+            numberOfLines={expanded ? undefined : 1}
+          >
+            <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
+              {item.nickname ?? "산책러"}{" "}
+            </Text>
             {item.content}
           </Text>
           {!expanded && (
-            <Button variant="link" size="sm" className="ml-1 h-5 px-0" onPress={() => setExpanded(true)}>
+            <Button
+              variant="link"
+              size="sm"
+              className="ml-1 h-5 px-0"
+              onPress={() => setExpanded(true)}
+            >
               <Text className="text-[11px] text-slate-500">더 보기</Text>
             </Button>
           )}

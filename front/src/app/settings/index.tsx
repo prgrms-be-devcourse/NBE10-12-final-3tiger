@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 
 export default function SettingsScreen() {
   const queryClient = useQueryClient();
@@ -96,9 +97,10 @@ export default function SettingsScreen() {
           {image ? (
             <Image source={{ uri: image }} className="h-28 w-28 rounded-full" />
           ) : (
-            <View className="h-28 w-28 items-center justify-center rounded-full bg-secondary">
-              <Ionicons name="person" size={42} color="#087A3F" />
-            </View>
+            <Image
+              source={DEFAULT_PROFILE_IMAGE}
+              className="h-28 w-28 rounded-full"
+            />
           )}
           <Pressable
             accessibilityLabel="프로필 이미지 변경"

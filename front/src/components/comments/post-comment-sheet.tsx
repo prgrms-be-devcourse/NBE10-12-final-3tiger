@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
 import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/text";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import {
   BottomSheetHandle,
   dismissBottomSheet,
@@ -124,11 +125,8 @@ function CommentRow({ item }: { item: PostComment }) {
   return (
     <View className="w-full flex-row items-start gap-3 px-5">
       <Avatar alt={`${item.nickname} 프로필`} className="h-10 w-10">
-        <AvatarFallback className="bg-[#E9F5EC]">
-          <Text className="font-black text-[#087A3F]">
-            {item.nickname.slice(0, 1)}
-          </Text>
-        </AvatarFallback>
+        <AvatarImage source={DEFAULT_PROFILE_IMAGE} />
+        <AvatarFallback className="bg-[#E9F5EC]" />
       </Avatar>
       <View className="flex-1 pt-0.5">
         <View className="flex-row items-center gap-1.5">
@@ -341,16 +339,14 @@ export function PostCommentSheet({
                 alt={`${profileQuery.data?.nickname ?? "내"} 프로필`}
                 className="h-11 w-11 border border-[#DDE7DE]"
               >
-                {profileQuery.data?.profileImageUrl ? (
-                  <AvatarImage
-                    source={{ uri: profileQuery.data.profileImageUrl }}
-                  />
-                ) : null}
-                <AvatarFallback className="bg-[#E9F5EC]">
-                  <Text className="font-black text-[#087A3F]">
-                    {(profileQuery.data?.nickname ?? "나").slice(0, 1)}
-                  </Text>
-                </AvatarFallback>
+                <AvatarImage
+                  source={
+                    profileQuery.data?.profileImageUrl
+                      ? { uri: profileQuery.data.profileImageUrl }
+                      : DEFAULT_PROFILE_IMAGE
+                  }
+                />
+                <AvatarFallback className="bg-[#E9F5EC]" />
               </Avatar>
               <View className="min-h-11 flex-1 flex-row items-end rounded-[22px] border border-[#DCE5DE] bg-[#F8FAF8] pl-4 pr-1.5 py-1.5">
                 <TextInput

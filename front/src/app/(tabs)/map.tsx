@@ -6,20 +6,25 @@ import { useCallback, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import MapView, { type Region } from "react-native-maps";
+import MapView, { type Region as MapRegion } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getRegions } from "@/api/course-api";
 import { getMyProfile } from "@/api/user-api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
+import type { Region as ServiceRegion } from "@/types/domain";
 
-const DEFAULT_REGION: Region = {
+const DEFAULT_REGION: MapRegion = {
   latitude: 37.5445,
   longitude: 127.0374,
   latitudeDelta: 0.025,
@@ -31,7 +36,7 @@ const CURRENT_LOCATION_TIMEOUT_MS = 3_000;
 const isValidCoordinate = (latitude?: number, longitude?: number) =>
   Number.isFinite(latitude) && Number.isFinite(longitude);
 
-const toRegion = (location: Location.LocationObject): Region => ({
+const toRegion = (location: Location.LocationObject): MapRegion => ({
   latitude: location.coords.latitude,
   longitude: location.coords.longitude,
   latitudeDelta: 0.018,
@@ -117,19 +122,26 @@ const CALM_DARK_MAP_STYLE = [
 export default function MapScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const mapRef = useRef<MapView>(null);
-  const lastViewedRegionRef = useRef<Region | null>(null);
+  const lastViewedRegionRef = useRef<MapRegion | null>(null);
   const [query, setQuery] = useState("");
   const [locating, setLocating] = useState(true);
   const [showLocationLoading, setShowLocationLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [regionsOpen, setRegionsOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const profileQuery = useQuery({
     queryKey: ["my-profile"],
     queryFn: getMyProfile,
     enabled: isAuthenticated,
   });
+  const regionsQuery = useQuery({
+    queryKey: ["regions"],
+    queryFn: getRegions,
+    enabled: regionsOpen,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const moveTo = useCallback((next: Region) => {
+  const moveTo = useCallback((next: MapRegion) => {
     if (!isValidCoordinate(next.latitude, next.longitude)) return;
     lastViewedRegionRef.current = next;
     mapRef.current?.animateToRegion(next, 500);
@@ -228,10 +240,23 @@ export default function MapScreen() {
     }, [locate]),
   );
 
-  const updateRegion = useCallback((next: Region) => {
+  const updateRegion = useCallback((next: MapRegion) => {
     if (!isValidCoordinate(next.latitude, next.longitude)) return;
     if (lastViewedRegionRef.current) lastViewedRegionRef.current = next;
   }, []);
+
+  const moveToServiceRegion = useCallback(
+    (item: ServiceRegion) => {
+      moveTo({
+        latitude: item.centerLat,
+        longitude: item.centerLng,
+        latitudeDelta: 0.08,
+        longitudeDelta: 0.06,
+      });
+      setRegionsOpen(false);
+    },
+    [moveTo],
+  );
 
   return (
     <View className="flex-1 bg-[#E8F0E5]">
@@ -293,35 +318,44 @@ export default function MapScreen() {
                 alt="프로필 사진"
                 className="h-9 w-9 border border-[#DDE5DA] bg-[#EEF6EB]"
               >
-                {profileQuery.data?.profileImageUrl && (
-                  <AvatarImage
-                    source={{ uri: profileQuery.data.profileImageUrl }}
-                  />
-                )}
-                <AvatarFallback className="bg-[#EEF6EB]">
-                  <Ionicons name="person" size={18} color="#365F49" />
-                </AvatarFallback>
+                <AvatarImage
+                  source={
+                    profileQuery.data?.profileImageUrl
+                      ? { uri: profileQuery.data.profileImageUrl }
+                      : DEFAULT_PROFILE_IMAGE
+                  }
+                />
+                <AvatarFallback className="bg-[#EEF6EB]" />
               </Avatar>
             </Button>
           </View>
         </View>
-        <View className="mt-3 flex-row gap-2">
-          <View className="h-[38px] flex-row items-center gap-1.5 rounded-full bg-white px-[13px]">
-            <Ionicons name="partly-sunny" size={18} color="#E38A00" />
-            <Text className="text-[13px] font-bold text-[#24372A]">
-              산책하기 좋은 날
-            </Text>
-          </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerClassName="gap-2 pt-3 pr-[18px]"
+        >
           <View className="h-[38px] flex-row items-center gap-1 rounded-full bg-[#E9FBEF] px-3">
             <Ionicons name="location" size={16} color="#087A3F" />
             <Text className="text-[13px] font-bold text-[#24372A]">
               내 주변
             </Text>
           </View>
-        </View>
+          <Button
+            variant="outline"
+            accessibilityLabel="탐색 가능 구역 보기"
+            className="h-[38px] rounded-full border-[#B8C8BA] bg-white px-3"
+            onPress={() => setRegionsOpen(true)}
+          >
+            <Ionicons name="map-outline" size={16} color="#087A3F" />
+            <Text className="text-[13px] font-bold text-[#24372A]">
+              탐색 가능 구역
+            </Text>
+          </Button>
+        </ScrollView>
       </SafeAreaView>
 
-      <View className="absolute bottom-14 left-[18px] right-[18px] items-end gap-3">
+      <View className="absolute bottom-7 left-[18px] right-[18px] items-end gap-3">
         {message && (
           <Text
             accessibilityLiveRegion="polite"
@@ -362,6 +396,96 @@ export default function MapScreen() {
           <Ionicons name="chevron-forward" size={22} color="white" />
         </Button>
       </View>
+
+      <Modal
+        visible={regionsOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setRegionsOpen(false)}
+      >
+        <View className="flex-1 justify-end">
+          <Pressable
+            accessibilityLabel="탐색 가능 구역 닫기"
+            className="absolute inset-0 bg-black/35"
+            onPress={() => setRegionsOpen(false)}
+          />
+          <SafeAreaView
+            edges={["bottom"]}
+            className="max-h-[68%] rounded-t-[30px] bg-[#FCFDFC]"
+          >
+            <View className="h-8 items-center justify-center">
+              <View className="h-[5px] w-[42px] rounded-full bg-slate-300" />
+            </View>
+            <View className="px-5 pb-3">
+              <Text className="text-xl font-extrabold text-[#191C1D]">
+                탐색 가능 구역
+              </Text>
+              <Text className="mt-1 text-sm text-[#6B756D]">
+                코스를 제공하는 지역으로 지도를 이동할 수 있어요.
+              </Text>
+            </View>
+            {regionsQuery.isPending ? (
+              <View className="items-center gap-3 px-5 py-12">
+                <ActivityIndicator color="#087A3F" />
+                <Text className="text-sm text-[#6B756D]">
+                  탐색 구역을 불러오는 중이에요
+                </Text>
+              </View>
+            ) : regionsQuery.isError ? (
+              <View className="items-center px-5 py-10">
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={30}
+                  color="#DC2626"
+                />
+                <Text className="mt-3 text-sm font-bold text-[#191C1D]">
+                  탐색 구역을 불러오지 못했어요
+                </Text>
+                <Button
+                  variant="outline"
+                  className="mt-4 rounded-xl"
+                  onPress={() => void regionsQuery.refetch()}
+                >
+                  <Text className="font-bold text-[#365F49]">다시 시도</Text>
+                </Button>
+              </View>
+            ) : (
+              <ScrollView
+                contentContainerClassName="gap-2 px-5 pb-6"
+                showsVerticalScrollIndicator
+              >
+                {regionsQuery.data?.map((item) => (
+                  <View
+                    key={item.regionCode}
+                    className="flex-row items-center gap-3 rounded-2xl border border-[#E1E8E2] bg-white p-4"
+                  >
+                    <View className="h-10 w-10 items-center justify-center rounded-full bg-[#E9FBEF]">
+                      <Ionicons name="location" size={19} color="#087A3F" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="font-extrabold text-[#191C1D]">
+                        {item.name}
+                      </Text>
+                      <Text className="mt-0.5 text-xs text-[#6B756D]">
+                        이용 가능한 코스 {item.courseCount}개
+                      </Text>
+                    </View>
+                    <Button
+                      size="sm"
+                      className="h-10 rounded-xl bg-[#087A3F] px-4"
+                      onPress={() => moveToServiceRegion(item)}
+                    >
+                      <Text className="text-xs font-extrabold text-white">
+                        이동
+                      </Text>
+                    </Button>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </SafeAreaView>
+        </View>
+      </Modal>
     </View>
   );
 }

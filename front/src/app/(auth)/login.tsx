@@ -119,6 +119,16 @@ export default function LoginScreen() {
               {loginMutation.isPending ? "로그인 중..." : "로그인"}
             </Text>
           </Button>
+          <Button
+            variant="outline"
+            className="mt-3 h-12 rounded-xl border-[#8FB69A] bg-white"
+            onPress={() => router.replace("/(tabs)/map" as never)}
+          >
+            <Ionicons name="compass-outline" size={19} color="#365F49" />
+            <Text className="font-extrabold text-[#365F49]">
+              로그인 없이 이용하기
+            </Text>
+          </Button>
           <View className="my-6 flex-row items-center gap-2.5">
             <View className="h-px flex-1 bg-[#D7DED8]" />
             <Text className="text-xs text-[#7B867E]">

@@ -8,9 +8,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { logout } from "@/api/auth-api";
 import { getMyProfile, updateMyProfile, withdraw } from "@/api/user-api";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
-const PROFILE =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCJsRPYBQCHgxBRzPFw66AOkmuy-9AcNt_g2vsX57A8W5WkBn2NTvk8pFMWNVdsTfB9j5-00K7LwDAttKzEqCEUpxz40iWZklmWuCCcnJapH0ozdk-JNtRzP-j3d1u3JqLk8W02FSfkUNj4lT6eT9hyxMflOn3Fk36NJbW9YAjrVawmzPvEb1mC8y_lFK_h3vCesJQSqde1Kmut7D5DynM8blIyQOG-sWzPXphy32YPAxjvirdKML5-PQ";
 const PERSONAS = [
   {
     key: "walker",
@@ -147,10 +146,10 @@ export default function ProfileScreen() {
           </Button>
           <Button
             variant="outline"
-            className="mt-2.5 h-12 w-full rounded-xl border-[#B8C8BA] bg-white"
+            className="mt-2.5 h-12 w-full rounded-xl border-[#8DDFA4] bg-[#BDF4CB]"
             onPress={() => router.push("/(auth)/signup" as never)}
           >
-            <Text className="font-bold text-[#365F49]">회원가입</Text>
+            <Text className="font-bold text-[#075E34]">회원가입</Text>
           </Button>
         </View>
       </SafeAreaView>
@@ -172,7 +171,11 @@ export default function ProfileScreen() {
           <View className="flex-row items-center gap-3">
             <View>
               <Image
-                source={{ uri: profile?.profileImageUrl || PROFILE }}
+                source={
+                  profile?.profileImageUrl
+                    ? { uri: profile.profileImageUrl }
+                    : DEFAULT_PROFILE_IMAGE
+                }
                 className="h-16 w-16 rounded-full border-2 border-slate-100"
               />
               <Pressable
