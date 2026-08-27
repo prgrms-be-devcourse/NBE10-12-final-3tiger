@@ -7,6 +7,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class S3PhotoStorageTest {
 
@@ -30,6 +31,22 @@ class S3PhotoStorageTest {
                     .startsWith("https://images.example.com/posts/17/")
                     .endsWith(".jpg");
             assertThat(target.expireInSeconds()).isEqualTo(300);
+        }
+    }
+
+    @Test
+    void rejectsUnsupportedContentType() {
+        try (S3Presigner presigner = S3Presigner.builder()
+                .region(Region.AP_NORTHEAST_2)
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create("test-access-key", "test-secret-key")))
+                .build()) {
+            S3PhotoStorage storage = new S3PhotoStorage(
+                    presigner, "today-walk-images", "https://images.example.com");
+
+            assertThatThrownBy(() -> storage.createUploadTarget(17L, "walk.pdf", "application/pdf"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("지원하지 않는 이미지 형식입니다: application/pdf");
         }
     }
 }

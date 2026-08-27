@@ -59,10 +59,12 @@ public class S3PhotoStorage implements PhotoStorage {
     }
 
     private String extensionFor(String contentType) {
+        if (contentType == null) throw new IllegalArgumentException("이미지 형식은 필수입니다.");
         return switch (contentType) {
+            case "image/jpeg" -> ".jpg";
             case "image/png" -> ".png";
             case "image/webp" -> ".webp";
-            default -> ".jpg";
+            default -> throw new IllegalArgumentException("지원하지 않는 이미지 형식입니다: " + contentType);
         };
     }
 }
