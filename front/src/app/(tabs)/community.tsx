@@ -65,10 +65,13 @@ function FeedPost({
   const [likeCount, setLikeCount] = useState(item.likeCount);
   const [bookmarked, setBookmarked] = useState(item.isBookmarked ?? false);
   const [expanded, setExpanded] = useState(false);
+  const [contentLineCount, setContentLineCount] = useState(0);
   useEffect(() => {
     setLiked(item.isLiked ?? false);
     setLikeCount(item.likeCount);
     setBookmarked(item.isBookmarked ?? false);
+    setExpanded(false);
+    setContentLineCount(0);
   }, [item]);
 
   const likeMutation = useMutation({
@@ -191,26 +194,41 @@ function FeedPost({
             bookmarkMutation.mutate({ desiredBookmarked: !bookmarked });
         }}
       />
-      <View className="flex-row items-end px-3 pb-4">
+      <View className="relative px-3 pb-4">
         <Text
-          className="flex-1 text-[13px] leading-5 text-[#252A26]"
-          numberOfLines={expanded ? undefined : 1}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          className="absolute left-3 right-3 top-0 opacity-0 text-[13px] leading-5"
+          onTextLayout={(event) =>
+            setContentLineCount(event.nativeEvent.lines.length)
+          }
         >
-          <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
+          <Text className="text-[13px] font-bold leading-5">
             {item.nickname ?? "산책러"}{" "}
           </Text>
           {item.content}
         </Text>
-        {!expanded && (
-          <Button
-            variant="link"
-            size="sm"
-            className="ml-1 h-5 px-0"
-            onPress={() => setExpanded(true)}
+        <View className="flex-row items-end">
+          <Text
+            className="flex-1 text-[13px] leading-5 text-[#252A26]"
+            numberOfLines={expanded ? undefined : 2}
           >
-            <Text className="text-[11px] text-slate-500">더 보기</Text>
-          </Button>
-        )}
+            <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
+              {item.nickname ?? "산책러"}{" "}
+            </Text>
+            {item.content}
+          </Text>
+          {!expanded && contentLineCount > 2 && (
+            <Button
+              variant="link"
+              size="sm"
+              className="ml-1 h-5 px-0"
+              onPress={() => setExpanded(true)}
+            >
+              <Text className="text-[11px] text-slate-500">더 보기</Text>
+            </Button>
+          )}
+        </View>
       </View>
     </View>
   );

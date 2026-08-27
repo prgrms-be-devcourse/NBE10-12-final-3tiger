@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -29,6 +30,15 @@ export default function LoginScreen() {
       router.replace("/(tabs)/map" as never);
     },
   });
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => true,
+      );
+      return () => subscription.remove();
+    }, []),
+  );
   const submit = () => {
     if (!email.trim() || !password) return;
     loginMutation.mutate({ email: email.trim(), password });
@@ -45,16 +55,7 @@ export default function LoginScreen() {
           contentContainerClassName="p-6 pb-10"
           keyboardShouldPersistTaps="handled"
         >
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel="뒤로 가기"
-            className="h-12 w-12"
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#33443A" />
-          </Button>
-          <View className="mt-5 h-[72px] w-[72px] self-center items-center justify-center rounded-3xl bg-[#DDF8E5]">
+          <View className="mt-8 h-[72px] w-[72px] self-center items-center justify-center rounded-3xl bg-[#DDF8E5]">
             <Ionicons name="leaf" size={38} color="#006E2F" />
           </View>
           <Text className="mt-5 text-center text-[32px] font-black text-[#0B1C30]">
