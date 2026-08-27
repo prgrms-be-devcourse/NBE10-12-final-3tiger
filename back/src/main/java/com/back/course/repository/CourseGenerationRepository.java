@@ -22,15 +22,15 @@ public class CourseGenerationRepository {
         this.jdbc = jdbc;
     }
 
-    /** 저장 없이 경로만 생성 */
+    /** 저장 없이 경로만 생성. persona=null이면 균등 가중치(walker)로 폴백. */
     public Optional<GenerateRow> generateOnly(
-            double lng, double lat, int targetM, LocalDateTime at, int candidateIdx
+            double lng, double lat, int targetM, LocalDateTime at, int candidateIdx, String persona
     ) {
         String sql = """
                 SELECT path_geojson, total_m, avg_score, error_pct, region_code
-                  FROM routing.generate_only(?, ?, ?, ?, ?)
+                  FROM routing.generate_only(?, ?, ?, ?, ?, ?)
                 """;
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, lng, lat, targetM, at, candidateIdx);
+        List<Map<String, Object>> rows = jdbc.queryForList(sql, lng, lat, targetM, at, candidateIdx, persona);
         if (rows.isEmpty()) return Optional.empty();
         Map<String, Object> r = rows.get(0);
         if (r.get("path_geojson") == null) return Optional.empty();

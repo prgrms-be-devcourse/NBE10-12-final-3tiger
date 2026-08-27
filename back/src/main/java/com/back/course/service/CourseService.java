@@ -63,16 +63,17 @@ public class CourseService {
     public PageResponse<CourseItem> search(CourseSearchQuery q) {
         boolean useSummer = isSummer(q.at() != null ? q.at() : LocalDateTime.now());
         int offset = q.page() * q.size();
+        String persona = q.persona() != null ? q.persona().name() : null;
 
         List<CourseListView> rows;
         long total;
         if (q.regionCode() != null) {
             rows = courses.searchByRegion(q.regionCode(), q.isLoop(), q.distanceMinM(), q.distanceMaxM(),
-                    useSummer, q.sort(), q.size(), offset);
+                    useSummer, q.sort(), persona, q.size(), offset);
             total = courses.countByRegion(q.regionCode(), q.isLoop(), q.distanceMinM(), q.distanceMaxM());
         } else {
             rows = courses.searchByLocation(q.lat(), q.lng(), q.radiusM(), q.isLoop(),
-                    q.distanceMinM(), q.distanceMaxM(), useSummer, q.sort(), q.size(), offset);
+                    q.distanceMinM(), q.distanceMaxM(), useSummer, q.sort(), persona, q.size(), offset);
             total = courses.countByLocation(q.lat(), q.lng(), q.radiusM(), q.isLoop(),
                     q.distanceMinM(), q.distanceMaxM());
         }
