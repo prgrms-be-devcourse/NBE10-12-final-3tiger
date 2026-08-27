@@ -6,10 +6,13 @@ import com.back.comment.repository.CommentRepository;
 import com.back.comment.repository.CommentUpvoteRepository;
 import com.back.global.api.PageResponse;
 import com.back.global.error.ApiException;
+import com.back.notification.event.CommentCreatedEvent;
+import com.back.notification.event.CommentUpvotedEvent;
 import com.back.post.domain.Post;
 import com.back.post.repository.PostRepository;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,8 +25,11 @@ import java.time.LocalDateTime;
 public class CommentService {
     private final CommentRepository comments; private final CommentUpvoteRepository commentUpvotes;
     private final PostRepository posts; private final UserRepository users;
-    public CommentService(CommentRepository comments, CommentUpvoteRepository commentUpvotes, PostRepository posts, UserRepository users) {
+    private final ApplicationEventPublisher eventPublisher;
+    public CommentService(CommentRepository comments, CommentUpvoteRepository commentUpvotes, PostRepository posts,
+                          UserRepository users, ApplicationEventPublisher eventPublisher) {
         this.comments = comments; this.commentUpvotes = commentUpvotes; this.posts = posts; this.users = users;
+        this.eventPublisher = eventPublisher;
     }
 
     public PageResponse<CommentResponse> getComments(Long postId, Pageable pageable) {
@@ -36,6 +42,8 @@ public class CommentService {
         Post post = posts.findById(postId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
         User user = users.findById(userId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 사용자입니다."));
         Comment comment = comments.save(new Comment(post, user, content));
+        eventPublisher.publishEvent(new CommentCreatedEvent(post.getUser().getId(), userId, user.getNickname(),
+                user.getProfileImageUrl(), postId, comment.getId()));
         return comment.getId();
     }
 
@@ -52,6 +60,8 @@ public class CommentService {
         User user = users.findById(userId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 사용자입니다."));
         commentUpvotes.save(new CommentUpvote(comment, user));
         comment.increaseUpvote();
+        eventPublisher.publishEvent(new CommentUpvotedEvent(comment.getUser().getId(), userId, user.getNickname(),
+                user.getProfileImageUrl(), comment.getPost().getId(), commentId));
         return new UpvoteResult(true, comment.getUpvoteCount());
     }
 
