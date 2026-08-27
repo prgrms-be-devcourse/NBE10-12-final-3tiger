@@ -19,6 +19,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+import io.jsonwebtoken.JwtException;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -94,5 +96,35 @@ class AuthServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_CREDENTIALS);
+    }
+
+    @Test
+    void logout_유효한토큰_Redis키삭제() {
+        io.jsonwebtoken.Claims claims = mock(io.jsonwebtoken.Claims.class);
+        given(jwtProvider.parseRefreshToken("valid-rt")).willReturn(claims);
+        given(claims.getSubject()).willReturn("1");
+        given(claims.getId()).willReturn("jti-uuid");
+
+        authService.logout("valid-rt");
+
+        verify(redisTemplate).delete("RT:1:jti-uuid");
+    }
+
+    @Test
+    void logout_만료된토큰_무시하고정상처리() {
+        given(jwtProvider.parseRefreshToken("expired-rt")).willThrow(new JwtException("expired"));
+
+        authService.logout("expired-rt");
+
+        verify(redisTemplate, never()).delete(anyString());
+    }
+
+    @Test
+    void logout_유효하지않은토큰_무시하고정상처리() {
+        given(jwtProvider.parseRefreshToken("bad-rt")).willThrow(new IllegalArgumentException("invalid"));
+
+        authService.logout("bad-rt");
+
+        verify(redisTemplate, never()).delete(anyString());
     }
 }

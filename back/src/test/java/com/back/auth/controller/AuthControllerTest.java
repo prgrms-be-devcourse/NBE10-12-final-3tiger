@@ -2,6 +2,7 @@ package com.back.auth.controller;
 
 import com.back.auth.dto.AuthResponse;
 import com.back.auth.dto.LoginRequest;
+import com.back.auth.dto.LogoutRequest;
 import com.back.auth.service.AuthService;
 import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.PasswordEncoderConfig;
@@ -23,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willDoNothing;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -81,5 +83,26 @@ class AuthControllerTest {
                                 new LoginRequest("kakao@test.com", "password123"))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("AUTH_409_2"));
+    }
+
+    @Test
+    void logout_성공_200() throws Exception {
+        willDoNothing().given(authService).logout(anyString());
+
+        mvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new LogoutRequest("some-refresh-token"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("로그아웃이 완료되었습니다."));
+    }
+
+    @Test
+    void logout_빈토큰_400() throws Exception {
+        mvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new LogoutRequest(""))))
+                .andExpect(status().isBadRequest());
     }
 }
