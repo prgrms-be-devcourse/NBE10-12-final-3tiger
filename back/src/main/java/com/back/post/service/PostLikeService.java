@@ -3,12 +3,14 @@ package com.back.post.service;
 import com.back.global.api.PageResponse;
 import com.back.comment.repository.CommentRepository;
 import com.back.global.error.ApiException;
+import com.back.notification.event.PostLikedEvent;
 import com.back.post.domain.Post;
 import com.back.post.domain.PostLike;
 import com.back.post.repository.PostLikeRepository;
 import com.back.post.repository.PostRepository;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -26,9 +28,11 @@ import java.util.stream.Collectors;
 public class PostLikeService {
     private final PostRepository posts; private final UserRepository users; private final PostLikeRepository postLikes;
     private final CommentRepository comments; private final PostLikeWriter postLikeWriter;
+    private final ApplicationEventPublisher eventPublisher;
     public PostLikeService(PostRepository posts, UserRepository users, PostLikeRepository postLikes,
-                           CommentRepository comments, PostLikeWriter postLikeWriter) {
-        this.posts = posts; this.users = users; this.postLikes = postLikes; this.comments = comments; this.postLikeWriter = postLikeWriter;
+                           CommentRepository comments, PostLikeWriter postLikeWriter, ApplicationEventPublisher eventPublisher) {
+        this.posts = posts; this.users = users; this.postLikes = postLikes; this.comments = comments;
+        this.postLikeWriter = postLikeWriter; this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -47,7 +51,11 @@ public class PostLikeService {
             return new LikeResult(true, post.getLikeCount());
         }
 
+        // increaseLikeCount(clearAutomatically=true)가 영속성 컨텍스트를 비우기 전에
+        // 지연로딩되는 게시물 작성자 id를 미리 읽어둠 (이후엔 LazyInitializationException 위험)
+        Long postOwnerId = post.getUser().getId();
         posts.increaseLikeCount(postId);
+        eventPublisher.publishEvent(new PostLikedEvent(postOwnerId, userId, user.getNickname(), user.getProfileImageUrl(), postId));
         // JPQL 벌크 업데이트라 영속성 컨텍스트(post)에는 반영되지 않으므로 직접 +1 계산
         return new LikeResult(true, post.getLikeCount() + 1);
     }
