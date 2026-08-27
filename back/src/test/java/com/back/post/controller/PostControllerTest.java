@@ -41,17 +41,16 @@ class PostControllerTest {
     @MockitoBean JwtProvider jwtProvider;
 
     @Test
-    @DisplayName("피드는 인증 없이 제목·내용·좋아요·댓글 정보를 조회할 수 있다")
+    @DisplayName("피드는 인증 없이 내용·좋아요·댓글 정보를 조회할 수 있다")
     void feed() throws Exception {
-        var item = new PostService.FeedItem(10L, 1L, "산책러", "서울숲 기록", "좋은 산책이었습니다.",
+        var item = new PostService.FeedItem(10L, 1L, "산책러", "좋은 산책이었습니다.",
                 "https://example.com/walk.jpg", 3, 2, false, LocalDateTime.of(2026, 8, 26, 9, 0));
-        given(postService.feed(null, null, "latest", 0, 20))
+        given(postService.feed(null, "latest", 0, 20))
                 .willReturn(new PageResponse<>(List.of(item), 0, 20, 1));
 
         mvc.perform(get("/api/v1/posts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].postId").value(10))
-                .andExpect(jsonPath("$.data.content[0].title").value("서울숲 기록"))
                 .andExpect(jsonPath("$.data.content[0].content").value("좋은 산책이었습니다."))
                 .andExpect(jsonPath("$.data.content[0].likeCount").value(3))
                 .andExpect(jsonPath("$.data.content[0].commentCount").value(2))
@@ -59,7 +58,7 @@ class PostControllerTest {
     }
 
     @Test
-    @DisplayName("인증 사용자는 코스 1에 제목과 내용이 있는 게시물을 작성할 수 있다")
+    @DisplayName("인증 사용자는 코스 1에 내용이 있는 게시물을 작성할 수 있다")
     void create() throws Exception {
         given(postService.create(eq(1L), any(PostService.CreateCommand.class)))
                 .willReturn(new PostService.CreatedPost(10L));
@@ -68,7 +67,7 @@ class PostControllerTest {
                         .with(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"courseId":1,"title":"서울숲 기록","content":"좋은 산책이었습니다.",
+                                {"courseId":1,"content":"좋은 산책이었습니다.",
                                  "photoUrl":"https://example.com/walk.jpg","walkedAt":"2026-08-26T09:00:00"}
                                 """))
                 .andExpect(status().isOk())
@@ -83,7 +82,7 @@ class PostControllerTest {
         mvc.perform(post("/api/v1/posts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"courseId":1,"title":"제목","content":"내용","walkedAt":"2026-08-26T09:00:00"}
+                                {"courseId":1,"content":"내용","walkedAt":"2026-08-26T09:00:00"}
                                 """))
                 .andExpect(status().isUnauthorized());
 
@@ -91,13 +90,13 @@ class PostControllerTest {
     }
 
     @Test
-    @DisplayName("제목이나 내용이 비어 있으면 400을 반환한다")
-    void validatesTitleAndContent() throws Exception {
+    @DisplayName("내용이 비어 있으면 400을 반환한다")
+    void validatesContent() throws Exception {
         mvc.perform(post("/api/v1/posts")
                         .with(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"courseId":1,"title":"","content":"","walkedAt":"2026-08-26T09:00:00"}
+                                {"courseId":1,"content":"","walkedAt":"2026-08-26T09:00:00"}
                                 """))
                 .andExpect(status().isBadRequest());
 

@@ -1,9 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { logout } from "@/api/auth-api";
+import { getMyProfile, updateMyProfile, withdraw } from "@/api/user-api";
+import { ErrorState, LoadingState } from "@/components/ui/data-state";
+import { useAuthStore } from "@/stores/auth-store";
 const PROFILE =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuCJsRPYBQCHgxBRzPFw66AOkmuy-9AcNt_g2vsX57A8W5WkBn2NTvk8pFMWNVdsTfB9j5-00K7LwDAttKzEqCEUpxz40iWZklmWuCCcnJapH0ozdk-JNtRzP-j3d1u3JqLk8W02FSfkUNj4lT6eT9hyxMflOn3Fk36NJbW9YAjrVawmzPvEb1mC8y_lFK_h3vCesJQSqde1Kmut7D5DynM8blIyQOG-sWzPXphy32YPAxjvirdKML5-PQ";
 const PERSONAS = [
@@ -52,18 +57,71 @@ const MENUS = [
   },
 ];
 export default function ProfileScreen() {
+  const queryClient = useQueryClient();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const clearSession = useAuthStore((state) => state.clearSession);
   const [persona, setPersona] = useState("dog");
-  const [tags, setTags] = useState(["공원 위주", "식수대 있음"]);
-  useFocusEffect(
-    useCallback(() => {
-      setPersona("dog");
-      setTags(["공원 위주", "식수대 있음"]);
-    }, []),
-  );
+  const [tags, setTags] = useState<string[]>([]);
+  const profileQuery = useQuery({
+    queryKey: ["my-profile"],
+    queryFn: getMyProfile,
+    enabled: isAuthenticated,
+  });
+  const profileMutation = useMutation({
+    mutationFn: updateMyProfile,
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["my-profile"] }),
+  });
+  const logoutMutation = useMutation({
+    mutationFn: logout,
+    onSettled: async () => {
+      await clearSession();
+      queryClient.clear();
+      router.replace("/(auth)/login" as never);
+    },
+  });
+  const withdrawMutation = useMutation({
+    mutationFn: withdraw,
+    onSuccess: async () => {
+      await clearSession();
+      queryClient.clear();
+      router.replace("/(auth)/login" as never);
+    },
+  });
+  useEffect(() => {
+    if (!isAuthenticated) router.replace("/(auth)/login" as never);
+  }, [isAuthenticated]);
+  useEffect(() => {
+    if (profileQuery.data) {
+      setPersona(profileQuery.data.primaryPersona ?? "dog");
+      setTags(profileQuery.data.personaTags ?? []);
+    }
+  }, [profileQuery.data]);
+  const savePreferences = (nextPersona: string, nextTags: string[]) => {
+    setPersona(nextPersona);
+    setTags(nextTags);
+    if (profileQuery.data)
+      profileMutation.mutate({
+        nickname: profileQuery.data.nickname,
+        primaryPersona: nextPersona,
+        personaTags: nextTags,
+      });
+  };
   const toggle = (tag: string) =>
-    setTags((v) =>
-      v.includes(tag) ? v.filter((x) => x !== tag) : [...v, tag],
+    savePreferences(
+      persona,
+      tags.includes(tag) ? tags.filter((x) => x !== tag) : [...tags, tag],
     );
+  if (profileQuery.isPending)
+    return <LoadingState label="프로필을 불러오는 중이에요" />;
+  if (profileQuery.isError)
+    return (
+      <ErrorState
+        message={profileQuery.error.message}
+        onRetry={() => void profileQuery.refetch()}
+      />
+    );
+  const profile = profileQuery.data;
   return (
     <SafeAreaView className="flex-1 bg-[#F2F7F2]" edges={["top"]}>
       <ScrollView contentContainerClassName="gap-3.5 p-5 pb-9">
@@ -71,7 +129,7 @@ export default function ProfileScreen() {
           <View className="flex-row items-center gap-3">
             <View>
               <Image
-                source={{ uri: PROFILE }}
+                source={{ uri: profile?.profileImageUrl || PROFILE }}
                 className="h-16 w-16 rounded-full border-2 border-slate-100"
               />
               <Pressable
@@ -85,10 +143,10 @@ export default function ProfileScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-[17px] font-semibold text-[#191C1D]">
-                산책러
+                {profile?.nickname}
               </Text>
               <Text className="mt-0.5 text-xs text-slate-500">
-                walker@example.com
+                {profile?.email}
               </Text>
             </View>
           </View>
@@ -101,7 +159,8 @@ export default function ProfileScreen() {
                 variant="secondary"
                 size="sm"
                 className="h-9 flex-1 rounded-lg bg-slate-200 px-3"
-                onPress={() => router.replace("/(auth)/login" as never)}
+                disabled={logoutMutation.isPending}
+                onPress={() => logoutMutation.mutate()}
               >
                 <Text className="text-xs font-semibold text-slate-600">
                   로그아웃
@@ -111,6 +170,8 @@ export default function ProfileScreen() {
                 variant="destructive"
                 size="sm"
                 className="h-9 flex-1 rounded-lg px-3"
+                disabled={withdrawMutation.isPending}
+                onPress={() => withdrawMutation.mutate()}
               >
                 <Text className="text-xs font-semibold text-white">
                   계정 삭제
@@ -137,7 +198,7 @@ export default function ProfileScreen() {
                   key={item.key}
                   className={`h-20 flex-1 items-center justify-center gap-1 rounded-lg border-2 ${active ? "bg-orange-50" : "border-slate-200 bg-slate-100"}`}
                   style={active ? { borderColor: item.color } : undefined}
-                  onPress={() => setPersona(item.key)}
+                  onPress={() => savePreferences(item.key, tags)}
                 >
                   <Ionicons
                     name={item.icon}
@@ -166,22 +227,25 @@ export default function ProfileScreen() {
             선호하는 산책 환경을 알려주세요.
           </Text>
           <View className="flex-row gap-1.5">
-            {["공원 위주", "그늘 많은 곳", "평탄한 길", "식수대 있음"].map(
-              (tag) => (
-                <Pressable
-                  key={tag}
-                  onPress={() => toggle(tag)}
-                  className={`h-10 flex-1 items-center justify-center rounded-full border px-1 ${tags.includes(tag) ? "border-[#22C55E] bg-[#22C55E]" : "border-[#BCCBB9] bg-slate-200"}`}
+            {[
+              ["park", "공원 위주"],
+              ["shade", "그늘 많은 곳"],
+              ["flat", "평탄한 길"],
+              ["water", "식수대 있음"],
+            ].map(([tag, label]) => (
+              <Pressable
+                key={tag}
+                onPress={() => toggle(tag)}
+                className={`h-10 flex-1 items-center justify-center rounded-full border px-1 ${tags.includes(tag) ? "border-[#22C55E] bg-[#22C55E]" : "border-[#BCCBB9] bg-slate-200"}`}
+              >
+                <Text
+                  numberOfLines={1}
+                  className="text-[11px] font-bold text-[#26372D]"
                 >
-                  <Text
-                    numberOfLines={1}
-                    className="text-[11px] font-bold text-[#26372D]"
-                  >
-                    {tag}
-                  </Text>
-                </Pressable>
-              ),
-            )}
+                  {label}
+                </Text>
+              </Pressable>
+            ))}
           </View>
         </View>
         <View className="overflow-hidden rounded-xl bg-[#F9FCF9] px-4">

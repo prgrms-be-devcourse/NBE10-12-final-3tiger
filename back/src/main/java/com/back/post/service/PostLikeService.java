@@ -67,21 +67,28 @@ public class PostLikeService {
     }
 
     public PageResponse<LikedPostItem> myLikes(Long userId, int page, int size) {
-        var found = postLikes.findByUser_IdOrderByCreatedAtDesc(userId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
-        List<Long> postIds = found.getContent().stream().map(postLike -> postLike.getPost().getId()).toList();
-        Map<Long, Long> commentCounts = postIds.isEmpty() ? Map.of() : comments.countByPostIds(postIds).stream()
-                .collect(Collectors.toMap(CommentRepository.PostCommentCount::getPostId,
+        var found = postLikes.findByUser_IdOrderByCreatedAtDesc(userId,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+        List<Long> postIds = found.getContent().stream()
+                .map(postLike -> postLike.getPost().getId())
+                .toList();
+        Map<Long, Long> commentCounts = postIds.isEmpty()
+                ? Map.of()
+                : comments.countByPostIds(postIds).stream()
+                    .collect(Collectors.toMap(
+                        CommentRepository.PostCommentCount::getPostId,
                         CommentRepository.PostCommentCount::getCommentCount));
         return PageResponse.from(found.map(postLike -> toLikedPostItem(postLike, commentCounts)));
     }
 
     private LikedPostItem toLikedPostItem(PostLike postLike, Map<Long, Long> commentCounts) {
         Post post = postLike.getPost();
-        return new LikedPostItem(post.getId(), post.getCourse().getId(), post.getUser().getNickname(), post.getTitle(), post.getContent(),
-                post.getPhotoUrl(), post.getLikeCount(), commentCounts.getOrDefault(post.getId(), 0L), postLike.getCreatedAt());
+        return new LikedPostItem(post.getId(), post.getCourse().getId(), post.getUser().getNickname(), post.getContent(),
+                post.getPhotoUrl(), post.getLikeCount(),
+                commentCounts.getOrDefault(post.getId(), 0L), postLike.getCreatedAt());
     }
 
     public record LikeResult(boolean isLiked, int likeCount) {}
-    public record LikedPostItem(Long postId, Long courseId, String nickname, String title, String content, String photoUrl,
+    public record LikedPostItem(Long postId, Long courseId, String nickname, String content, String photoUrl,
                                 int likeCount, long commentCount, LocalDateTime likedAt) {}
 }

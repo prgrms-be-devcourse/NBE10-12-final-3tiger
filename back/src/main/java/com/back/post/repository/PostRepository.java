@@ -15,9 +15,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     Page<Post> findAll(Pageable pageable);
 
     @EntityGraph(attributePaths = {"user", "course"})
-    Page<Post> findByCourseRegionCode(String regionCode, Pageable pageable);
-
-    @EntityGraph(attributePaths = {"user", "course"})
     Page<Post> findByUserId(Long userId, Pageable pageable);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

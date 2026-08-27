@@ -62,7 +62,7 @@ class PostServiceTest {
     }
 
     private Post post(Long id, User user, Course course) {
-        Post post = new Post(user, course, "서울숲 기록", "좋은 산책이었습니다.",
+        Post post = new Post(user, course, "좋은 산책이었습니다.",
                 "https://example.com/walk.jpg", LocalDateTime.of(2026, 8, 26, 9, 0));
         ReflectionTestUtils.setField(post, "id", id);
         return post;
@@ -85,7 +85,7 @@ class PostServiceTest {
         given(courses.findById(1L)).willReturn(Optional.of(course));
         given(posts.save(any(Post.class))).willReturn(saved);
 
-        var command = new PostService.CreateCommand(1L, "서울숲 기록", "좋은 산책이었습니다.",
+        var command = new PostService.CreateCommand(1L, "좋은 산책이었습니다.",
                 "https://example.com/walk.jpg", LocalDateTime.of(2026, 8, 26, 9, 0));
         PostService.CreatedPost result = postService.create(1L, command);
 
@@ -97,7 +97,7 @@ class PostServiceTest {
     @DisplayName("존재하지 않는 사용자로 작성하면 401을 반환한다")
     void createRejectsUnknownUser() {
         given(users.findById(99L)).willReturn(Optional.empty());
-        var command = new PostService.CreateCommand(1L, "제목", "내용", null, LocalDateTime.now());
+        var command = new PostService.CreateCommand(1L, "내용", null, LocalDateTime.now());
 
         ApiException exception = catchThrowableOfType(() -> postService.create(99L, command), ApiException.class);
 
@@ -111,7 +111,7 @@ class PostServiceTest {
     void createRejectsUnknownCourse() {
         given(users.findById(1L)).willReturn(Optional.of(user(1L)));
         given(courses.findById(999L)).willReturn(Optional.empty());
-        var command = new PostService.CreateCommand(999L, "제목", "내용", null, LocalDateTime.now());
+        var command = new PostService.CreateCommand(999L, "내용", null, LocalDateTime.now());
 
         ApiException exception = catchThrowableOfType(() -> postService.create(1L, command), ApiException.class);
 
@@ -121,7 +121,7 @@ class PostServiceTest {
     }
 
     @Test
-    @DisplayName("피드에서 제목·내용·좋아요 수·댓글 수·현재 사용자 좋아요 여부를 매핑한다")
+    @DisplayName("피드에서 내용·좋아요 수·댓글 수·현재 사용자 좋아요 여부를 매핑한다")
     void feed() {
         Post post = post(10L, user(2L), course(1L));
         post.increaseLikeCount();
@@ -130,10 +130,9 @@ class PostServiceTest {
         given(postLikes.findLikedPostIds(eq(1L), any())).willReturn(List.of(10L));
         given(comments.countByPostIds(any())).willReturn(List.of(commentCount));
 
-        PageResponse<PostService.FeedItem> result = postService.feed(1L, null, "latest", 0, 20);
+        PageResponse<PostService.FeedItem> result = postService.feed(1L, "latest", 0, 20);
 
         PostService.FeedItem item = result.content().getFirst();
-        assertThat(item.title()).isEqualTo("서울숲 기록");
         assertThat(item.content()).isEqualTo("좋은 산책이었습니다.");
         assertThat(item.likeCount()).isEqualTo(1);
         assertThat(item.commentCount()).isEqualTo(3);
@@ -146,7 +145,7 @@ class PostServiceTest {
         Post post = post(10L, user(2L), course(1L));
         given(posts.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of(post)));
 
-        PostService.FeedItem item = postService.feed(null, null, "latest", 0, 20).content().getFirst();
+        PostService.FeedItem item = postService.feed(null, "latest", 0, 20).content().getFirst();
 
         assertThat(item.isLiked()).isFalse();
         verify(postLikes, never()).findLikedPostIds(any(), any());

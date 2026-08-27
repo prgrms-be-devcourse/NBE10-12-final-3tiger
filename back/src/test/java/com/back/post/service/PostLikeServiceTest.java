@@ -55,7 +55,7 @@ class PostLikeServiceTest {
     private Post newPost() {
         User user = User.createLocal("test@test.com", "dummy-hash", "산책러");
         Course course = new Course("서울숲 코스", "11200", 2500);
-        return new Post(user, course, "산책 기록", "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
+        return new Post(user, course, "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
     }
 
     @Test
@@ -186,7 +186,7 @@ class PostLikeServiceTest {
         User user = User.createLocal("test@test.com", "dummy-hash", "산책러");
         Course course = new Course("서울숲 코스", "11200", 2500);
         ReflectionTestUtils.setField(course, "id", 20L);
-        Post post = new Post(user, course, "산책 기록", "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
+        Post post = new Post(user, course, "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
         ReflectionTestUtils.setField(post, "id", 10L);
         PostLike postLike = new PostLike(post, user);
 
@@ -202,7 +202,6 @@ class PostLikeServiceTest {
         assertThat(item.postId()).isEqualTo(10L);
         assertThat(item.courseId()).isEqualTo(20L);
         assertThat(item.nickname()).isEqualTo("산책러");
-        assertThat(item.title()).isEqualTo("산책 기록");
         assertThat(item.content()).isEqualTo("오늘도 산책");
         assertThat(item.photoUrl()).isEqualTo("http://example.com/photo.jpg");
         assertThat(item.likeCount()).isEqualTo(0);
