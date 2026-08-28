@@ -6,6 +6,8 @@ import com.back.comment.repository.CommentUpvoteRepository;
 import com.back.course.domain.Course;
 import com.back.global.api.PageResponse;
 import com.back.global.error.ApiException;
+import com.back.notification.event.CommentCreatedEvent;
+import com.back.notification.event.CommentUpvotedEvent;
 import com.back.post.domain.Post;
 import com.back.post.repository.PostRepository;
 import com.back.user.domain.User;
@@ -13,6 +15,7 @@ import com.back.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -63,17 +66,21 @@ class CommentServiceTest {
     }
 
     @Test
-    @DisplayName("t1: 댓글 작성 성공 시 commentId를 반환한다")
+    @DisplayName("t1: 댓글 작성 성공 시 commentId를 반환하고 CommentCreatedEvent를 발행한다")
     void t1() {
         // given
         Long postId = 1L;
         Long userId = 1L;
-        Post post = newPost();
-        User user = User.createLocal("test@test.com", "dummy-hash", "산책러");
-        Comment savedComment = new Comment(post, user, "좋은 코스네요");
+        User postAuthor = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        ReflectionTestUtils.setField(postAuthor, "id", 42L);
+        Course course = new Course("서울숲 코스", "11200", 2500);
+        Post post = new Post(postAuthor, course, "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
+        User commenter = User.createLocal("test@test.com", "dummy-hash", "산책러");
+        ReflectionTestUtils.setField(commenter, "id", userId);
+        Comment savedComment = new Comment(post, commenter, "좋은 코스네요");
         ReflectionTestUtils.setField(savedComment, "id", 100L);
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(userRepository.findById(userId)).willReturn(Optional.of(commenter));
         given(commentRepository.save(any(Comment.class))).willReturn(savedComment);
 
         // when
@@ -81,6 +88,16 @@ class CommentServiceTest {
 
         // then
         assertThat(commentId).isEqualTo(100L);
+
+        ArgumentCaptor<CommentCreatedEvent> captor = ArgumentCaptor.forClass(CommentCreatedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        CommentCreatedEvent event = captor.getValue();
+        assertThat(event.receiverId()).isEqualTo(42L);
+        assertThat(event.actorId()).isEqualTo(userId);
+        assertThat(event.actorNickname()).isEqualTo("산책러");
+        assertThat(event.actorProfileImageUrl()).isEqualTo(commenter.getProfileImageUrl());
+        assertThat(event.postId()).isEqualTo(postId);
+        assertThat(event.commentId()).isEqualTo(100L);
     }
 
     @Test
@@ -143,15 +160,20 @@ class CommentServiceTest {
     }
 
     @Test
-    @DisplayName("t5: 댓글 공감 성공 시 upvoted=true이고 upvoteCount가 1 증가한다")
+    @DisplayName("t5: 댓글 공감 성공 시 upvoted=true이고 upvoteCount가 1 증가하며 CommentUpvotedEvent를 발행한다")
     void t5() {
         // given
         Long commentId = 1L;
         Long userId = 1L;
-        Post post = newPost();
         User author = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        ReflectionTestUtils.setField(author, "id", 42L);
+        Course course = new Course("서울숲 코스", "11200", 2500);
+        Post post = new Post(author, course, "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
+        ReflectionTestUtils.setField(post, "id", 7L);
         Comment comment = new Comment(post, author, "좋은 코스네요");
+        ReflectionTestUtils.setField(comment, "id", commentId);
         User upvoter = User.createLocal("test@test.com", "dummy-hash", "산책러");
+        ReflectionTestUtils.setField(upvoter, "id", userId);
         given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
         given(commentUpvoteRepository.existsByComment_IdAndUser_Id(commentId, userId)).willReturn(false);
         given(userRepository.findById(userId)).willReturn(Optional.of(upvoter));
@@ -164,6 +186,16 @@ class CommentServiceTest {
         assertThat(result.upvoteCount()).isEqualTo(1);
         verify(commentUpvoteWriter).trySaveUpvote(eq(comment), any(User.class));
         verify(commentRepository).increaseUpvote(commentId);
+
+        ArgumentCaptor<CommentUpvotedEvent> captor = ArgumentCaptor.forClass(CommentUpvotedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        CommentUpvotedEvent event = captor.getValue();
+        assertThat(event.receiverId()).isEqualTo(42L);
+        assertThat(event.actorId()).isEqualTo(userId);
+        assertThat(event.actorNickname()).isEqualTo("산책러");
+        assertThat(event.actorProfileImageUrl()).isEqualTo(upvoter.getProfileImageUrl());
+        assertThat(event.postId()).isEqualTo(7L);
+        assertThat(event.commentId()).isEqualTo(commentId);
     }
 
     @Test
@@ -189,6 +221,7 @@ class CommentServiceTest {
         verify(commentUpvoteRepository).deleteByComment_IdAndUser_Id(commentId, userId);
         verify(commentRepository).decreaseUpvote(commentId);
         verify(userRepository, never()).findById(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test

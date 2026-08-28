@@ -4,6 +4,7 @@ import com.back.bookmark.repository.BookmarkRepository;
 import com.back.course.domain.Course;
 import com.back.global.api.PageResponse;
 import com.back.global.error.ApiException;
+import com.back.notification.event.PostLikedEvent;
 import com.back.post.domain.Post;
 import com.back.post.domain.PostLike;
 import com.back.post.repository.PostLikeRepository;
@@ -14,6 +15,7 @@ import com.back.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -66,15 +68,20 @@ class PostLikeServiceTest {
     }
 
     @Test
-    @DisplayName("t1: 좋아요 등록 성공 시 likeCount가 1 증가하고 isLiked=true를 반환한다")
+    @DisplayName("t1: 좋아요 등록 성공 시 likeCount가 1 증가하고 isLiked=true를 반환하며 PostLikedEvent를 발행한다")
     void t1() {
         // given
-        Post post = newPost();
         Long postId = 1L;
         Long userId = 1L;
+        User postOwner = User.createLocal("owner@test.com", "dummy-hash", "글쓴이");
+        ReflectionTestUtils.setField(postOwner, "id", 42L);
+        Course course = new Course("서울숲 코스", "11200", 2500);
+        Post post = new Post(postOwner, course, "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
+        User liker = User.createLocal("test@test.com", "dummy-hash", "산책러");
+        ReflectionTestUtils.setField(liker, "id", userId);
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
         given(postLikeRepository.existsByPost_IdAndUser_Id(postId, userId)).willReturn(false);
-        given(userRepository.findById(userId)).willReturn(Optional.of(User.createLocal("test@test.com", "dummy-hash", "산책러")));
+        given(userRepository.findById(userId)).willReturn(Optional.of(liker));
 
         // when
         PostLikeService.LikeResult result = postLikeService.like(postId, userId);
@@ -84,6 +91,15 @@ class PostLikeServiceTest {
         assertThat(result.likeCount()).isEqualTo(1);
         verify(postLikeWriter).trySaveLike(eq(post), any());
         verify(postRepository).increaseLikeCount(postId);
+
+        ArgumentCaptor<PostLikedEvent> captor = ArgumentCaptor.forClass(PostLikedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        PostLikedEvent event = captor.getValue();
+        assertThat(event.receiverId()).isEqualTo(42L);
+        assertThat(event.actorId()).isEqualTo(userId);
+        assertThat(event.actorNickname()).isEqualTo("산책러");
+        assertThat(event.actorProfileImageUrl()).isEqualTo(liker.getProfileImageUrl());
+        assertThat(event.postId()).isEqualTo(postId);
     }
 
     @Test
