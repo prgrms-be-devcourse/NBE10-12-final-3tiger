@@ -10,11 +10,15 @@ import com.back.user.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.Cursor;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -57,6 +61,9 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
+        userRepository.findByIdAndDeletedAtIsNull(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
+
         return issueTokens(userId);
     }
 
@@ -71,6 +78,28 @@ public class AuthService {
         Long userId = Long.valueOf(claims.getSubject());
         String jti = claims.getId();
         redisTemplate.delete("RT:" + userId + ":" + jti);
+    }
+
+    public void revokeAllRefreshTokens(Long userId) {
+        String keyPrefix = "RT:" + userId + ":";
+        ScanOptions options = ScanOptions.scanOptions()
+                .match(keyPrefix + "*")
+                .count(100)
+                .build();
+        List<String> refreshTokenKeys = new ArrayList<>();
+
+        try (Cursor<String> cursor = redisTemplate.scan(options)) {
+            while (cursor.hasNext()) {
+                String key = cursor.next();
+                if (key.startsWith(keyPrefix)) {
+                    refreshTokenKeys.add(key);
+                }
+            }
+        }
+
+        if (!refreshTokenKeys.isEmpty()) {
+            redisTemplate.delete(refreshTokenKeys);
+        }
     }
 
     private AuthResponse issueTokens(Long userId) {
