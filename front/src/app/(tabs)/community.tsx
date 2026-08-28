@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Image, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -336,7 +336,10 @@ export default function CommunityScreen() {
         ? lastPage.page + 1
         : undefined,
   });
-  const posts = postsQuery.data?.pages.flatMap((page) => page.content) ?? [];
+  const posts = useMemo(
+    () => postsQuery.data?.pages.flatMap((page) => page.content) ?? [],
+    [postsQuery.data?.pages],
+  );
   const ownedPostIdsQuery = useQuery({
     queryKey: ["owned-post-ids"],
     queryFn: async () => {

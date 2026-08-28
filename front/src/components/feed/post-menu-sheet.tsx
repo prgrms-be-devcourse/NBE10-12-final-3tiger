@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { deletePost } from "@/api/post-api";
 import {
@@ -18,6 +19,13 @@ import {
 } from "@/components/ui/bottom-sheet-handle";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
+
+const SHEET_TOP_PADDING = 10;
+const HANDLE_HEIGHT = 32;
+const TITLE_HEIGHT = 40;
+const MENU_ROW_HEIGHT = 56;
+const DIVIDER_HEIGHT = 1;
+const MIN_BOTTOM_PADDING = 16;
 
 export function PostMenuSheet({
   postId,
@@ -32,8 +40,19 @@ export function PostMenuSheet({
 }) {
   const queryClient = useQueryClient();
   const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(windowHeight)).current;
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const menuItemCount = canDelete ? 2 : 1;
+  const dividerCount = canDelete ? 1 : 0;
+  const bottomPadding = Math.max(insets.bottom, MIN_BOTTOM_PADDING);
+  const sheetHeight =
+    SHEET_TOP_PADDING +
+    HANDLE_HEIGHT +
+    TITLE_HEIGHT +
+    MENU_ROW_HEIGHT * menuItemCount +
+    DIVIDER_HEIGHT * dividerCount +
+    bottomPadding;
 
   useEffect(() => {
     if (!open) return;
@@ -82,7 +101,8 @@ export function PostMenuSheet({
             accessibilityRole="menu"
             className="rounded-t-[30px] bg-[#FCFDFC] pt-2.5"
             style={{
-              height: canDelete ? 230 : 174,
+              height: sheetHeight,
+              paddingBottom: bottomPadding,
               transform: [{ translateY }],
             }}
           >
