@@ -54,7 +54,7 @@ export function EmptyState({
   return (
     <View className="flex-1 items-center justify-center px-6 py-12">
       <Ionicons name="leaf-outline" size={36} color="#94A09A" />
-      <Text className="mt-3 font-bold text-foreground">{title}</Text>
+      <Text className="mt-3 font-bold text-[#191C1D]">{title}</Text>
       {description && (
         <Text className="mt-1 text-center text-sm text-muted-foreground">
           {description}
