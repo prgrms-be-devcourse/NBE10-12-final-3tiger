@@ -34,6 +34,14 @@ import { useAuthStore } from "@/stores/auth-store";
 
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
 
+const PERSONA_FILTERS: Array<{ key: string | null; label: string }> = [
+  { key: null, label: "전체" },
+  { key: "walker", label: "일반" },
+  { key: "dog", label: "반려견" },
+  { key: "senior", label: "시니어" },
+  { key: "stroller", label: "유모차" },
+];
+
 export default function CourseScreen() {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -41,6 +49,7 @@ export default function CourseScreen() {
   const [coords, setCoords] = useState(DEFAULT_COORDS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(true);
+  const [persona, setPersona] = useState<string | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
   const dismissDetails = () =>
@@ -57,7 +66,7 @@ export default function CourseScreen() {
     });
   }, []);
   const coursesQuery = useQuery({
-    queryKey: ["courses", coords],
+    queryKey: ["courses", coords, persona],
     queryFn: () =>
       getCourses({
         lat: coords.latitude,
@@ -66,12 +75,13 @@ export default function CourseScreen() {
         sort: "score",
         page: 0,
         size: 10,
+        persona: persona ?? undefined,
       }),
   });
   const courses = coursesQuery.data?.content ?? [];
   useEffect(() => {
-    if (selectedId === null && courses[0]) setSelectedId(courses[0].courseId);
-  }, [courses, selectedId]);
+    setSelectedId(courses[0]?.courseId ?? null);
+  }, [courses]);
   useEffect(() => {
     if (!showDetails) return;
     sheetTranslateY.setValue(windowHeight);
@@ -173,6 +183,28 @@ export default function CourseScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="gap-2 pt-3"
+        >
+          {PERSONA_FILTERS.map((filter) => {
+            const active = persona === filter.key;
+            return (
+              <Pressable
+                key={filter.label}
+                className={`h-9 justify-center rounded-full px-3 ${active ? "bg-[#087A3F]" : "bg-white"}`}
+                onPress={() => setPersona(filter.key)}
+              >
+                <Text
+                  className={`text-xs font-extrabold ${active ? "text-white" : "text-[#536158]"}`}
+                >
+                  {filter.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerClassName="gap-2 pt-2"
         >
           {courses.map((course) => (
             <Pressable

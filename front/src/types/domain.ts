@@ -85,3 +85,22 @@ export type Region = {
   centerLng: number;
   courseCount: number;
 };
+
+export type GeoJsonLineString = {
+  type?: string;
+  coordinates: [number, number][];
+};
+
+export type GenerateCandidate = {
+  path: GeoJsonLineString;
+  totalM: number;
+  avgScore: number;
+  errorPct: number;
+  regionCode: string;
+};
+
+export type GenerateResponse = {
+  candidates: GenerateCandidate[];
+  requestedCount: number;
+  returnedCount: number;
+};
