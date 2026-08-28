@@ -18,6 +18,8 @@ services:
       - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/10-restore.sh:ro
       - ./docker/auth-migration.sql:/tmp/auth-migration.sql:ro
       - ./docker/20-auth-migration.sh:/docker-entrypoint-initdb.d/20-auth-migration.sh:ro
+      - ./docker/30-social-schema.sql:/tmp/social-schema.sql:ro
+      - ./docker/30-social-schema.sh:/docker-entrypoint-initdb.d/30-social-schema.sh:ro
       - ./docker/post-like-unique-constraint.sql:/tmp/post-like-unique-constraint.sql:ro
       - ./docker/40-post-like-unique-constraint.sh:/docker-entrypoint-initdb.d/40-post-like-unique-constraint.sh:ro
       - ./docker/21_persona_weight.sql:/tmp/persona/21_persona_weight.sql:ro
