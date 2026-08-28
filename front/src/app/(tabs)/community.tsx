@@ -12,10 +12,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
 import { getUnreadNotificationCount } from "@/api/notification-api";
-import { getPosts, likePost, unlikePost } from "@/api/post-api";
+import { getMyPosts, getPosts, likePost, unlikePost } from "@/api/post-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
+import { PostMenuSheet } from "@/components/feed/post-menu-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
@@ -60,10 +61,12 @@ function IconButton({
 
 function FeedPost({
   item,
+  canDelete,
   onOpenComments,
   onRequireLogin,
 }: {
   item: PostFeedItem;
+  canDelete: boolean;
   onOpenComments: () => void;
   onRequireLogin: () => void;
 }) {
@@ -74,6 +77,7 @@ function FeedPost({
   const [bookmarked, setBookmarked] = useState(item.isBookmarked);
   const [expanded, setExpanded] = useState(false);
   const [contentLineCount, setContentLineCount] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     setLiked(item.isLiked);
     setLikeCount(item.likeCount);
@@ -83,7 +87,6 @@ function FeedPost({
     setExpanded(false);
     setContentLineCount(0);
   }, [item.postId]);
-
   const updateMyPostLike = (isLiked: boolean, nextLikeCount: number) => {
     queryClient.setQueriesData<{
       pages: Array<{ content: PostFeedItem[] }>;
@@ -223,6 +226,7 @@ function FeedPost({
           size="icon"
           accessibilityLabel="게시글 메뉴"
           className="h-8 w-8 rounded-full"
+          onPress={() => setMenuOpen(true)}
         >
           <Ionicons name="ellipsis-vertical" size={18} color="#087A3F" />
         </Button>
@@ -300,6 +304,13 @@ function FeedPost({
           댓글 {item.commentCount ?? 0}개 모두 보기
         </Text>
       </View>
+
+      <PostMenuSheet
+        postId={item.postId}
+        open={menuOpen}
+        canDelete={canDelete}
+        onClose={() => setMenuOpen(false)}
+      />
     </View>
   );
 }
@@ -326,6 +337,16 @@ export default function CommunityScreen() {
         : undefined,
   });
   const posts = postsQuery.data?.pages.flatMap((page) => page.content) ?? [];
+  const ownedPostIdsQuery = useQuery({
+    queryKey: ["owned-post-ids"],
+    queryFn: async () => {
+      const result = await getMyPosts({ page: 0, size: 1_000 });
+      return result.content.map((post) => post.postId);
+    },
+    enabled: isAuthenticated,
+    staleTime: 30_000,
+  });
+  const ownedPostIds = new Set(ownedPostIdsQuery.data ?? []);
   const unreadQuery = useQuery({
     queryKey: ["notification-unread-count"],
     queryFn: getUnreadNotificationCount,
@@ -413,6 +434,7 @@ export default function CommunityScreen() {
           renderItem={({ item }) => (
             <FeedPost
               item={item}
+              canDelete={ownedPostIds.has(item.postId)}
               onOpenComments={() => setCommentPostId(item.postId)}
               onRequireLogin={() => setLoginRequiredOpen(true)}
             />
