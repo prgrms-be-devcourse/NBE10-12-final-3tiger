@@ -5,13 +5,11 @@ import com.back.global.auth.CurrentUserId;
 import com.back.user.dto.MyPageResponse;
 import com.back.user.dto.SignupRequest;
 import com.back.user.dto.SignupResponse;
-import com.back.user.dto.UpdateProfileRequest;
 import com.back.user.service.UserService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -44,14 +42,5 @@ public class UserController {
     @GetMapping("/me")
     public ApiResponse<MyPageResponse> getMyPage(@CurrentUserId Long userId) {
         return ApiResponse.ok("마이페이지 조회 성공", userService.getMyPage(userId));
-    }
-
-    @PatchMapping("/me")
-    public ApiResponse<Void> updateMyProfile(
-            @CurrentUserId Long userId,
-            @Valid @RequestBody UpdateProfileRequest request
-    ) {
-        userService.updateProfile(userId, request);
-        return ApiResponse.ok("프로필이 수정되었습니다.", null);
     }
 }

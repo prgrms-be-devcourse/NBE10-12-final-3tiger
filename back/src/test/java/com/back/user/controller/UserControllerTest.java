@@ -8,12 +8,10 @@ import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
 import com.back.user.dto.MyPageResponse;
 import com.back.user.dto.SignupResponse;
-import com.back.user.dto.UpdateProfileRequest;
 import com.back.user.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -26,13 +24,11 @@ import java.util.List;
 
 import static com.back.TestAuthentication.authenticatedAs;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -189,74 +185,5 @@ class UserControllerTest {
     void getMyPageRejectsUnauthenticatedRequest() throws Exception {
         mvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void updateMyProfileSucceedsWithValidPayload() throws Exception {
-        mvc.perform(patch("/api/v1/users/me")
-                        .with(authenticatedAs(1L))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "nickname": "새 닉네임",
-                                  "primaryPersona": "dog",
-                                  "personaTags": ["dog", "senior"]
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resultCode").value("200-1"))
-                .andExpect(jsonPath("$.message").value("프로필이 수정되었습니다."))
-                .andExpect(jsonPath("$.data").value(nullValue()));
-
-        ArgumentCaptor<UpdateProfileRequest> captor =
-                ArgumentCaptor.forClass(UpdateProfileRequest.class);
-        verify(userService).updateProfile(eq(1L), captor.capture());
-        UpdateProfileRequest sent = captor.getValue();
-        org.assertj.core.api.Assertions.assertThat(sent.nickname()).isEqualTo("새 닉네임");
-        org.assertj.core.api.Assertions.assertThat(sent.primaryPersona()).isEqualTo("dog");
-        org.assertj.core.api.Assertions.assertThat(sent.personaTags())
-                .containsExactly("dog", "senior");
-    }
-
-    @Test
-    void updateMyProfileRejectsUnauthenticatedRequest() throws Exception {
-        mvc.perform(patch("/api/v1/users/me")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "nickname": "새 닉네임",
-                                  "primaryPersona": "dog",
-                                  "personaTags": []
-                                }
-                                """))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {
-            "{\"nickname\":\"\",\"primaryPersona\":\"dog\",\"personaTags\":[]}",
-            "{\"nickname\":\"   \",\"primaryPersona\":\"dog\",\"personaTags\":[]}",
-            "{\"primaryPersona\":\"dog\",\"personaTags\":[]}"
-    })
-    void updateMyProfileRejectsBlankNickname(String requestBody) throws Exception {
-        mvc.perform(patch("/api/v1/users/me")
-                        .with(authenticatedAs(1L))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("COMMON_400"));
-    }
-
-    @Test
-    void updateMyProfileRejectsNicknameOver50Chars() throws Exception {
-        String longNickname = "가".repeat(51);
-        String body = "{\"nickname\":\"" + longNickname + "\",\"primaryPersona\":\"dog\",\"personaTags\":[]}";
-
-        mvc.perform(patch("/api/v1/users/me")
-                        .with(authenticatedAs(1L))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("COMMON_400"));
     }
 }

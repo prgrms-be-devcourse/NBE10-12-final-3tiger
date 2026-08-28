@@ -130,23 +130,6 @@ public class User extends BaseEntity {
         );
     }
 
-    public void updatePreferences(
-            String nickname,
-            Persona primaryPersona,
-            List<Persona> personaTags
-    ) {
-        this.nickname = Objects.requireNonNull(
-                nickname,
-                "닉네임은 필수입니다."
-        );
-        if (primaryPersona != null) {
-            this.primaryPersona = primaryPersona;
-        }
-        this.personaTags = personaTags == null
-                ? new ArrayList<>()
-                : new ArrayList<>(personaTags);
-    }
-
     public void changeProfileImage(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
     }
