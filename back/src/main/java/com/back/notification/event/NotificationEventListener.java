@@ -19,28 +19,28 @@ public class NotificationEventListener {
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void on(PostLikedEvent event) {
-        if (event.receiverId().equals(event.actorId())) return; // 자기 알림 방지
-
-        Notification notification = notificationCommandService.save(event.receiverId(), event.actorId(),
-                event.actorNickname(), event.actorProfileImageUrl(), NotificationType.LIKE, event.postId(), null);
-        sseRegistry.send(event.receiverId(), NotificationService.NotificationResponse.from(notification));
+        handle(event.receiverId(), event.actorId(), event.actorNickname(), event.actorProfileImageUrl(),
+                NotificationType.LIKE, event.postId(), null);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void on(CommentCreatedEvent event) {
-        if (event.receiverId().equals(event.actorId())) return;
-
-        Notification notification = notificationCommandService.save(event.receiverId(), event.actorId(),
-                event.actorNickname(), event.actorProfileImageUrl(), NotificationType.COMMENT, event.postId(), event.commentId());
-        sseRegistry.send(event.receiverId(), NotificationService.NotificationResponse.from(notification));
+        handle(event.receiverId(), event.actorId(), event.actorNickname(), event.actorProfileImageUrl(),
+                NotificationType.COMMENT, event.postId(), event.commentId());
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void on(CommentUpvotedEvent event) {
-        if (event.receiverId().equals(event.actorId())) return;
+        handle(event.receiverId(), event.actorId(), event.actorNickname(), event.actorProfileImageUrl(),
+                NotificationType.COMMENT_UPVOTE, event.postId(), event.commentId());
+    }
 
-        Notification notification = notificationCommandService.save(event.receiverId(), event.actorId(),
-                event.actorNickname(), event.actorProfileImageUrl(), NotificationType.COMMENT_UPVOTE, event.postId(), event.commentId());
-        sseRegistry.send(event.receiverId(), NotificationService.NotificationResponse.from(notification));
+    private void handle(Long receiverId, Long actorId, String actorNickname, String actorProfileImageUrl,
+                        NotificationType type, Long postId, Long commentId) {
+        if (receiverId.equals(actorId)) return; // 자기 알림 방지
+
+        Notification notification = notificationCommandService.save(receiverId, actorId,
+                actorNickname, actorProfileImageUrl, type, postId, commentId);
+        sseRegistry.send(receiverId, NotificationService.NotificationResponse.from(notification));
     }
 }
