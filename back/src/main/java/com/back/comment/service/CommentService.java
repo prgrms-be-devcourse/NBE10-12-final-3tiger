@@ -13,12 +13,15 @@ import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
@@ -35,9 +38,14 @@ public class CommentService {
         this.eventPublisher = eventPublisher;
     }
 
-    public PageResponse<CommentResponse> getComments(Long postId, Pageable pageable) {
+    public PageResponse<CommentResponse> getComments(Long postId, Long userId, Pageable pageable) {
         getPostByIdOrThrow(postId);
-        return PageResponse.from(comments.findByPost_IdOrderByCreatedAtDesc(postId, pageable).map(this::toCommentResponse));
+        Page<Comment> found = comments.findByPost_IdOrderByCreatedAtDesc(postId, pageable);
+        List<Long> commentIds = found.getContent().stream().map(Comment::getId).toList();
+        Set<Long> upvotedCommentIds = userId == null || commentIds.isEmpty()
+                ? Set.of()
+                : Set.copyOf(commentUpvotes.findUpvotedCommentIds(userId, commentIds));
+        return PageResponse.from(found.map(comment -> toCommentResponse(comment, upvotedCommentIds)));
     }
 
     @Transactional
@@ -107,11 +115,13 @@ public class CommentService {
         return comments.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 댓글입니다."));
     }
 
-    private CommentResponse toCommentResponse(Comment comment) {
+    private CommentResponse toCommentResponse(Comment comment, Set<Long> upvotedCommentIds) {
         return new CommentResponse(comment.getId(), comment.getUser().getId(), comment.getUser().getNickname(),
-                comment.getContent(), comment.getUpvoteCount(), comment.getCreatedAt());
+                comment.getContent(), comment.getUpvoteCount(),
+                upvotedCommentIds.contains(comment.getId()), comment.getCreatedAt());
     }
 
-    public record CommentResponse(Long commentId, Long userId, String nickname, String content, int upvoteCount, LocalDateTime createdAt) {}
+    public record CommentResponse(Long commentId, Long userId, String nickname, String content, int upvoteCount,
+                                  boolean isUpvoted, LocalDateTime createdAt) {}
     public record UpvoteResult(boolean upvoted, int upvoteCount) {}
 }

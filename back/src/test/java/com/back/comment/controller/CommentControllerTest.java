@@ -25,6 +25,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -50,12 +51,12 @@ class CommentControllerTest {
     private JwtProvider jwtProvider;
 
     @Test
-    @DisplayName("t1: GET /api/v1/posts/{postId}/comments 요청 시 200과 페이징 응답을 반환한다")
+    @DisplayName("t1: 비로그인 GET /api/v1/posts/{postId}/comments 요청 시 200, userId=null로 조회되고 isUpvoted=false")
     void t1() throws Exception {
         // given
         CommentService.CommentResponse commentResponse =
-                new CommentService.CommentResponse(1L, 1L, "산책러", "좋은 코스네요", 0, LocalDateTime.now());
-        given(commentService.getComments(eq(1L), any(Pageable.class)))
+                new CommentService.CommentResponse(1L, 1L, "산책러", "좋은 코스네요", 0, false, LocalDateTime.now());
+        given(commentService.getComments(eq(1L), isNull(), any(Pageable.class)))
                 .willReturn(PageResponse.from(new PageImpl<>(List.of(commentResponse))));
 
         // when & then
@@ -63,7 +64,27 @@ class CommentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].commentId").value(1))
                 .andExpect(jsonPath("$.data.content[0].nickname").value("산책러"))
+                .andExpect(jsonPath("$.data.content[0].isUpvoted").value(false))
                 .andExpect(jsonPath("$.data.totalElements").value(1));
+
+        verify(commentService).getComments(eq(1L), isNull(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("t1b: 로그인 GET /api/v1/posts/{postId}/comments 요청 시 현재 사용자 id로 조회되고 isUpvoted가 응답에 반영된다")
+    void t1b() throws Exception {
+        // given
+        CommentService.CommentResponse commentResponse =
+                new CommentService.CommentResponse(1L, 2L, "산책러", "좋은 코스네요", 3, true, LocalDateTime.now());
+        given(commentService.getComments(eq(1L), eq(1L), any(Pageable.class)))
+                .willReturn(PageResponse.from(new PageImpl<>(List.of(commentResponse))));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/posts/{postId}/comments", 1L).with(authenticatedAs(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].isUpvoted").value(true));
+
+        verify(commentService).getComments(eq(1L), eq(1L), any(Pageable.class));
     }
 
     @Test
