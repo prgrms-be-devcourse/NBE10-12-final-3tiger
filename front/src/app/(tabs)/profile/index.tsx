@@ -42,6 +42,13 @@ const PERSONAS = [
 ];
 const MENUS = [
   {
+    label: "코스 생성",
+    description: "원하는 조건으로 새 코스를 만들어요",
+    icon: "sparkles" as const,
+    color: "bg-[#087A3F]",
+    route: "/course/generate",
+  },
+  {
     label: "저장한 코스",
     description: "다시 걷고 싶은 코스를 확인해요",
     icon: "bookmark" as const,
