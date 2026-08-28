@@ -1,16 +1,37 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { type InfiniteData, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 import EventSource, { type CustomEvent } from "react-native-sse";
 
 import { API_BASE_URL } from "@/api/client";
 import { useAuthStore } from "@/stores/auth-store";
+import type { PageResponse } from "@/types/api";
 import type {
   NotificationItem,
   NotificationUnreadCount,
 } from "@/types/notification";
 
 type NotificationStreamEvent = "connected" | "notification";
+
+const notificationTypes = new Set(["LIKE", "COMMENT", "COMMENT_UPVOTE"]);
+
+function isNotificationItem(value: unknown): value is NotificationItem {
+  if (!value || typeof value !== "object") return false;
+  const item = value as Record<string, unknown>;
+
+  return (
+    typeof item.id === "number" &&
+    notificationTypes.has(String(item.type)) &&
+    typeof item.postId === "number" &&
+    (item.commentId === null || typeof item.commentId === "number") &&
+    typeof item.actorId === "number" &&
+    typeof item.actorNickname === "string" &&
+    (item.actorProfileImageUrl === null ||
+      typeof item.actorProfileImageUrl === "string") &&
+    typeof item.read === "boolean" &&
+    typeof item.createdAt === "string"
+  );
+}
 
 export function useNotificationStream() {
   const queryClient = useQueryClient();
@@ -43,6 +64,7 @@ export function useNotificationStream() {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let reconnectDelay = 1_000;
     let disposed = false;
+    const receivedNotificationIds = new Set<number>();
 
     const synchronize = () => {
       void queryClient.invalidateQueries({
@@ -72,13 +94,50 @@ export function useNotificationStream() {
         (event: CustomEvent<"notification">) => {
           if (!event.data) return;
           try {
-            JSON.parse(event.data) as NotificationItem;
-            queryClient.setQueryData<NotificationUnreadCount>(
-              ["notification-unread-count"],
-              (previous) => ({ count: (previous?.count ?? 0) + 1 }),
+            const parsed: unknown = JSON.parse(event.data);
+            if (!isNotificationItem(parsed)) {
+              synchronize();
+              return;
+            }
+
+            const cached = queryClient.getQueryData<
+              InfiniteData<PageResponse<NotificationItem>, number>
+            >(["notifications"]);
+            const alreadyCached = cached?.pages.some((page) =>
+              page.content.some((item) => item.id === parsed.id),
             );
+            if (receivedNotificationIds.has(parsed.id) || alreadyCached) return;
+            receivedNotificationIds.add(parsed.id);
+
+            if (!parsed.read) {
+              queryClient.setQueryData<NotificationUnreadCount>(
+                ["notification-unread-count"],
+                (previous) => ({ count: (previous?.count ?? 0) + 1 }),
+              );
+            }
+
+            queryClient.setQueryData<
+              InfiniteData<PageResponse<NotificationItem>, number>
+            >(["notifications"], (previous) => {
+              if (!previous) return previous;
+              return {
+                ...previous,
+                pages: previous.pages.map((page, index) => ({
+                  ...page,
+                  content:
+                    index === 0
+                      ? [parsed, ...page.content].slice(0, page.size)
+                      : page.content,
+                  totalElements: page.totalElements + 1,
+                })),
+              };
+            });
+
             void queryClient.invalidateQueries({
               queryKey: ["notifications"],
+            });
+            void queryClient.invalidateQueries({
+              queryKey: ["notification-unread-count"],
             });
           } catch {
             synchronize();
