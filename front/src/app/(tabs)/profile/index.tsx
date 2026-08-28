@@ -73,6 +73,7 @@ const MENUS = [
 export default function ProfileScreen() {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const refreshToken = useAuthStore((state) => state.refreshToken);
   const clearSession = useAuthStore((state) => state.clearSession);
   const [persona, setPersona] = useState("dog");
   const [tags, setTags] = useState<string[]>([]);
@@ -87,7 +88,8 @@ export default function ProfileScreen() {
       void queryClient.invalidateQueries({ queryKey: ["my-profile"] }),
   });
   const logoutMutation = useMutation({
-    mutationFn: logout,
+    mutationFn: () =>
+      refreshToken ? logout(refreshToken) : Promise.resolve(null),
     onSettled: async () => {
       await clearSession();
       queryClient.clear();
