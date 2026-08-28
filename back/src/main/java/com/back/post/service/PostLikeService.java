@@ -98,19 +98,21 @@ public class PostLikeService {
         Set<Long> bookmarkedCourseIds = courseIds.isEmpty()
                 ? Set.of()
                 : bookmarks.findBookmarkedCourseIds(userId, courseIds);
-        return PageResponse.from(found.map(postLike -> toLikedPostItem(postLike, commentCounts, bookmarkedCourseIds)));
+        return PageResponse.from(found.map(postLike -> toLikedPostItem(postLike, userId, commentCounts, bookmarkedCourseIds)));
     }
 
-    private LikedPostItem toLikedPostItem(PostLike postLike, Map<Long, Long> commentCounts,
+    private LikedPostItem toLikedPostItem(PostLike postLike, Long currentUserId, Map<Long, Long> commentCounts,
                                           Set<Long> bookmarkedCourseIds) {
         Post post = postLike.getPost();
         return new LikedPostItem(post.getId(), post.getCourse().getId(), post.getUser().getNickname(), post.getContent(),
                 post.getPhotoUrl(), post.getLikeCount(),
                 commentCounts.getOrDefault(post.getId(), 0L),
-                bookmarkedCourseIds.contains(post.getCourse().getId()), postLike.getCreatedAt());
+                bookmarkedCourseIds.contains(post.getCourse().getId()),
+                post.getUser().getId().equals(currentUserId), postLike.getCreatedAt());
     }
 
     public record LikeResult(boolean isLiked, int likeCount) {}
     public record LikedPostItem(Long postId, Long courseId, String nickname, String content, String photoUrl,
-                                int likeCount, long commentCount, boolean isBookmarked, LocalDateTime likedAt) {}
+                                int likeCount, long commentCount, boolean isBookmarked, boolean isMine,
+                                LocalDateTime likedAt) {}
 }

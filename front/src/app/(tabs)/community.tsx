@@ -2,18 +2,21 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Image, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
+import { getUnreadNotificationCount } from "@/api/notification-api";
 import { getPosts, likePost, unlikePost } from "@/api/post-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
+import { PostMenuSheet } from "@/components/feed/post-menu-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
@@ -58,10 +61,12 @@ function IconButton({
 
 function FeedPost({
   item,
+  canDelete,
   onOpenComments,
   onRequireLogin,
 }: {
   item: PostFeedItem;
+  canDelete: boolean;
   onOpenComments: () => void;
   onRequireLogin: () => void;
 }) {
@@ -72,6 +77,7 @@ function FeedPost({
   const [bookmarked, setBookmarked] = useState(item.isBookmarked);
   const [expanded, setExpanded] = useState(false);
   const [contentLineCount, setContentLineCount] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     setLiked(item.isLiked);
     setLikeCount(item.likeCount);
@@ -81,24 +87,47 @@ function FeedPost({
     setExpanded(false);
     setContentLineCount(0);
   }, [item.postId]);
+  const updateMyPostLike = (isLiked: boolean, nextLikeCount: number) => {
+    queryClient.setQueriesData<{
+      pages: Array<{ content: PostFeedItem[] }>;
+      pageParams: unknown[];
+    }>({ queryKey: ["my-posts"] }, (data) => {
+      if (!data) return data;
+      return {
+        ...data,
+        pages: data.pages.map((page) => ({
+          ...page,
+          content: page.content.map((post) =>
+            post.postId === item.postId
+              ? { ...post, isLiked, likeCount: nextLikeCount }
+              : post,
+          ),
+        })),
+      };
+    });
+  };
 
   const likeMutation = useMutation({
     mutationFn: ({ desiredLiked }: { desiredLiked: boolean }) =>
       desiredLiked ? likePost(item.postId) : unlikePost(item.postId),
     onMutate: ({ desiredLiked }: { desiredLiked: boolean }) => {
       const previous = { liked, likeCount };
+      const nextLikeCount = Math.max(0, likeCount + (desiredLiked ? 1 : -1));
       setLiked(desiredLiked);
-      setLikeCount((count) => count + (desiredLiked ? 1 : -1));
+      setLikeCount(nextLikeCount);
+      updateMyPostLike(desiredLiked, nextLikeCount);
       return previous;
     },
     onError: (_error, _variables, context) => {
       if (!context) return;
       setLiked(context.liked);
       setLikeCount(context.likeCount);
+      updateMyPostLike(context.liked, context.likeCount);
     },
     onSuccess: (result) => {
       setLiked(result.isLiked);
       setLikeCount(result.likeCount);
+      updateMyPostLike(result.isLiked, result.likeCount);
       if (!result.isLiked) {
         queryClient.setQueriesData<{
           pages: Array<{ content: PostFeedItem[] }>;
@@ -119,6 +148,7 @@ function FeedPost({
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["posts"] });
+      void queryClient.invalidateQueries({ queryKey: ["my-posts"] });
       void queryClient.invalidateQueries({
         queryKey: ["liked-posts"],
         refetchType: "all",
@@ -196,6 +226,7 @@ function FeedPost({
           size="icon"
           accessibilityLabel="게시글 메뉴"
           className="h-8 w-8 rounded-full"
+          onPress={() => setMenuOpen(true)}
         >
           <Ionicons name="ellipsis-vertical" size={18} color="#087A3F" />
         </Button>
@@ -273,11 +304,26 @@ function FeedPost({
           댓글 {item.commentCount ?? 0}개 모두 보기
         </Text>
       </View>
+
+      <PostMenuSheet
+        postId={item.postId}
+        open={menuOpen}
+        canDelete={canDelete}
+        onClose={() => setMenuOpen(false)}
+      />
     </View>
   );
 }
 
 export default function CommunityScreen() {
+  const { notificationId, postId, openComments } = useLocalSearchParams<{
+    notificationId?: string;
+    postId?: string;
+    openComments?: string;
+  }>();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const listRef = useRef<FlatList<PostFeedItem>>(null);
+  const handledNotificationId = useRef<string | null>(null);
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const postsQuery = useInfiniteQuery({
@@ -290,7 +336,35 @@ export default function CommunityScreen() {
         ? lastPage.page + 1
         : undefined,
   });
-  const posts = postsQuery.data?.pages.flatMap((page) => page.content) ?? [];
+  const posts = useMemo(
+    () => postsQuery.data?.pages.flatMap((page) => page.content) ?? [],
+    [postsQuery.data?.pages],
+  );
+  const unreadQuery = useQuery({
+    queryKey: ["notification-unread-count"],
+    queryFn: getUnreadNotificationCount,
+    enabled: isAuthenticated,
+    staleTime: 15_000,
+  });
+
+  useEffect(() => {
+    if (
+      !notificationId ||
+      handledNotificationId.current === notificationId ||
+      !postId ||
+      posts.length === 0
+    )
+      return;
+    handledNotificationId.current = notificationId;
+    const targetPostId = Number(postId);
+    const index = posts.findIndex((item) => item.postId === targetPostId);
+    if (index >= 0) {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToIndex({ index, animated: true });
+      });
+    }
+    if (openComments === "1") setCommentPostId(targetPostId);
+  }, [notificationId, openComments, postId, posts]);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -312,7 +386,28 @@ export default function CommunityScreen() {
         />
         <View className="ml-auto flex-row">
           <IconButton label="피드 검색" icon="search" />
-          <IconButton label="알림" icon="notifications-outline" />
+          <View>
+            <IconButton
+              label="알림"
+              icon="notifications-outline"
+              onPress={() => {
+                if (!isAuthenticated) {
+                  setLoginRequiredOpen(true);
+                  return;
+                }
+                router.push("/notifications" as never);
+              }}
+            />
+            {(unreadQuery.data?.count ?? 0) > 0 && (
+              <View className="absolute right-0.5 top-0.5 min-w-[18px] items-center justify-center rounded-full bg-[#EF4444] px-1 py-0.5">
+                <Text className="text-[9px] font-black leading-3 text-white">
+                  {(unreadQuery.data?.count ?? 0) > 99
+                    ? "99+"
+                    : unreadQuery.data?.count}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
       {postsQuery.isPending ? (
@@ -326,11 +421,13 @@ export default function CommunityScreen() {
         />
       ) : (
         <FlatList
+          ref={listRef}
           data={posts}
           keyExtractor={(item) => String(item.postId)}
           renderItem={({ item }) => (
             <FeedPost
               item={item}
+              canDelete={item.isMine}
               onOpenComments={() => setCommentPostId(item.postId)}
               onRequireLogin={() => setLoginRequiredOpen(true)}
             />
@@ -343,6 +440,12 @@ export default function CommunityScreen() {
               void postsQuery.fetchNextPage();
           }}
           onEndReachedThreshold={0.6}
+          onScrollToIndexFailed={({ index }) => {
+            listRef.current?.scrollToOffset({
+              offset: Math.max(0, index * 380),
+              animated: true,
+            });
+          }}
           ListFooterComponent={
             postsQuery.isFetchingNextPage ? (
               <ActivityIndicator color="#087A3F" className="my-4" />

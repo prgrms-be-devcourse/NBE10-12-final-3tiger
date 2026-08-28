@@ -7,6 +7,12 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import { useAuthStore } from "@/stores/auth-store";
+import { useNotificationStream } from "@/hooks/use-notification-stream";
+
+function NotificationStreamConnector() {
+  useNotificationStream();
+  return null;
+}
 
 export default function RootLayout() {
   const [queryClient] = useState(
@@ -35,6 +41,7 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <NotificationStreamConnector />
       <Stack screenOptions={{ headerShown: false }} />
       <PortalHost />
     </QueryClientProvider>

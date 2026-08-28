@@ -1,21 +1,72 @@
-import axios, { AxiosError, type AxiosRequestConfig } from "axios";
+import axios, {
+  AxiosError,
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+} from "axios";
 
 import { useAuthStore } from "@/stores/auth-store";
 import { ApiError, type ApiResponse } from "@/types/api";
+import type { AuthTokens } from "@/types/auth";
 
-const baseURL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "");
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "");
 
-if (!baseURL) {
+if (!API_BASE_URL) {
   console.warn(
     "EXPO_PUBLIC_API_URL이 설정되지 않아 API 요청을 보낼 수 없습니다.",
   );
 }
 
 export const apiClient = axios.create({
-  baseURL,
+  baseURL: API_BASE_URL,
   timeout: 15_000,
   headers: { "Content-Type": "application/json" },
 });
+
+const refreshClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 15_000,
+  headers: { "Content-Type": "application/json" },
+});
+
+type RetryableRequestConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+};
+
+let refreshPromise: Promise<AuthTokens> | null = null;
+
+const isAuthRequest = (url?: string) => Boolean(url?.includes("/api/v1/auth/"));
+
+async function requestTokenRefresh() {
+  const refreshToken = useAuthStore.getState().refreshToken;
+  if (!refreshToken) throw new Error("저장된 리프레시 토큰이 없습니다.");
+
+  const response = await refreshClient.post<ApiResponse<AuthTokens>>(
+    "/api/v1/auth/refresh",
+    { refreshToken },
+  );
+  const tokens = response.data.data;
+  await useAuthStore.getState().saveTokens(tokens);
+  return tokens;
+}
+
+export function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = requestTokenRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+const toApiError = (error: AxiosError<ApiResponse<unknown>>) =>
+  new ApiError(
+    error.response?.data?.message ??
+      (error.request
+        ? "서버에 연결할 수 없습니다."
+        : "요청 처리 중 오류가 발생했습니다."),
+    error.response?.status,
+    error.response?.data?.resultCode,
+  );
 
 apiClient.interceptors.request.use((config) => {
   const accessToken = useAuthStore.getState().accessToken;
@@ -26,20 +77,27 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiResponse<unknown>>) => {
-    if (error.response?.status === 401)
+    const originalRequest = error.config as RetryableRequestConfig | undefined;
+    const shouldRefresh =
+      error.response?.status === 401 &&
+      originalRequest !== undefined &&
+      !originalRequest._retry &&
+      !isAuthRequest(originalRequest.url);
+
+    if (shouldRefresh) {
+      originalRequest._retry = true;
+      try {
+        const tokens = await refreshAccessToken();
+        originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
+        return apiClient.request(originalRequest);
+      } catch {
+        await useAuthStore.getState().clearSession();
+      }
+    } else if (error.response?.status === 401 && originalRequest?._retry) {
       await useAuthStore.getState().clearSession();
-    const message =
-      error.response?.data?.message ??
-      (error.request
-        ? "서버에 연결할 수 없습니다."
-        : "요청 처리 중 오류가 발생했습니다.");
-    return Promise.reject(
-      new ApiError(
-        message,
-        error.response?.status,
-        error.response?.data?.resultCode,
-      ),
-    );
+    }
+
+    return Promise.reject(toApiError(error));
   },
 );
 

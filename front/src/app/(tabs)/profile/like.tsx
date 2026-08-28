@@ -13,6 +13,7 @@ import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
 import { getMyLikedPosts, likePost, unlikePost } from "@/api/post-api";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
+import { PostMenuSheet } from "@/components/feed/post-menu-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
@@ -23,9 +24,11 @@ import type { LikedPostItem } from "@/types/domain";
 
 function LikedPostCard({
   item,
+  canDelete,
   onComments,
 }: {
   item: LikedPostItem;
+  canDelete: boolean;
   onComments: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -33,6 +36,7 @@ function LikedPostCard({
   const [likeCount, setLikeCount] = useState(item.likeCount);
   const [bookmarked, setBookmarked] = useState(item.isBookmarked);
   const [expanded, setExpanded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => {
     setBookmarked(item.isBookmarked);
     setLikeCount(item.likeCount);
@@ -138,7 +142,15 @@ function LikedPostCard({
             )}
           </Text>
         </View>
-        <Ionicons name="ellipsis-vertical" size={18} color="#526056" />
+        <Button
+          variant="ghost"
+          size="icon"
+          accessibilityLabel="게시글 메뉴"
+          className="h-8 w-8 rounded-full"
+          onPress={() => setMenuOpen(true)}
+        >
+          <Ionicons name="ellipsis-vertical" size={18} color="#087A3F" />
+        </Button>
       </View>
       {item.photoUrl ? (
         <Image
@@ -191,6 +203,12 @@ function LikedPostCard({
           댓글 {item.commentCount ?? 0}개 모두 보기
         </Text>
       </View>
+      <PostMenuSheet
+        postId={item.postId}
+        open={menuOpen}
+        canDelete={canDelete}
+        onClose={() => setMenuOpen(false)}
+      />
     </View>
   );
 }
@@ -243,6 +261,7 @@ export default function LikedPostsScreen() {
           renderItem={({ item }) => (
             <LikedPostCard
               item={item}
+              canDelete={item.isMine}
               onComments={() => setCommentPostId(item.postId)}
             />
           )}

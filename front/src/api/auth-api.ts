@@ -12,8 +12,12 @@ export const socialLogin = (
     method: "POST",
     data: { authorizationCode },
   });
-export const logout = () =>
-  apiRequest<null>({ url: "/api/v1/auth/logout", method: "POST" });
+export const logout = (refreshToken: string) =>
+  apiRequest<null>({
+    url: "/api/v1/auth/logout",
+    method: "POST",
+    data: { refreshToken },
+  });
 export const signup = (data: SignupRequest) =>
   apiRequest<{ userId: number; loginType: string }>({
     url: "/api/v1/users/signup",
