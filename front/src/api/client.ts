@@ -36,7 +36,7 @@ let refreshPromise: Promise<AuthTokens> | null = null;
 
 const isAuthRequest = (url?: string) => Boolean(url?.includes("/api/v1/auth/"));
 
-async function refreshTokens() {
+async function requestTokenRefresh() {
   const refreshToken = useAuthStore.getState().refreshToken;
   if (!refreshToken) throw new Error("저장된 리프레시 토큰이 없습니다.");
 
@@ -47,6 +47,15 @@ async function refreshTokens() {
   const tokens = response.data.data;
   await useAuthStore.getState().saveTokens(tokens);
   return tokens;
+}
+
+export function refreshAccessToken() {
+  if (!refreshPromise) {
+    refreshPromise = requestTokenRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 const toApiError = (error: AxiosError<ApiResponse<unknown>>) =>
@@ -78,12 +87,7 @@ apiClient.interceptors.response.use(
     if (shouldRefresh) {
       originalRequest._retry = true;
       try {
-        if (!refreshPromise) {
-          refreshPromise = refreshTokens().finally(() => {
-            refreshPromise = null;
-          });
-        }
-        const tokens = await refreshPromise;
+        const tokens = await refreshAccessToken();
         originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
         return apiClient.request(originalRequest);
       } catch {

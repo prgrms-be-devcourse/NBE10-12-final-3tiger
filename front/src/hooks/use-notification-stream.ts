@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AppState } from "react-native";
 import EventSource, { type CustomEvent } from "react-native-sse";
 
-import { API_BASE_URL } from "@/api/client";
+import { API_BASE_URL, refreshAccessToken } from "@/api/client";
 import { useAuthStore } from "@/stores/auth-store";
 import type { PageResponse } from "@/types/api";
 import type {
@@ -145,10 +145,21 @@ export function useNotificationStream() {
         },
       );
 
-      source.addEventListener("error", () => {
+      source.addEventListener("error", async (event) => {
         source?.close();
         source = null;
         if (disposed) return;
+
+        const status = "xhrStatus" in event ? event.xhrStatus : undefined;
+        if (status === 401) {
+          try {
+            await refreshAccessToken();
+          } catch {
+            await useAuthStore.getState().clearSession();
+          }
+          return;
+        }
+
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
           connect();
