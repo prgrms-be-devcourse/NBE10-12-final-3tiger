@@ -191,6 +191,7 @@ class PostLikeServiceTest {
         // given
         Long userId = 1L;
         User user = User.createLocal("test@test.com", "dummy-hash", "산책러");
+        ReflectionTestUtils.setField(user, "id", userId);
         Course course = new Course("서울숲 코스", "11200", 2500);
         ReflectionTestUtils.setField(course, "id", 20L);
         Post post = new Post(user, course, "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
@@ -215,6 +216,7 @@ class PostLikeServiceTest {
         assertThat(item.photoUrl()).isEqualTo("http://example.com/photo.jpg");
         assertThat(item.likeCount()).isEqualTo(0);
         assertThat(item.isBookmarked()).isTrue();
+        assertThat(item.isMine()).isTrue();
         assertThat(item.likedAt()).isEqualTo(postLike.getCreatedAt());
     }
 }

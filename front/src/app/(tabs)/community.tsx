@@ -12,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
 import { getUnreadNotificationCount } from "@/api/notification-api";
-import { getMyPosts, getPosts, likePost, unlikePost } from "@/api/post-api";
+import { getPosts, likePost, unlikePost } from "@/api/post-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
@@ -340,16 +340,6 @@ export default function CommunityScreen() {
     () => postsQuery.data?.pages.flatMap((page) => page.content) ?? [],
     [postsQuery.data?.pages],
   );
-  const ownedPostIdsQuery = useQuery({
-    queryKey: ["owned-post-ids"],
-    queryFn: async () => {
-      const result = await getMyPosts({ page: 0, size: 1_000 });
-      return result.content.map((post) => post.postId);
-    },
-    enabled: isAuthenticated,
-    staleTime: 30_000,
-  });
-  const ownedPostIds = new Set(ownedPostIdsQuery.data ?? []);
   const unreadQuery = useQuery({
     queryKey: ["notification-unread-count"],
     queryFn: getUnreadNotificationCount,
@@ -437,7 +427,7 @@ export default function CommunityScreen() {
           renderItem={({ item }) => (
             <FeedPost
               item={item}
-              canDelete={ownedPostIds.has(item.postId)}
+              canDelete={item.isMine}
               onOpenComments={() => setCommentPostId(item.postId)}
               onRequireLogin={() => setLoginRequiredOpen(true)}
             />

@@ -58,10 +58,12 @@ export type Post = {
 export type PostFeedItem = Post & {
   isLiked: boolean;
   isBookmarked: boolean;
+  isMine: boolean;
 };
 
 export type LikedPostItem = Post & {
   isBookmarked: boolean;
+  isMine: boolean;
 };
 
 export type PostComment = {

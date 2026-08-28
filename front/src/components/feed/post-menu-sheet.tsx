@@ -79,7 +79,6 @@ export function PostMenuSheet({
         queryClient.invalidateQueries({ queryKey: ["posts"] }),
         queryClient.invalidateQueries({ queryKey: ["my-posts"] }),
         queryClient.invalidateQueries({ queryKey: ["liked-posts"] }),
-        queryClient.invalidateQueries({ queryKey: ["owned-post-ids"] }),
       ]);
     },
   });

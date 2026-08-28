@@ -55,7 +55,7 @@ public class PostService {
         Set<Long> bookmarkedCourseIds = userId == null || courseIds.isEmpty()
                 ? Set.of()
                 : bookmarks.findBookmarkedCourseIds(userId, courseIds);
-        return PageResponse.from(found.map(post -> toFeedItem(post, commentCounts, likedPostIds, bookmarkedCourseIds)));
+        return PageResponse.from(found.map(post -> toFeedItem(post, userId, commentCounts, likedPostIds, bookmarkedCourseIds)));
     }
     public PageResponse<MyPostItem> mine(Long userId, int page, int size) {
         Page<Post> found = posts.findByUserId(userId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
@@ -81,11 +81,12 @@ public class PostService {
         postLikes.deleteAllByPostId(postId);
         posts.delete(post);
     }
-    private FeedItem toFeedItem(Post p, Map<Long, Long> commentCounts, Set<Long> likedPostIds,
+    private FeedItem toFeedItem(Post p, Long currentUserId, Map<Long, Long> commentCounts, Set<Long> likedPostIds,
                                 Set<Long> bookmarkedCourseIds) {
         return new FeedItem(p.getId(), p.getCourse().getId(), p.getUser().getNickname(), p.getContent(),
                 p.getPhotoUrl(), p.getLikeCount(), commentCounts.getOrDefault(p.getId(), 0L),
-                likedPostIds.contains(p.getId()), bookmarkedCourseIds.contains(p.getCourse().getId()), p.getWalkedAt());
+                likedPostIds.contains(p.getId()), bookmarkedCourseIds.contains(p.getCourse().getId()),
+                currentUserId != null && p.getUser().getId().equals(currentUserId), p.getWalkedAt());
     }
     private List<Long> postIds(Page<Post> found) {
         return found.getContent().stream().map(Post::getId).toList();
@@ -100,7 +101,7 @@ public class PostService {
     public record CreatedPost(Long postId) {}
     public record FeedItem(Long postId, Long courseId, String nickname, String content, String photoUrl,
                            int likeCount, long commentCount, boolean isLiked, boolean isBookmarked,
-                           LocalDateTime walkedAt) {}
+                           boolean isMine, LocalDateTime walkedAt) {}
     public record MyPostItem(Long postId, Long courseId, String content, String photoUrl,
                              int likeCount, long commentCount, LocalDateTime walkedAt) {}
 }

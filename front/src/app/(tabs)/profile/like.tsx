@@ -2,7 +2,6 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   useInfiniteQuery,
   useMutation,
-  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { router } from "expo-router";
@@ -11,12 +10,7 @@ import { ActivityIndicator, FlatList, Image, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
-import {
-  getMyLikedPosts,
-  getMyPosts,
-  likePost,
-  unlikePost,
-} from "@/api/post-api";
+import { getMyLikedPosts, likePost, unlikePost } from "@/api/post-api";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
 import { PostMenuSheet } from "@/components/feed/post-menu-sheet";
@@ -236,16 +230,6 @@ export default function LikedPostsScreen() {
         : undefined,
   });
   const posts = likedQuery.data?.pages.flatMap((page) => page.content) ?? [];
-  const ownedPostIdsQuery = useQuery({
-    queryKey: ["owned-post-ids"],
-    queryFn: async () => {
-      const result = await getMyPosts({ page: 0, size: 1_000 });
-      return result.content.map((post) => post.postId);
-    },
-    enabled: isAuthenticated,
-    staleTime: 30_000,
-  });
-  const ownedPostIds = new Set(ownedPostIdsQuery.data ?? []);
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
@@ -277,7 +261,7 @@ export default function LikedPostsScreen() {
           renderItem={({ item }) => (
             <LikedPostCard
               item={item}
-              canDelete={ownedPostIds.has(item.postId)}
+              canDelete={item.isMine}
               onComments={() => setCommentPostId(item.postId)}
             />
           )}
