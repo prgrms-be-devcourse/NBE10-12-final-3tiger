@@ -1,7 +1,6 @@
 package com.back.comment.service;
 
 import com.back.comment.domain.Comment;
-import com.back.comment.domain.CommentUpvote;
 import com.back.comment.repository.CommentRepository;
 import com.back.comment.repository.CommentUpvoteRepository;
 import com.back.course.domain.Course;
@@ -18,6 +17,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +33,7 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -47,6 +48,8 @@ class CommentServiceTest {
     private PostRepository postRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private CommentUpvoteWriter commentUpvoteWriter;
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
@@ -159,7 +162,8 @@ class CommentServiceTest {
         // then
         assertThat(result.upvoted()).isTrue();
         assertThat(result.upvoteCount()).isEqualTo(1);
-        verify(commentUpvoteRepository).save(any(CommentUpvote.class));
+        verify(commentUpvoteWriter).trySaveUpvote(eq(comment), any(User.class));
+        verify(commentRepository).increaseUpvote(commentId);
     }
 
     @Test
@@ -174,6 +178,7 @@ class CommentServiceTest {
         comment.increaseUpvote();
         given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
         given(commentUpvoteRepository.existsByComment_IdAndUser_Id(commentId, userId)).willReturn(true);
+        given(commentUpvoteRepository.deleteByComment_IdAndUser_Id(commentId, userId)).willReturn(1);
 
         // when
         CommentService.UpvoteResult result = commentService.toggleUpvote(commentId, userId);
@@ -182,6 +187,7 @@ class CommentServiceTest {
         assertThat(result.upvoted()).isFalse();
         assertThat(result.upvoteCount()).isEqualTo(0);
         verify(commentUpvoteRepository).deleteByComment_IdAndUser_Id(commentId, userId);
+        verify(commentRepository).decreaseUpvote(commentId);
         verify(userRepository, never()).findById(any());
     }
 
@@ -254,5 +260,53 @@ class CommentServiceTest {
         // then
         assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(exception.getMessage()).isEqualTo("존재하지 않는 댓글입니다.");
+    }
+
+    @Test
+    @DisplayName("t11: 동시 요청으로 유니크 제약에 걸리면(DataIntegrityViolationException) 이미 공감한 상태로 간주하고 upvoteCount를 그대로 반환한다")
+    void t11() {
+        // given
+        Long commentId = 1L;
+        Long userId = 1L;
+        Post post = newPost();
+        User author = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        Comment comment = new Comment(post, author, "좋은 코스네요");
+        for (int i = 0; i < 3; i++) comment.increaseUpvote();
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+        given(commentUpvoteRepository.existsByComment_IdAndUser_Id(commentId, userId)).willReturn(false);
+        given(userRepository.findById(userId)).willReturn(Optional.of(User.createLocal("test@test.com", "dummy-hash", "산책러")));
+        willThrow(new DataIntegrityViolationException("duplicate key")).given(commentUpvoteWriter).trySaveUpvote(any(), any());
+
+        // when
+        CommentService.UpvoteResult result = commentService.toggleUpvote(commentId, userId);
+
+        // then
+        assertThat(result.upvoted()).isTrue();
+        assertThat(result.upvoteCount()).isEqualTo(3);
+        verify(commentRepository, never()).increaseUpvote(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("t12: 공감 취소 시 이미 삭제되어 삭제 건수가 0이면 카운트를 감소시키지 않는다")
+    void t12() {
+        // given
+        Long commentId = 1L;
+        Long userId = 1L;
+        Post post = newPost();
+        User author = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        Comment comment = new Comment(post, author, "좋은 코스네요");
+        for (int i = 0; i < 2; i++) comment.increaseUpvote();
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+        given(commentUpvoteRepository.existsByComment_IdAndUser_Id(commentId, userId)).willReturn(true);
+        given(commentUpvoteRepository.deleteByComment_IdAndUser_Id(commentId, userId)).willReturn(0);
+
+        // when
+        CommentService.UpvoteResult result = commentService.toggleUpvote(commentId, userId);
+
+        // then
+        assertThat(result.upvoted()).isFalse();
+        assertThat(result.upvoteCount()).isEqualTo(2);
+        verify(commentRepository, never()).decreaseUpvote(any());
     }
 }

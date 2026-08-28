@@ -27,6 +27,14 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     @Query("delete from Comment c where c.post.id = :postId")
     int deleteAllByPostId(@Param("postId") Long postId);
 
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Comment c SET c.upvoteCount = c.upvoteCount + 1 WHERE c.id = :id")
+    int increaseUpvote(@Param("id") Long commentId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Comment c SET c.upvoteCount = c.upvoteCount - 1 WHERE c.id = :id AND c.upvoteCount > 0")
+    int decreaseUpvote(@Param("id") Long commentId);
+
     interface PostCommentCount {
         Long getPostId();
         long getCommentCount();
