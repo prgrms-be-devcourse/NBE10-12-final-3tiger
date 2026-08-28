@@ -5,6 +5,8 @@ import com.back.global.api.PageResponse;
 import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.SecurityConfig;
 import com.back.global.config.WebConfig;
+import com.back.global.error.ApiException;
+import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,6 +15,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -23,6 +26,9 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -31,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static com.back.TestAuthentication.authenticatedAs;
 
 @WebMvcTest(CommentController.class)
-@Import({SecurityConfig.class, WebConfig.class, CurrentUserIdResolver.class})
+@Import({SecurityConfig.class, WebConfig.class, CurrentUserIdResolver.class, GlobalExceptionHandler.class})
 class CommentControllerTest {
 
     @Autowired
@@ -105,5 +111,44 @@ class CommentControllerTest {
         // when & then
         mockMvc.perform(delete("/api/v1/comments/{commentId}", 1L).with(authenticatedAs(1L)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("t6: 미인증 상태로 댓글 작성 시 401을 반환한다")
+    void t6() throws Exception {
+        // when & then
+        mockMvc.perform(post("/api/v1/posts/{postId}/comments", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"좋은 코스네요\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verify(commentService, never()).createComment(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("t7: 존재하지 않는 postId로 댓글 작성 시 404를 반환한다")
+    void t7() throws Exception {
+        // given
+        given(commentService.createComment(999L, 1L, "좋은 코스네요"))
+                .willThrow(new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
+
+        // when & then
+        mockMvc.perform(post("/api/v1/posts/{postId}/comments", 999L)
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"좋은 코스네요\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("t8: 본인 댓글이 아닌 댓글 삭제 시 403을 반환한다")
+    void t8() throws Exception {
+        // given
+        doThrow(new ApiException(HttpStatus.FORBIDDEN, "본인 댓글만 삭제할 수 있습니다."))
+                .when(commentService).deleteComment(1L, 2L);
+
+        // when & then
+        mockMvc.perform(delete("/api/v1/comments/{commentId}", 1L).with(authenticatedAs(2L)))
+                .andExpect(status().isForbidden());
     }
 }
