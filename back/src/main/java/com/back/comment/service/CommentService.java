@@ -36,14 +36,14 @@ public class CommentService {
     }
 
     public PageResponse<CommentResponse> getComments(Long postId, Pageable pageable) {
-        posts.findById(postId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
+        getPostByIdOrThrow(postId);
         return PageResponse.from(comments.findByPost_IdOrderByCreatedAtDesc(postId, pageable).map(this::toCommentResponse));
     }
 
     @Transactional
     public Long createComment(Long postId, Long userId, String content) {
-        Post post = posts.findById(postId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
-        User user = users.findById(userId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 사용자입니다."));
+        Post post = getPostByIdOrThrow(postId);
+        User user = getUserByIdOrThrow(userId);
         Comment comment = comments.save(new Comment(post, user, content));
         eventPublisher.publishEvent(new CommentCreatedEvent(post.getUser().getId(), userId, user.getNickname(),
                 user.getProfileImageUrl(), postId, comment.getId()));
@@ -52,7 +52,7 @@ public class CommentService {
 
     @Transactional
     public UpvoteResult toggleUpvote(Long commentId, Long userId) {
-        Comment comment = comments.findById(commentId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 댓글입니다."));
+        Comment comment = getCommentByIdOrThrow(commentId);
 
         if (commentUpvotes.existsByComment_IdAndUser_Id(commentId, userId)) {
             int deleted = commentUpvotes.deleteByComment_IdAndUser_Id(commentId, userId);
@@ -65,7 +65,7 @@ public class CommentService {
             return new UpvoteResult(false, Math.max(comment.getUpvoteCount() - 1, 0));
         }
 
-        User user = users.findById(userId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 사용자입니다."));
+        User user = getUserByIdOrThrow(userId);
         try {
             commentUpvoteWriter.trySaveUpvote(comment, user);
         } catch (DataIntegrityViolationException e) {
@@ -86,13 +86,25 @@ public class CommentService {
 
     @Transactional
     public void deleteComment(Long commentId, Long userId) {
-        Comment comment = comments.findById(commentId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 댓글입니다."));
+        Comment comment = getCommentByIdOrThrow(commentId);
 
         if (!comment.getUser().getId().equals(userId)) {
             throw new ApiException(HttpStatus.FORBIDDEN, "본인 댓글만 삭제할 수 있습니다.");
         }
 
         comments.delete(comment);
+    }
+
+    private Post getPostByIdOrThrow(Long id) {
+        return posts.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
+    }
+
+    private User getUserByIdOrThrow(Long id) {
+        return users.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 사용자입니다."));
+    }
+
+    private Comment getCommentByIdOrThrow(Long id) {
+        return comments.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 댓글입니다."));
     }
 
     private CommentResponse toCommentResponse(Comment comment) {
