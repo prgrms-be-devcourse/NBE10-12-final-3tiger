@@ -3,16 +3,16 @@ import axios, { AxiosError, type AxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/stores/auth-store";
 import { ApiError, type ApiResponse } from "@/types/api";
 
-const baseURL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "");
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "");
 
-if (!baseURL) {
+if (!API_BASE_URL) {
   console.warn(
     "EXPO_PUBLIC_API_URL이 설정되지 않아 API 요청을 보낼 수 없습니다.",
   );
 }
 
 export const apiClient = axios.create({
-  baseURL,
+  baseURL: API_BASE_URL,
   timeout: 15_000,
   headers: { "Content-Type": "application/json" },
 });

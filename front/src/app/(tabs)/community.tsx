@@ -2,14 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Image, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
+import { getUnreadNotificationCount } from "@/api/notification-api";
 import { getPosts, likePost, unlikePost } from "@/api/post-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
@@ -278,6 +280,14 @@ function FeedPost({
 }
 
 export default function CommunityScreen() {
+  const { notificationId, postId, openComments } = useLocalSearchParams<{
+    notificationId?: string;
+    postId?: string;
+    openComments?: string;
+  }>();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const listRef = useRef<FlatList<PostFeedItem>>(null);
+  const handledNotificationId = useRef<string | null>(null);
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const postsQuery = useInfiniteQuery({
@@ -291,6 +301,31 @@ export default function CommunityScreen() {
         : undefined,
   });
   const posts = postsQuery.data?.pages.flatMap((page) => page.content) ?? [];
+  const unreadQuery = useQuery({
+    queryKey: ["notification-unread-count"],
+    queryFn: getUnreadNotificationCount,
+    enabled: isAuthenticated,
+    staleTime: 15_000,
+  });
+
+  useEffect(() => {
+    if (
+      !notificationId ||
+      handledNotificationId.current === notificationId ||
+      !postId ||
+      posts.length === 0
+    )
+      return;
+    handledNotificationId.current = notificationId;
+    const targetPostId = Number(postId);
+    const index = posts.findIndex((item) => item.postId === targetPostId);
+    if (index >= 0) {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToIndex({ index, animated: true });
+      });
+    }
+    if (openComments === "1") setCommentPostId(targetPostId);
+  }, [notificationId, openComments, postId, posts]);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
@@ -312,7 +347,28 @@ export default function CommunityScreen() {
         />
         <View className="ml-auto flex-row">
           <IconButton label="피드 검색" icon="search" />
-          <IconButton label="알림" icon="notifications-outline" />
+          <View>
+            <IconButton
+              label="알림"
+              icon="notifications-outline"
+              onPress={() => {
+                if (!isAuthenticated) {
+                  setLoginRequiredOpen(true);
+                  return;
+                }
+                router.push("/notifications" as never);
+              }}
+            />
+            {(unreadQuery.data?.count ?? 0) > 0 && (
+              <View className="absolute right-0.5 top-0.5 min-w-[18px] items-center justify-center rounded-full bg-[#EF4444] px-1 py-0.5">
+                <Text className="text-[9px] font-black leading-3 text-white">
+                  {(unreadQuery.data?.count ?? 0) > 99
+                    ? "99+"
+                    : unreadQuery.data?.count}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
       {postsQuery.isPending ? (
@@ -326,6 +382,7 @@ export default function CommunityScreen() {
         />
       ) : (
         <FlatList
+          ref={listRef}
           data={posts}
           keyExtractor={(item) => String(item.postId)}
           renderItem={({ item }) => (
@@ -343,6 +400,12 @@ export default function CommunityScreen() {
               void postsQuery.fetchNextPage();
           }}
           onEndReachedThreshold={0.6}
+          onScrollToIndexFailed={({ index }) => {
+            listRef.current?.scrollToOffset({
+              offset: Math.max(0, index * 380),
+              animated: true,
+            });
+          }}
           ListFooterComponent={
             postsQuery.isFetchingNextPage ? (
               <ActivityIndicator color="#087A3F" className="my-4" />

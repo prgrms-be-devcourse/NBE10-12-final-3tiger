@@ -19,7 +19,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getMyBookmarks } from "@/api/course-api";
-import { createPost, getPhotoUploadUrl, uploadPostPhoto } from "@/api/post-api";
+import { createPost, uploadPostPhoto } from "@/api/post-api";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import {
@@ -59,15 +59,11 @@ export default function WritePostScreen() {
     mutationFn: async () => {
       if (!asset || !selectedCourse)
         throw new Error("사진과 코스를 선택해 주세요.");
-      const fileName = asset.fileName ?? `walk-${Date.now()}.jpg`;
-      const contentType = asset.mimeType ?? "image/jpeg";
-      const upload = await getPhotoUploadUrl(fileName, contentType);
-      const blob = await fetch(asset.uri).then((response) => response.blob());
-      await uploadPostPhoto(upload.uploadUrl, blob, contentType);
+      const photoUrl = await uploadPostPhoto(asset);
       return createPost({
         courseId: selectedCourse.courseId,
         content: content.trim(),
-        photoUrl: upload.photoUrl,
+        photoUrl,
         walkedAt: new Date().toISOString(),
       });
     },
