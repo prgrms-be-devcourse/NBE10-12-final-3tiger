@@ -42,13 +42,13 @@ public class PostLikeService {
 
     @Transactional
     public LikeResult like(Long postId, Long userId) {
-        Post post = posts.findById(postId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
+        Post post = getPostByIdOrThrow(postId);
 
         if (postLikes.existsByPost_IdAndUser_Id(postId, userId)) {
             return new LikeResult(true, post.getLikeCount());
         }
 
-        User user = users.findById(userId).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "존재하지 않는 사용자입니다."));
+        User user = getUserByIdOrThrow(userId);
         try {
             postLikeWriter.trySaveLike(post, user);
         } catch (DataIntegrityViolationException e) {
@@ -67,7 +67,7 @@ public class PostLikeService {
 
     @Transactional
     public LikeResult unlike(Long postId, Long userId) {
-        Post post = posts.findById(postId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
+        Post post = getPostByIdOrThrow(postId);
 
         int deleted = postLikes.deleteByPost_IdAndUser_Id(postId, userId);
         if (deleted == 0) {
@@ -109,6 +109,14 @@ public class PostLikeService {
                 commentCounts.getOrDefault(post.getId(), 0L),
                 bookmarkedCourseIds.contains(post.getCourse().getId()),
                 post.getUser().getId().equals(currentUserId), postLike.getCreatedAt());
+    }
+
+    private Post getPostByIdOrThrow(Long id) {
+        return posts.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
+    }
+
+    private User getUserByIdOrThrow(Long id) {
+        return users.findById(id).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "존재하지 않는 사용자입니다."));
     }
 
     public record LikeResult(boolean isLiked, int likeCount) {}

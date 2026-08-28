@@ -68,13 +68,13 @@ public class PostService {
         return storage.createUploadTarget(userId, fileName, contentType);
     }
     @Transactional public CreatedPost create(Long userId, CreateCommand command) {
-        User user = users.findById(userId).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "존재하지 않는 사용자입니다."));
-        Course course = courses.findById(command.courseId()).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 코스입니다."));
+        User user = getUserByIdOrThrow(userId);
+        Course course = getCourseByIdOrThrow(command.courseId());
         Post post = posts.save(new Post(user, course, command.content(), command.photoUrl(), command.walkedAt()));
         return new CreatedPost(post.getId());
     }
     @Transactional public void delete(Long userId, Long postId) {
-        Post post = posts.findById(postId).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
+        Post post = getPostByIdOrThrow(postId);
         if (!post.getUser().getId().equals(userId)) throw new ApiException(HttpStatus.FORBIDDEN, "본인의 게시물만 삭제할 수 있습니다.");
         commentUpvotes.deleteAllByPostId(postId);
         comments.deleteAllByPostId(postId);
@@ -87,6 +87,15 @@ public class PostService {
                 p.getPhotoUrl(), p.getLikeCount(), commentCounts.getOrDefault(p.getId(), 0L),
                 likedPostIds.contains(p.getId()), bookmarkedCourseIds.contains(p.getCourse().getId()),
                 currentUserId != null && p.getUser().getId().equals(currentUserId), p.getWalkedAt());
+    }
+    private Post getPostByIdOrThrow(Long id) {
+        return posts.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
+    }
+    private User getUserByIdOrThrow(Long id) {
+        return users.findById(id).orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "존재하지 않는 사용자입니다."));
+    }
+    private Course getCourseByIdOrThrow(Long id) {
+        return courses.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 코스입니다."));
     }
     private List<Long> postIds(Page<Post> found) {
         return found.getContent().stream().map(Post::getId).toList();

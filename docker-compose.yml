@@ -22,6 +22,8 @@ services:
       - ./docker/30-social-schema.sh:/docker-entrypoint-initdb.d/30-social-schema.sh:ro
       - ./docker/post-like-unique-constraint.sql:/tmp/post-like-unique-constraint.sql:ro
       - ./docker/40-post-like-unique-constraint.sh:/docker-entrypoint-initdb.d/40-post-like-unique-constraint.sh:ro
+      - ./docker/comment-upvote-unique-constraint.sql:/tmp/comment-upvote-unique-constraint.sql:ro
+      - ./docker/60-comment-upvote-unique-constraint.sh:/docker-entrypoint-initdb.d/60-comment-upvote-unique-constraint.sh:ro
       - ./docker/21_persona_weight.sql:/tmp/persona/21_persona_weight.sql:ro
       - ./docker/22_persona_course_scores.sql:/tmp/persona/22_persona_course_scores.sql:ro
       - ./docker/23_persona_edge_costs.sql:/tmp/persona/23_persona_edge_costs.sql:ro
