@@ -22,6 +22,7 @@ import {
   getCourses,
   unbookmarkCourse,
 } from "@/api/course-api";
+import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
@@ -29,11 +30,14 @@ import {
   BottomSheetHandle,
   dismissBottomSheet,
 } from "@/components/ui/bottom-sheet-handle";
+import { useAuthStore } from "@/stores/auth-store";
 
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
 
 export default function CourseScreen() {
   const queryClient = useQueryClient();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const [coords, setCoords] = useState(DEFAULT_COORDS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(true);
@@ -185,100 +189,126 @@ export default function CourseScreen() {
           ))}
         </ScrollView>
       </SafeAreaView>
-      {showDetails && <Animated.View
-        className="absolute inset-x-0 bottom-0 h-[68%] rounded-t-[30px] bg-white px-5 pb-[22px] pt-2.5 shadow-2xl"
-        style={{ transform: [{ translateY: sheetTranslateY }] }}
-      >
-        <BottomSheetHandle
-          onDismiss={() => setShowDetails(false)}
-          translateY={sheetTranslateY}
-          dismissDistance={windowHeight}
-        />
-        <ScrollView className="flex-1" contentContainerClassName="px-0 pb-2" nestedScrollEnabled showsVerticalScrollIndicator>
-        {coursesQuery.isPending || detailQuery.isPending ? (
-          <ActivityIndicator color="#087A3F" className="my-12" />
-        ) : detail ? (
-          <>
-            <View className="flex-row items-center">
-              <View className="flex-1">
-                <Text className="text-[11px] font-black text-[#087A3F]">
-                  현재 위치 추천 코스
-                </Text>
-                <Text className="mt-1 text-[22px] font-black text-[#18271D]">
-                  {detail.name}
-                </Text>
-              </View>
-              <Button
-                variant="secondary"
-                size="icon"
-                accessibilityLabel="코스 저장"
-                className="rounded-2xl"
-                disabled={bookmarkMutation.isPending}
-                onPress={() => {
-                  if (selectedId !== null && !bookmarkMutation.isPending)
-                    bookmarkMutation.mutate();
-                }}
-              >
-                <Ionicons
-                  name={isBookmarked ? "bookmark" : "bookmark-outline"}
-                  size={23}
-                  color="#087A3F"
-                />
-              </Button>
-            </View>
-            <Text className="mt-1.5 text-[13px] text-[#78837B]">
-              {(detail.distanceM / 1000).toFixed(1)}km · 약{" "}
-              {detail.estimatedMinutes ?? "-"}분{" "}
-              {detail.isLoop ? "· 순환 코스" : ""}
-            </Text>
-            <View className="mt-[15px] flex-row rounded-[18px] bg-[#F2F8F2] py-3">
-              {[
-                [
-                  `${Math.round((detail.scores?.shadeSummer ?? 0) * 100)}%`,
-                  "그늘",
-                ],
-                [`${detail.scores?.avgSlopeDegree ?? "-"}°`, "평균 경사"],
-                [detail.scores?.surfaceType ?? "-", "노면"],
-              ].map(([value, label]) => (
-                <View key={label} className="flex-1 items-center">
-                  <Text className="text-sm font-black text-[#25352B]">
-                    {value}
-                  </Text>
-                  <Text className="mt-0.5 text-[10px] text-slate-500">
-                    {label}
-                  </Text>
+      {showDetails && (
+        <Animated.View
+          className="absolute inset-x-0 bottom-0 h-[68%] rounded-t-[30px] bg-white px-5 pb-[22px] pt-2.5 shadow-2xl"
+          style={{ transform: [{ translateY: sheetTranslateY }] }}
+        >
+          <BottomSheetHandle
+            onDismiss={() => setShowDetails(false)}
+            translateY={sheetTranslateY}
+            dismissDistance={windowHeight}
+          />
+          <ScrollView
+            className="flex-1"
+            contentContainerClassName="px-0 pb-2"
+            nestedScrollEnabled
+            showsVerticalScrollIndicator
+          >
+            {coursesQuery.isPending || detailQuery.isPending ? (
+              <ActivityIndicator color="#087A3F" className="my-12" />
+            ) : detail ? (
+              <>
+                <View className="flex-row items-center">
+                  <View className="flex-1">
+                    <Text className="text-[11px] font-black text-[#087A3F]">
+                      현재 위치 추천 코스
+                    </Text>
+                    <Text className="mt-1 text-[22px] font-black text-[#18271D]">
+                      {detail.name}
+                    </Text>
+                  </View>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    accessibilityLabel="코스 저장"
+                    className="rounded-2xl"
+                    disabled={bookmarkMutation.isPending}
+                    onPress={() => {
+                      if (!isAuthenticated) {
+                        setLoginRequiredOpen(true);
+                        return;
+                      }
+                      if (selectedId !== null && !bookmarkMutation.isPending)
+                        bookmarkMutation.mutate();
+                    }}
+                  >
+                    <Ionicons
+                      name={isBookmarked ? "bookmark" : "bookmark-outline"}
+                      size={23}
+                      color="#087A3F"
+                    />
+                  </Button>
                 </View>
-              ))}
-            </View>
-            <Button
-              className="mt-[15px] h-14 rounded-[18px]"
-              onPress={() => router.push(`/course/${detail.courseId}` as never)}
-            >
-              <Ionicons
-                name="information-circle-outline"
-                size={20}
-                color="white"
-              />
-              <Text className="text-base font-black text-white">
-                코스 상세 보기
+                <Text className="mt-1.5 text-[13px] text-[#78837B]">
+                  {(detail.distanceM / 1000).toFixed(1)}km · 약{" "}
+                  {detail.estimatedMinutes ?? "-"}분{" "}
+                  {detail.isLoop ? "· 순환 코스" : ""}
+                </Text>
+                <View className="mt-[15px] flex-row rounded-[18px] bg-[#F2F8F2] py-3">
+                  {[
+                    [
+                      `${Math.round((detail.scores?.shadeSummer ?? 0) * 100)}%`,
+                      "그늘",
+                    ],
+                    [`${detail.scores?.avgSlopeDegree ?? "-"}°`, "평균 경사"],
+                    [detail.scores?.surfaceType ?? "-", "노면"],
+                  ].map(([value, label]) => (
+                    <View key={label} className="flex-1 items-center">
+                      <Text className="text-sm font-black text-[#25352B]">
+                        {value}
+                      </Text>
+                      <Text className="mt-0.5 text-[10px] text-slate-500">
+                        {label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                <Button
+                  className="mt-[15px] h-14 rounded-[18px]"
+                  onPress={() =>
+                    router.push(`/course/${detail.courseId}` as never)
+                  }
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={20}
+                    color="white"
+                  />
+                  <Text className="text-base font-black text-white">
+                    코스 상세 보기
+                  </Text>
+                </Button>
+              </>
+            ) : (
+              <Text className="py-12 text-center text-muted-foreground">
+                주변 추천 코스가 없어요.
               </Text>
-            </Button>
-          </>
-        ) : (
-          <Text className="py-12 text-center text-muted-foreground">
-            주변 추천 코스가 없어요.
-          </Text>
-        )}
-        </ScrollView>
-      </Animated.View>}
+            )}
+          </ScrollView>
+        </Animated.View>
+      )}
       {!showDetails && (
-        <SafeAreaView edges={["bottom"]} className="absolute inset-x-0 bottom-5 items-center" pointerEvents="box-none">
-          <Button className="h-14 flex-row gap-2 rounded-full px-6 shadow-lg" onPress={() => setShowDetails(true)}>
+        <SafeAreaView
+          edges={["bottom"]}
+          className="absolute inset-x-0 bottom-5 items-center"
+          pointerEvents="box-none"
+        >
+          <Button
+            className="h-14 flex-row gap-2 rounded-full px-6 shadow-lg"
+            onPress={() => setShowDetails(true)}
+          >
             <Ionicons name="chevron-up" size={20} color="white" />
-            <Text className="text-[15px] font-black text-white">코스 정보 보기</Text>
+            <Text className="text-[15px] font-black text-white">
+              코스 정보 보기
+            </Text>
           </Button>
         </SafeAreaView>
       )}
+      <LoginRequiredModal
+        visible={loginRequiredOpen}
+        onClose={() => setLoginRequiredOpen(false)}
+      />
     </View>
   );
 }

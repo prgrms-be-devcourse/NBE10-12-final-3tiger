@@ -1,5 +1,6 @@
 package com.back.post.service;
 
+import com.back.bookmark.repository.BookmarkRepository;
 import com.back.course.domain.Course;
 import com.back.global.api.PageResponse;
 import com.back.global.error.ApiException;
@@ -26,6 +27,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
@@ -47,6 +49,8 @@ class PostLikeServiceTest {
     private PostLikeRepository postLikeRepository;
     @Mock
     private CommentRepository commentRepository;
+    @Mock
+    private BookmarkRepository bookmarkRepository;
     @Mock
     private PostLikeWriter postLikeWriter;
     @Mock
@@ -195,6 +199,8 @@ class PostLikeServiceTest {
 
         given(postLikeRepository.findByUser_IdOrderByCreatedAtDesc(eq(userId), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(postLike)));
+        given(bookmarkRepository.findBookmarkedCourseIds(userId, List.of(20L)))
+                .willReturn(Set.of(20L));
 
         // when
         PageResponse<PostLikeService.LikedPostItem> response = postLikeService.myLikes(userId, 0, 20);
@@ -208,6 +214,7 @@ class PostLikeServiceTest {
         assertThat(item.content()).isEqualTo("오늘도 산책");
         assertThat(item.photoUrl()).isEqualTo("http://example.com/photo.jpg");
         assertThat(item.likeCount()).isEqualTo(0);
+        assertThat(item.isBookmarked()).isTrue();
         assertThat(item.likedAt()).isEqualTo(postLike.getCreatedAt());
     }
 }

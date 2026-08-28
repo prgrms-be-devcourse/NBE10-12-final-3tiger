@@ -29,9 +29,10 @@ import {
 import { getMyProfile } from "@/api/user-api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { EmptyState, ErrorState } from "@/components/ui/data-state";
+import { ErrorState } from "@/components/ui/data-state";
 import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/text";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import {
   BottomSheetHandle,
   dismissBottomSheet,
@@ -45,10 +46,14 @@ function CommentRow({ item }: { item: PostComment }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [upvoted, setUpvoted] = useState(item.upvoted ?? false);
   const [upvoteCount, setUpvoteCount] = useState(item.upvoteCount);
+  const [profileImageReady, setProfileImageReady] = useState(false);
   useEffect(() => {
     setUpvoted(item.upvoted ?? false);
     setUpvoteCount(item.upvoteCount);
   }, [item.upvoted, item.upvoteCount]);
+  useEffect(() => {
+    setProfileImageReady(false);
+  }, [item.profileImageUrl]);
   const scale = useRef(new Animated.Value(1)).current;
   const burst = useRef(new Animated.Value(0)).current;
   const mutation = useMutation({
@@ -122,20 +127,27 @@ function CommentRow({ item }: { item: PostComment }) {
   };
 
   return (
-    <View className="w-full flex-row items-start gap-3 px-5">
+    <View
+      className={`w-full flex-row items-start gap-3 px-5 ${profileImageReady ? "opacity-100" : "opacity-0"}`}
+    >
       <Avatar alt={`${item.nickname} 프로필`} className="h-10 w-10">
-        <AvatarFallback className="bg-secondary">
-          <Text className="font-black text-primary">
-            {item.nickname.slice(0, 1)}
-          </Text>
-        </AvatarFallback>
+        <AvatarImage
+          source={
+            item.profileImageUrl
+              ? { uri: item.profileImageUrl }
+              : DEFAULT_PROFILE_IMAGE
+          }
+          onLoad={() => setProfileImageReady(true)}
+          onError={() => setProfileImageReady(true)}
+        />
+        <AvatarFallback className="bg-[#E9F5EC]" />
       </Avatar>
       <View className="flex-1 pt-0.5">
         <View className="flex-row items-center gap-1.5">
-          <Text className="text-xs font-bold text-foreground">
+          <Text className="text-xs font-bold text-[#191C1D]">
             {item.nickname}
           </Text>
-          <Text className="text-[10px] text-muted-foreground">
+          <Text className="text-[10px] text-[#6B756D]">
             {new Date(item.createdAt).toLocaleDateString("ko-KR")}
           </Text>
         </View>
@@ -203,13 +215,13 @@ export function PostCommentSheet({
     dismissBottomSheet(sheetTranslateY, windowHeight, onClose);
   useEffect(() => {
     if (postId !== null) {
-    sheetTranslateY.setValue(windowHeight);
-    Animated.timing(sheetTranslateY, {
-      toValue: 0,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
+      sheetTranslateY.setValue(windowHeight);
+      Animated.timing(sheetTranslateY, {
+        toValue: 0,
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
     }
   }, [postId, sheetTranslateY, windowHeight]);
   const numericPostId = postId === null ? null : Number(postId);
@@ -264,14 +276,17 @@ export function PostCommentSheet({
       onRequestClose={dismissSheet}
     >
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-black/40" onPress={dismissSheet} />
+        <Pressable
+          className="absolute inset-0 bg-black/40"
+          onPress={dismissSheet}
+        />
         <KeyboardAvoidingView
           className="h-[78%]"
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
         >
           <Animated.View
-            className="flex-1 rounded-t-[30px] bg-background pt-2.5"
+            className="flex-1 rounded-t-[30px] bg-[#FCFDFC] pt-2.5"
             style={{ transform: [{ translateY: sheetTranslateY }] }}
           >
             <BottomSheetHandle
@@ -280,7 +295,7 @@ export function PostCommentSheet({
               dismissDistance={windowHeight}
             />
             <View className="h-10 items-center justify-center px-5">
-              <Text className="text-[17px] font-black text-foreground">
+              <Text className="text-[17px] font-black text-[#191C1D]">
                 댓글
               </Text>
             </View>
@@ -306,10 +321,15 @@ export function PostCommentSheet({
                 nestedScrollEnabled
                 keyboardShouldPersistTaps="handled"
                 ListEmptyComponent={
-                  <EmptyState
-                    title="아직 댓글이 없어요"
-                    description="첫 댓글을 남겨보세요."
-                  />
+                  <View className="flex-1 items-center justify-center px-6 py-12">
+                    <Ionicons name="leaf-outline" size={36} color="#94A09A" />
+                    <Text className="mt-3 font-bold text-[#191C1D]">
+                      아직 댓글이 없어요
+                    </Text>
+                    <Text className="mt-1 text-center text-sm text-[#6B756D]">
+                      첫 댓글을 남겨보세요.
+                    </Text>
+                  </View>
                 }
                 renderItem={({ item }) => <CommentRow item={item} />}
                 onEndReached={() => {
@@ -327,22 +347,20 @@ export function PostCommentSheet({
                 }
               />
             )}
-            <Separator />
+            <Separator className="bg-[#E5EBE5]" />
             <View className="flex-row items-start gap-3 bg-white px-4 pb-4 pt-3">
               <Avatar
                 alt={`${profileQuery.data?.nickname ?? "내"} 프로필`}
                 className="h-11 w-11 border border-[#DDE7DE]"
               >
-                {profileQuery.data?.profileImageUrl ? (
-                  <AvatarImage
-                    source={{ uri: profileQuery.data.profileImageUrl }}
-                  />
-                ) : null}
-                <AvatarFallback className="bg-[#E9F5EC]">
-                  <Text className="font-black text-[#087A3F]">
-                    {(profileQuery.data?.nickname ?? "나").slice(0, 1)}
-                  </Text>
-                </AvatarFallback>
+                <AvatarImage
+                  source={
+                    profileQuery.data?.profileImageUrl
+                      ? { uri: profileQuery.data.profileImageUrl }
+                      : DEFAULT_PROFILE_IMAGE
+                  }
+                />
+                <AvatarFallback className="bg-[#E9F5EC]" />
               </Avatar>
               <View className="min-h-11 flex-1 flex-row items-end rounded-[22px] border border-[#DCE5DE] bg-[#F8FAF8] pl-4 pr-1.5 py-1.5">
                 <TextInput

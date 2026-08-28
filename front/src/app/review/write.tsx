@@ -181,10 +181,9 @@ export default function WritePostScreen() {
           <Pressable
             className="absolute inset-0 bg-black/40"
             onPress={dismissCourseSheet}
-          >
-          </Pressable>
+          ></Pressable>
           <Animated.View
-            className="h-[78%] rounded-t-[30px] bg-background pt-2.5"
+            className="h-[78%] rounded-t-[30px] bg-[#FCFDFC] pt-2.5"
             style={{ transform: [{ translateY: sheetTranslateY }] }}
           >
             <BottomSheetHandle
@@ -193,7 +192,7 @@ export default function WritePostScreen() {
               dismissDistance={windowHeight}
             />
             <View className="h-10 items-center justify-center px-5">
-              <Text className="text-[17px] font-black text-foreground">
+              <Text className="text-[17px] font-black text-[#191C1D]">
                 코스 선택
               </Text>
             </View>
@@ -225,7 +224,7 @@ export default function WritePostScreen() {
                   <Button
                     variant="ghost"
                     accessibilityLabel={`${item.name} 선택`}
-                    className="min-h-[72px] flex-row items-center justify-start gap-3 rounded-2xl border border-[#E5ECE5] bg-white px-4 py-3"
+                    className="min-h-[72px] flex-row items-center justify-start gap-3 rounded-2xl border border-[#E5EBE5] bg-white px-4 py-3"
                     onPress={() => {
                       setSelectedCourse(item);
                       dismissCourseSheet();
@@ -235,17 +234,26 @@ export default function WritePostScreen() {
                       <Ionicons name="map-outline" size={22} color="#087A3F" />
                     </View>
                     <View className="flex-1 items-start">
-                      <Text className="text-sm font-black text-foreground">
+                      <Text className="text-sm font-black text-[#6B756D]">
                         {item.name}
                       </Text>
-                      <Text className="mt-1 text-xs text-muted-foreground">
-                        {(item.distanceM / 1000).toFixed(1)}km · 약 {item.estimatedMinutes ?? "-"}분
+                      <Text className="mt-1 text-xs text-[#6B756D]">
+                        {(item.distanceM / 1000).toFixed(1)}km · 약{" "}
+                        {item.estimatedMinutes ?? "-"}분
                       </Text>
                     </View>
                     <Ionicons
-                      name={selectedCourse?.courseId === item.courseId ? "checkmark-circle" : "chevron-forward"}
+                      name={
+                        selectedCourse?.courseId === item.courseId
+                          ? "checkmark-circle"
+                          : "chevron-forward"
+                      }
                       size={22}
-                      color={selectedCourse?.courseId === item.courseId ? "#087A3F" : "#64748B"}
+                      color={
+                        selectedCourse?.courseId === item.courseId
+                          ? "#087A3F"
+                          : "#64748B"
+                      }
                     />
                   </Button>
                 )}

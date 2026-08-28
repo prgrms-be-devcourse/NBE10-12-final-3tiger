@@ -1,5 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { router, usePathname } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -16,7 +21,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { getCourseDetail, getMyBookmarks, unbookmarkCourse } from "@/api/course-api";
+import {
+  getCourseDetail,
+  getMyBookmarks,
+  unbookmarkCourse,
+} from "@/api/course-api";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
@@ -25,7 +34,7 @@ import {
   dismissBottomSheet,
 } from "@/components/ui/bottom-sheet-handle";
 import { useAuthStore } from "@/stores/auth-store";
-import type { Course } from "@/types/domain";
+import type { BookmarkedCourse } from "@/types/domain";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1000";
@@ -39,7 +48,9 @@ export default function ProfileBookmarkScreen() {
   const { height: windowHeight } = useWindowDimensions();
   const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
   const dismissSheet = () =>
-    dismissBottomSheet(sheetTranslateY, windowHeight, () => setSelectedId(null));
+    dismissBottomSheet(sheetTranslateY, windowHeight, () =>
+      setSelectedId(null),
+    );
   useEffect(() => {
     if (!isAuthenticated) router.replace("/(auth)/login" as never);
   }, [isAuthenticated]);
@@ -65,7 +76,10 @@ export default function ProfileBookmarkScreen() {
     mutationFn: (courseId: number) => unbookmarkCourse(courseId),
     onSuccess: (_result, courseId) => {
       queryClient.setQueryData<{
-        pages: Array<{ content: Course[]; totalElements: number }>;
+        pages: Array<{
+          content: BookmarkedCourse[];
+          totalElements: number;
+        }>;
         pageParams: unknown[];
       }>(["bookmarks"], (data) => {
         if (!data) return data;
@@ -73,15 +87,32 @@ export default function ProfileBookmarkScreen() {
           ...data,
           pages: data.pages.map((page) => ({
             ...page,
-            content: page.content.filter((course) => course.courseId !== courseId),
-            totalElements: page.totalElements -
-              (page.content.some((course) => course.courseId === courseId) ? 1 : 0),
+            content: page.content.filter(
+              (course) => course.courseId !== courseId,
+            ),
+            totalElements:
+              page.totalElements -
+              (page.content.some((course) => course.courseId === courseId)
+                ? 1
+                : 0),
           })),
         };
       });
     },
-    onSettled: () =>
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"], refetchType: "all" }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["bookmarks"],
+        refetchType: "all",
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["posts"],
+        refetchType: "all",
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["liked-posts"],
+        refetchType: "all",
+      });
+    },
   });
   const selected = detailQuery.data;
   useEffect(() => {
@@ -112,9 +143,7 @@ export default function ProfileBookmarkScreen() {
           >
             <Ionicons name="arrow-back" size={24} color="#191C1D" />
           </Button>
-          <Text className="text-lg text-[#006E2F]">
-            저장한 코스
-          </Text>
+          <Text className="text-lg text-[#006E2F]">저장한 코스</Text>
           <View className="w-11" />
         </View>
       )}
@@ -147,8 +176,13 @@ export default function ProfileBookmarkScreen() {
             <CourseCard
               item={item}
               onPress={() => setSelectedId(item.courseId)}
-              onToggleBookmark={() => removeBookmarkMutation.mutate(item.courseId)}
-              bookmarkPending={removeBookmarkMutation.isPending && removeBookmarkMutation.variables === item.courseId}
+              onToggleBookmark={() =>
+                removeBookmarkMutation.mutate(item.courseId)
+              }
+              bookmarkPending={
+                removeBookmarkMutation.isPending &&
+                removeBookmarkMutation.variables === item.courseId
+              }
             />
           )}
           onEndReached={() => {
@@ -173,12 +207,19 @@ export default function ProfileBookmarkScreen() {
         onRequestClose={dismissSheet}
       >
         <View className="flex-1 justify-end">
-          <Pressable className="absolute inset-0 bg-black/40" onPress={dismissSheet} />
+          <Pressable
+            className="absolute inset-0 bg-black/40"
+            onPress={dismissSheet}
+          />
           <Animated.View
             className="h-[66%] rounded-t-[28px] bg-white pt-2.5"
             style={{ transform: [{ translateY: sheetTranslateY }] }}
           >
-            <BottomSheetHandle onDismiss={() => setSelectedId(null)} translateY={sheetTranslateY} dismissDistance={windowHeight} />
+            <BottomSheetHandle
+              onDismiss={() => setSelectedId(null)}
+              translateY={sheetTranslateY}
+              dismissDistance={windowHeight}
+            />
             {detailQuery.isPending ? (
               <ActivityIndicator color="#087A3F" className="my-16" />
             ) : detailQuery.isError ? (
@@ -187,7 +228,12 @@ export default function ProfileBookmarkScreen() {
                 onRetry={() => void detailQuery.refetch()}
               />
             ) : selected ? (
-              <ScrollView className="flex-1" contentContainerClassName="px-5 pb-8" nestedScrollEnabled showsVerticalScrollIndicator>
+              <ScrollView
+                className="flex-1"
+                contentContainerClassName="px-5 pb-8"
+                nestedScrollEnabled
+                showsVerticalScrollIndicator
+              >
                 <Image
                   source={{ uri: selected.imageUrl || FALLBACK_IMAGE }}
                   className="h-[170px] w-full rounded-xl"
@@ -201,15 +247,6 @@ export default function ProfileBookmarkScreen() {
                       {selected.name}
                     </Text>
                   </View>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    accessibilityLabel="닫기"
-                    className="rounded-full"
-                    onPress={() => setSelectedId(null)}
-                  >
-                    <Ionicons name="close" size={22} color="#475569" />
-                  </Button>
                 </View>
                 <View className="mt-3 flex-row items-center gap-1.5">
                   <Ionicons
@@ -217,9 +254,13 @@ export default function ProfileBookmarkScreen() {
                     size={18}
                     color="#006E2F"
                   />
-                  <Text>{(selected.distanceM / 1000).toFixed(1)}km</Text>
+                  <Text className="font-semibold text-black">
+                    {(selected.distanceM / 1000).toFixed(1)}km
+                  </Text>
                   <Ionicons name="timer-outline" size={18} color="#006E2F" />
-                  <Text>{selected.estimatedMinutes ?? "-"}분</Text>
+                  <Text className="font-semibold text-black">
+                    {selected.estimatedMinutes ?? "-"}분
+                  </Text>
                 </View>
                 <Text className="mt-[13px] text-sm leading-[21px] text-slate-600">
                   {selected.summary ??
@@ -251,7 +292,7 @@ function CourseCard({
   onToggleBookmark,
   bookmarkPending,
 }: {
-  item: Course;
+  item: BookmarkedCourse;
   onPress: () => void;
   onToggleBookmark: () => void;
   bookmarkPending: boolean;
@@ -295,14 +336,12 @@ function CourseCard({
         <Text className="mr-[9px] text-[13px] text-slate-600">
           {(item.distanceM / 1000).toFixed(1)}km
         </Text>
-        {item.estimatedMinutes !== undefined && (
-          <>
-            <Ionicons name="timer-outline" size={17} color="#475569" />
-            <Text className="text-[13px] text-slate-600">
-              {item.estimatedMinutes}분
-            </Text>
-          </>
-        )}
+        <Ionicons name="timer-outline" size={17} color="#475569" />
+        <Text className="text-[13px] text-slate-600">
+          {item.estimatedMinutes ??
+            Math.max(1, Math.round(item.distanceM / 80))}
+          분
+        </Text>
       </View>
     </Pressable>
   );

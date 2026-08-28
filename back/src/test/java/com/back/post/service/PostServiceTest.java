@@ -1,5 +1,6 @@
 package com.back.post.service;
 
+import com.back.bookmark.repository.BookmarkRepository;
 import com.back.comment.repository.CommentRepository;
 import com.back.comment.repository.CommentUpvoteRepository;
 import com.back.course.domain.Course;
@@ -26,6 +27,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
@@ -44,6 +46,7 @@ class PostServiceTest {
     @Mock UserRepository users;
     @Mock CourseRepository courses;
     @Mock PostLikeRepository postLikes;
+    @Mock BookmarkRepository bookmarks;
     @Mock CommentRepository comments;
     @Mock CommentUpvoteRepository commentUpvotes;
     @Mock PhotoStorage storage;
@@ -140,6 +143,7 @@ class PostServiceTest {
         var commentCount = commentCount(10L, 3L);
         given(posts.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of(post)));
         given(postLikes.findLikedPostIds(eq(1L), any())).willReturn(List.of(10L));
+        given(bookmarks.findBookmarkedCourseIds(1L, List.of(1L))).willReturn(Set.of(1L));
         given(comments.countByPostIds(any())).willReturn(List.of(commentCount));
 
         PageResponse<PostService.FeedItem> result = postService.feed(1L, "latest", 0, 20);
@@ -149,6 +153,7 @@ class PostServiceTest {
         assertThat(item.likeCount()).isEqualTo(1);
         assertThat(item.commentCount()).isEqualTo(3);
         assertThat(item.isLiked()).isTrue();
+        assertThat(item.isBookmarked()).isTrue();
     }
 
     @Test
@@ -160,7 +165,9 @@ class PostServiceTest {
         PostService.FeedItem item = postService.feed(null, "latest", 0, 20).content().getFirst();
 
         assertThat(item.isLiked()).isFalse();
+        assertThat(item.isBookmarked()).isFalse();
         verify(postLikes, never()).findLikedPostIds(any(), any());
+        verify(bookmarks, never()).findBookmarkedCourseIds(any(), any());
     }
 
     @Test

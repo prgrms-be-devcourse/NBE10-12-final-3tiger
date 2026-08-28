@@ -40,10 +40,12 @@ public class BookmarkService {
 
     public PageResponse<BookmarkItem> mine(Long userId, int page, int size) {
         var result = bookmarks.findByUserId(userId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
-                .map(b -> new BookmarkItem(b.getCourse().getId(), b.getCourse().getName(), b.getCourse().getDistanceM(), b.getCreatedAt()));
+                .map(b -> new BookmarkItem(b.getCourse().getId(), b.getCourse().getName(), b.getCourse().getDistanceM(),
+                        true, b.getCreatedAt()));
         return PageResponse.from(result);
     }
 
     public record BookmarkState(boolean isBookmarked) {}
-    public record BookmarkItem(Long courseId, String name, int distanceM, LocalDateTime bookmarkedAt) {}
+    public record BookmarkItem(Long courseId, String name, int distanceM, boolean isBookmarked,
+                               LocalDateTime bookmarkedAt) {}
 }

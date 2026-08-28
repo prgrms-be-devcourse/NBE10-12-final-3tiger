@@ -1,36 +1,181 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Keyboard,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
-import MapView, { Marker, type Region } from "react-native-maps";
+import MapView, { type Region as MapRegion } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getRegions } from "@/api/course-api";
+import { getMyProfile } from "@/api/user-api";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
+import { useAuthStore } from "@/stores/auth-store";
+import type { Region as ServiceRegion } from "@/types/domain";
 
-const DEFAULT_REGION: Region = {
+// 위도 약 0.009도는 남북 약 1km로, 화면 중심 기준 반경 약 500m다.
+const FIVE_HUNDRED_METER_VIEW = {
+  latitudeDelta: 0.009,
+  longitudeDelta: 0.009,
+} as const;
+
+const DEFAULT_REGION: MapRegion = {
   latitude: 37.5445,
   longitude: 127.0374,
-  latitudeDelta: 0.025,
-  longitudeDelta: 0.018,
+  ...FIVE_HUNDRED_METER_VIEW,
 };
 
+const CURRENT_LOCATION_TIMEOUT_MS = 3_000;
+
+const isValidCoordinate = (latitude?: number, longitude?: number) =>
+  Number.isFinite(latitude) && Number.isFinite(longitude);
+
+const toRegion = (location: Location.LocationObject): MapRegion => ({
+  latitude: location.coords.latitude,
+  longitude: location.coords.longitude,
+  ...FIVE_HUNDRED_METER_VIEW,
+});
+
+async function getCurrentLocationWithin(
+  timeoutMs: number,
+): Promise<Location.LocationObject | null> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      }),
+      new Promise<null>((resolve) => {
+        timeoutId = setTimeout(() => resolve(null), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+const CALM_DARK_MAP_STYLE = [
+  { elementType: "geometry", stylers: [{ color: "#111411" }] },
+  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#8F9891" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#111411" }] },
+  {
+    featureType: "administrative",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#343A35" }],
+  },
+  {
+    featureType: "landscape",
+    elementType: "geometry",
+    stylers: [{ color: "#101310" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "geometry",
+    stylers: [{ color: "#171B18" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#18211B" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#5E645F" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#2F3430" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#777D78" }],
+  },
+  {
+    featureType: "road.local",
+    elementType: "geometry",
+    stylers: [{ color: "#4D524E" }],
+  },
+  {
+    featureType: "transit",
+    elementType: "geometry",
+    stylers: [{ color: "#242925" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#090C0A" }],
+  },
+];
+
 export default function MapScreen() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const mapRef = useRef<MapView>(null);
-  const [region, setRegion] = useState(DEFAULT_REGION);
+  const lastViewedRegionRef = useRef<MapRegion | null>(null);
   const [query, setQuery] = useState("");
   const [locating, setLocating] = useState(true);
+  const [showLocationLoading, setShowLocationLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [regionsOpen, setRegionsOpen] = useState(false);
+  const { height: windowHeight } = useWindowDimensions();
+  const regionsSheetTranslateY = useRef(
+    new Animated.Value(windowHeight),
+  ).current;
   const [message, setMessage] = useState<string | null>(null);
+  const profileQuery = useQuery({
+    queryKey: ["my-profile"],
+    queryFn: getMyProfile,
+    enabled: isAuthenticated,
+  });
+  const regionsQuery = useQuery({
+    queryKey: ["regions"],
+    queryFn: getRegions,
+    enabled: regionsOpen,
+    staleTime: 5 * 60 * 1000,
+  });
+  const dismissRegionsSheet = useCallback(
+    () =>
+      dismissBottomSheet(regionsSheetTranslateY, windowHeight, () =>
+        setRegionsOpen(false),
+      ),
+    [regionsSheetTranslateY, windowHeight],
+  );
+  useEffect(() => {
+    if (!regionsOpen) return;
+    regionsSheetTranslateY.setValue(windowHeight);
+    Animated.timing(regionsSheetTranslateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [regionsOpen, regionsSheetTranslateY, windowHeight]);
 
-  const moveTo = useCallback((next: Region) => {
-    setRegion(next);
+  const moveTo = useCallback((next: MapRegion) => {
+    if (!isValidCoordinate(next.latitude, next.longitude)) return;
+    lastViewedRegionRef.current = next;
     mapRef.current?.animateToRegion(next, 500);
   }, []);
 
@@ -46,18 +191,39 @@ export default function MapScreen() {
         return;
       }
 
-      const current = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+      const lastKnown = await Location.getLastKnownPositionAsync({
+        maxAge: 60_000,
+        requiredAccuracy: 500,
       });
-      moveTo({
-        latitude: current.coords.latitude,
-        longitude: current.coords.longitude,
-        latitudeDelta: 0.018,
-        longitudeDelta: 0.014,
-      });
+
+      if (
+        lastKnown &&
+        isValidCoordinate(lastKnown.coords.latitude, lastKnown.coords.longitude)
+      ) {
+        moveTo(toRegion(lastKnown));
+        return;
+      }
+
+      setShowLocationLoading(true);
+      const current = await getCurrentLocationWithin(
+        CURRENT_LOCATION_TIMEOUT_MS,
+      );
+
+      if (
+        current &&
+        isValidCoordinate(current.coords.latitude, current.coords.longitude)
+      ) {
+        moveTo(toRegion(current));
+        return;
+      }
+
+      moveTo(DEFAULT_REGION);
+      setMessage("현재 위치를 찾지 못해 서울숲을 표시하고 있어요.");
     } catch {
-      setMessage("현재 위치를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      moveTo(DEFAULT_REGION);
+      setMessage("현재 위치를 확인하지 못해 서울숲을 표시하고 있어요.");
     } finally {
+      setShowLocationLoading(false);
       setLocating(false);
     }
   }, [moveTo]);
@@ -81,8 +247,7 @@ export default function MapScreen() {
       moveTo({
         latitude: result.latitude,
         longitude: result.longitude,
-        latitudeDelta: 0.018,
-        longitudeDelta: 0.014,
+        ...FIVE_HUNDRED_METER_VIEW,
       });
     } catch {
       setMessage("장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.");
@@ -91,9 +256,37 @@ export default function MapScreen() {
     }
   }, [moveTo, query]);
 
-  useEffect(() => {
-    void locate();
-  }, [locate]);
+  useFocusEffect(
+    useCallback(() => {
+      const lastViewedRegion = lastViewedRegionRef.current;
+      if (!lastViewedRegion) {
+        void locate();
+        return;
+      }
+
+      const animationFrame = requestAnimationFrame(() => {
+        mapRef.current?.animateToRegion(lastViewedRegion, 0);
+      });
+      return () => cancelAnimationFrame(animationFrame);
+    }, [locate]),
+  );
+
+  const updateRegion = useCallback((next: MapRegion) => {
+    if (!isValidCoordinate(next.latitude, next.longitude)) return;
+    if (lastViewedRegionRef.current) lastViewedRegionRef.current = next;
+  }, []);
+
+  const moveToServiceRegion = useCallback(
+    (item: ServiceRegion) => {
+      moveTo({
+        latitude: item.centerLat,
+        longitude: item.centerLng,
+        ...FIVE_HUNDRED_METER_VIEW,
+      });
+      dismissRegionsSheet();
+    },
+    [dismissRegionsSheet, moveTo],
+  );
 
   return (
     <View className="flex-1 bg-[#E8F0E5]">
@@ -104,39 +297,34 @@ export default function MapScreen() {
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
+        customMapStyle={CALM_DARK_MAP_STYLE}
+        userInterfaceStyle="dark"
         mapPadding={{ top: 120, right: 16, bottom: 170, left: 16 }}
-        onRegionChangeComplete={setRegion}
-      >
-        <Marker
-          title="산책 추천 장소"
-          coordinate={{
-            latitude: region.latitude + 0.003,
-            longitude: region.longitude - 0.002,
-          }}
+        onRegionChangeComplete={updateRegion}
+      />
+
+      {showLocationLoading && (
+        <View
+          style={StyleSheet.absoluteFill}
+          className="z-20 items-center justify-center bg-[#111411]/80"
+          accessibilityLiveRegion="polite"
         >
-          <View className="h-[42px] w-[42px] items-center justify-center rounded-full border-[3px] border-white bg-[#087A3F]">
-            <Ionicons name="leaf" size={19} color="white" />
+          <View className="items-center gap-3 rounded-3xl bg-white px-7 py-6 shadow-lg">
+            <ActivityIndicator size="large" color="#22C55E" />
+            <Text className="text-[15px] font-bold text-[#24372A]">
+              내 위치를 찾고 있어요
+            </Text>
+            <Text className="text-xs text-[#6D7B6D]">잠시만 기다려 주세요</Text>
           </View>
-        </Marker>
-        <Marker
-          title="반려동물 추천 장소"
-          coordinate={{
-            latitude: region.latitude - 0.004,
-            longitude: region.longitude + 0.003,
-          }}
-        >
-          <View className="h-[42px] w-[42px] items-center justify-center rounded-full border-[3px] border-white bg-amber-500">
-            <Ionicons name="paw" size={19} color="white" />
-          </View>
-        </Marker>
-      </MapView>
+        </View>
+      )}
 
       <SafeAreaView
         edges={["top"]}
         className="px-[18px]"
         pointerEvents="box-none"
       >
-        <View className="mt-1.5 flex-row items-center gap-2.5">
+        <View className="mt-1.5 flex-row items-center">
           <View className="h-[54px] flex-1 flex-row items-center gap-2.5 rounded-[18px] bg-white px-[17px] shadow-md">
             <Ionicons name="search" size={21} color="#526056" />
             <TextInput
@@ -149,32 +337,55 @@ export default function MapScreen() {
               onSubmitEditing={() => void searchPlace()}
             />
             {searching && <ActivityIndicator size="small" color="#087A3F" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              accessibilityLabel="마이페이지로 이동"
+              className="-mr-2 h-11 w-11 rounded-full p-0"
+              onPress={() => router.push("/(tabs)/profile" as never)}
+            >
+              <Avatar
+                alt="프로필 사진"
+                className="h-9 w-9 border border-[#DDE5DA] bg-[#EEF6EB]"
+              >
+                <AvatarImage
+                  source={
+                    profileQuery.data?.profileImageUrl
+                      ? { uri: profileQuery.data.profileImageUrl }
+                      : DEFAULT_PROFILE_IMAGE
+                  }
+                />
+                <AvatarFallback className="bg-[#EEF6EB]" />
+              </Avatar>
+            </Button>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="알림"
-            className="h-[52px] w-[52px] items-center justify-center rounded-[18px] bg-white shadow-md"
-          >
-            <Ionicons name="notifications-outline" size={22} color="#203126" />
-          </Pressable>
         </View>
-        <View className="mt-3 flex-row gap-2">
-          <View className="h-[38px] flex-row items-center gap-1.5 rounded-full bg-white px-[13px]">
-            <Ionicons name="partly-sunny" size={18} color="#E38A00" />
-            <Text className="text-[13px] font-bold text-[#24372A]">
-              산책하기 좋은 날
-            </Text>
-          </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerClassName="gap-2 pt-3 pr-[18px]"
+        >
           <View className="h-[38px] flex-row items-center gap-1 rounded-full bg-[#E9FBEF] px-3">
             <Ionicons name="location" size={16} color="#087A3F" />
             <Text className="text-[13px] font-bold text-[#24372A]">
               내 주변
             </Text>
           </View>
-        </View>
+          <Button
+            variant="secondary"
+            accessibilityLabel="탐색 가능 구역 보기"
+            className="h-[38px] rounded-full bg-white px-3"
+            onPress={() => setRegionsOpen(true)}
+          >
+            <Ionicons name="map-outline" size={16} color="#087A3F" />
+            <Text className="text-[13px] font-bold text-[#24372A]">
+              탐색 가능 구역
+            </Text>
+          </Button>
+        </ScrollView>
       </SafeAreaView>
 
-      <View className="absolute bottom-[18px] left-[18px] right-[18px] items-end gap-3">
+      <View className="absolute bottom-7 left-[18px] right-[18px] items-end gap-3">
         {message && (
           <Text
             accessibilityLiveRegion="polite"
@@ -183,10 +394,11 @@ export default function MapScreen() {
             {message}
           </Text>
         )}
-        <Pressable
-          accessibilityRole="button"
+        <Button
+          variant="secondary"
+          size="icon"
           accessibilityLabel="현재 위치로 이동"
-          className="h-[52px] w-[52px] items-center justify-center rounded-[18px] bg-[#22C55E] shadow-md"
+          className="h-[52px] w-[52px] rounded-[18px] bg-[#22C55E] shadow-md"
           disabled={locating}
           onPress={() => void locate()}
         >
@@ -195,17 +407,16 @@ export default function MapScreen() {
           ) : (
             <Ionicons name="navigate" size={22} color="white" />
           )}
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          className="min-h-[82px] w-full flex-row items-center gap-3 rounded-3xl bg-[#22C55E] px-4 shadow-lg"
+        </Button>
+        <Button
+          className="h-[68px] w-full justify-start rounded-[22px] bg-[#22C55E] px-4 shadow-lg"
           onPress={() => router.push("/(tabs)/course" as never)}
         >
-          <View className="h-[42px] w-[42px] items-center justify-center rounded-[14px] bg-[#BDF4CB]">
-            <Ionicons name="sparkles" size={20} color="#087A3F" />
+          <View className="h-9 w-9 items-center justify-center rounded-xl bg-[#BDF4CB]">
+            <Ionicons name="sparkles" size={18} color="#087A3F" />
           </View>
           <View className="flex-1">
-            <Text className="text-[17px] font-extrabold text-white">
+            <Text className="text-base font-extrabold text-white">
               나에게 딱 맞는 코스 발굴
             </Text>
             <Text className="mt-1 text-xs text-[#C9F4D5]">
@@ -213,8 +424,102 @@ export default function MapScreen() {
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={22} color="white" />
-        </Pressable>
+        </Button>
       </View>
+
+      <Modal
+        visible={regionsOpen}
+        transparent
+        animationType="none"
+        onRequestClose={dismissRegionsSheet}
+      >
+        <View className="flex-1 justify-end">
+          <Pressable
+            accessibilityLabel="탐색 가능 구역 닫기"
+            className="absolute inset-0 bg-black/40"
+            onPress={dismissRegionsSheet}
+          />
+          <Animated.View
+            className="h-[78%] rounded-t-[30px] bg-[#FCFDFC] pt-2.5"
+            style={{ transform: [{ translateY: regionsSheetTranslateY }] }}
+          >
+            <BottomSheetHandle
+              onDismiss={() => setRegionsOpen(false)}
+              translateY={regionsSheetTranslateY}
+              dismissDistance={windowHeight}
+            />
+            <View className="px-5 pb-3">
+              <Text className="text-xl font-extrabold text-[#191C1D]">
+                탐색 가능 구역
+              </Text>
+              <Text className="mt-1 text-sm text-[#6B756D]">
+                코스를 제공하는 지역으로 지도를 이동할 수 있어요.
+              </Text>
+            </View>
+            {regionsQuery.isPending ? (
+              <View className="items-center gap-3 px-5 py-12">
+                <ActivityIndicator color="#087A3F" />
+                <Text className="text-sm text-[#6B756D]">
+                  탐색 구역을 불러오는 중이에요
+                </Text>
+              </View>
+            ) : regionsQuery.isError ? (
+              <View className="items-center px-5 py-10">
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={30}
+                  color="#DC2626"
+                />
+                <Text className="mt-3 text-sm font-bold text-[#191C1D]">
+                  탐색 구역을 불러오지 못했어요
+                </Text>
+                <Button
+                  variant="outline"
+                  className="mt-4 rounded-xl"
+                  onPress={() => void regionsQuery.refetch()}
+                >
+                  <Text className="font-bold text-[#365F49]">다시 시도</Text>
+                </Button>
+              </View>
+            ) : (
+              <ScrollView
+                className="flex-1"
+                contentContainerClassName="gap-2 px-5 pb-6"
+                showsVerticalScrollIndicator
+                nestedScrollEnabled
+              >
+                {regionsQuery.data?.map((item) => (
+                  <View
+                    key={item.regionCode}
+                    className="flex-row items-center gap-3 rounded-2xl border border-[#E1E8E2] bg-white p-4"
+                  >
+                    <View className="h-10 w-10 items-center justify-center rounded-full bg-[#E9FBEF]">
+                      <Ionicons name="location" size={19} color="#087A3F" />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="font-extrabold text-[#191C1D]">
+                        {item.name}
+                      </Text>
+                      <Text className="mt-0.5 text-xs text-[#6B756D]">
+                        이용 가능한 코스 {item.courseCount}개
+                      </Text>
+                    </View>
+                    <Button
+                      size="sm"
+                      className="h-10 rounded-xl bg-[#087A3F] px-4"
+                      onPress={() => moveToServiceRegion(item)}
+                    >
+                      <Text className="text-xs font-extrabold text-white">
+                        이동
+                      </Text>
+                    </Button>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 }

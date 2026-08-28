@@ -36,6 +36,10 @@ export type Course = {
   bookmarkedAt?: string;
 };
 
+export type BookmarkedCourse = Course & {
+  isBookmarked: boolean;
+};
+
 export type Post = {
   postId: number;
   courseId: number;
@@ -51,10 +55,20 @@ export type Post = {
   profileImageUrl?: string;
 };
 
+export type PostFeedItem = Post & {
+  isLiked: boolean;
+  isBookmarked: boolean;
+};
+
+export type LikedPostItem = Post & {
+  isBookmarked: boolean;
+};
+
 export type PostComment = {
   commentId: number;
   userId: number;
   nickname: string;
+  profileImageUrl?: string | null;
   content: string;
   upvoteCount: number;
   /** 현재 로그인한 사용자가 공감했는지 여부(백엔드가 제공하는 경우) */

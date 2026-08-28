@@ -71,7 +71,9 @@ class BackApplicationTests {
         mvc.perform(put("/api/v1/courses/{id}/bookmarks", courseId).with(authenticatedAs(userId)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.isBookmarked").value(true));
         mvc.perform(get("/api/v1/users/me/bookmarks").with(authenticatedAs(userId)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.content[0].isBookmarked").value(true));
         mvc.perform(delete("/api/v1/courses/{id}/bookmarks", courseId).with(authenticatedAs(userId)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.isBookmarked").value(false));
     }

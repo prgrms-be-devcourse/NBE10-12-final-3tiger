@@ -11,13 +11,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
 import { getPosts, likePost, unlikePost } from "@/api/post-api";
+import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
-import type { Post as PostType } from "@/types/domain";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
+import { useAuthStore } from "@/stores/auth-store";
+import type { PostFeedItem } from "@/types/domain";
 
 function formatTime(value: string) {
   const date = new Date(value);
@@ -56,20 +59,28 @@ function IconButton({
 function FeedPost({
   item,
   onOpenComments,
+  onRequireLogin,
 }: {
-  item: PostType;
+  item: PostFeedItem;
   onOpenComments: () => void;
+  onRequireLogin: () => void;
 }) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
-  const [liked, setLiked] = useState(item.isLiked ?? false);
+  const [liked, setLiked] = useState(item.isLiked);
   const [likeCount, setLikeCount] = useState(item.likeCount);
-  const [bookmarked, setBookmarked] = useState(item.isBookmarked ?? false);
+  const [bookmarked, setBookmarked] = useState(item.isBookmarked);
   const [expanded, setExpanded] = useState(false);
+  const [contentLineCount, setContentLineCount] = useState(0);
   useEffect(() => {
-    setLiked(item.isLiked ?? false);
+    setLiked(item.isLiked);
     setLikeCount(item.likeCount);
-    setBookmarked(item.isBookmarked ?? false);
-  }, [item]);
+    setBookmarked(item.isBookmarked);
+  }, [item.isBookmarked, item.isLiked, item.likeCount]);
+  useEffect(() => {
+    setExpanded(false);
+    setContentLineCount(0);
+  }, [item.postId]);
 
   const likeMutation = useMutation({
     mutationFn: ({ desiredLiked }: { desiredLiked: boolean }) =>
@@ -90,7 +101,7 @@ function FeedPost({
       setLikeCount(result.likeCount);
       if (!result.isLiked) {
         queryClient.setQueriesData<{
-          pages: Array<{ content: PostType[] }>;
+          pages: Array<{ content: PostFeedItem[] }>;
           pageParams: unknown[];
         }>({ queryKey: ["liked-posts"] }, (data) => {
           if (!data) return data;
@@ -127,9 +138,33 @@ function FeedPost({
     onError: (_error, _variables, previous) => {
       if (previous !== undefined) setBookmarked(previous);
     },
-    onSuccess: (result) => setBookmarked(result.isBookmarked),
-    onSettled: () =>
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
+    onSuccess: (result) => {
+      setBookmarked(result.isBookmarked);
+      queryClient.setQueriesData<{
+        pages: Array<{ content: PostFeedItem[] }>;
+        pageParams: unknown[];
+      }>({ queryKey: ["posts"] }, (data) => {
+        if (!data) return data;
+        return {
+          ...data,
+          pages: data.pages.map((page) => ({
+            ...page,
+            content: page.content.map((post) =>
+              post.courseId === item.courseId
+                ? { ...post, isBookmarked: result.isBookmarked }
+                : post,
+            ),
+          })),
+        };
+      });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["liked-posts"],
+        refetchType: "all",
+      });
+    },
   });
 
   return (
@@ -139,14 +174,14 @@ function FeedPost({
           alt={`${item.nickname ?? "사용자"} 프로필`}
           className="h-8 w-8 border border-[#E4EAE5]"
         >
-          {item.profileImageUrl && (
-            <AvatarImage source={{ uri: item.profileImageUrl }} />
-          )}
-          <AvatarFallback className="bg-[#E9F5EC]">
-            <Text className="text-xs font-bold text-[#087A3F]">
-              {(item.nickname ?? "산").slice(0, 1)}
-            </Text>
-          </AvatarFallback>
+          <AvatarImage
+            source={
+              item.profileImageUrl
+                ? { uri: item.profileImageUrl }
+                : DEFAULT_PROFILE_IMAGE
+            }
+          />
+          <AvatarFallback className="bg-[#E9F5EC]" />
         </Avatar>
         <View className="flex-1">
           <Text className="text-[13px] font-semibold leading-4 text-[#191C1D]">
@@ -181,36 +216,62 @@ function FeedPost({
         likeCount={likeCount}
         commentCount={item.commentCount ?? 0}
         onToggleLike={() => {
+          if (!isAuthenticated) {
+            onRequireLogin();
+            return;
+          }
           if (!likeMutation.isPending)
             likeMutation.mutate({ desiredLiked: !liked });
         }}
         onOpenComments={onOpenComments}
         bookmarked={bookmarked}
         onToggleBookmark={() => {
+          if (!isAuthenticated) {
+            onRequireLogin();
+            return;
+          }
           if (!bookmarkMutation.isPending)
             bookmarkMutation.mutate({ desiredBookmarked: !bookmarked });
         }}
       />
-      <View className="flex-row items-end px-3 pb-4">
+      <View className="relative px-3 pb-4">
         <Text
-          className="flex-1 text-[13px] leading-5 text-[#252A26]"
-          numberOfLines={expanded ? undefined : 1}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          className="absolute left-3 right-3 top-0 opacity-0 text-[13px] leading-5"
+          onTextLayout={(event) =>
+            setContentLineCount(event.nativeEvent.lines.length)
+          }
         >
-          <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
+          <Text className="text-[13px] font-bold leading-5">
             {item.nickname ?? "산책러"}{" "}
           </Text>
           {item.content}
         </Text>
-        {!expanded && (
-          <Button
-            variant="link"
-            size="sm"
-            className="ml-1 h-5 px-0"
-            onPress={() => setExpanded(true)}
+        <View className="flex-row items-end">
+          <Text
+            className="flex-1 text-[13px] leading-5 text-[#252A26]"
+            numberOfLines={expanded ? undefined : 2}
           >
-            <Text className="text-[11px] text-slate-500">더 보기</Text>
-          </Button>
-        )}
+            <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
+              {item.nickname ?? "산책러"}{" "}
+            </Text>
+            {item.content}
+          </Text>
+          {!expanded && contentLineCount > 2 && (
+            <Button
+              variant="link"
+              size="sm"
+              className="ml-1 h-5 px-0"
+              onPress={() => setExpanded(true)}
+            >
+              <Text className="text-[11px] text-slate-500">더 보기</Text>
+            </Button>
+          )}
+        </View>
+        <Text className="mt-1 text-[10px] text-[#758078]">
+          댓글 {item.commentCount ?? 0}개 모두 보기
+        </Text>
       </View>
     </View>
   );
@@ -218,6 +279,7 @@ function FeedPost({
 
 export default function CommunityScreen() {
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
+  const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const postsQuery = useInfiniteQuery({
     queryKey: ["posts", "latest"],
     queryFn: ({ pageParam }) =>
@@ -270,6 +332,7 @@ export default function CommunityScreen() {
             <FeedPost
               item={item}
               onOpenComments={() => setCommentPostId(item.postId)}
+              onRequireLogin={() => setLoginRequiredOpen(true)}
             />
           )}
           showsVerticalScrollIndicator={false}
@@ -290,6 +353,10 @@ export default function CommunityScreen() {
       <PostCommentSheet
         postId={commentPostId}
         onClose={() => setCommentPostId(null)}
+      />
+      <LoginRequiredModal
+        visible={loginRequiredOpen}
+        onClose={() => setLoginRequiredOpen(false)}
       />
     </SafeAreaView>
   );

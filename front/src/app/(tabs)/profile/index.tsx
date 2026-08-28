@@ -8,22 +8,36 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { logout } from "@/api/auth-api";
 import { getMyProfile, updateMyProfile, withdraw } from "@/api/user-api";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
-const PROFILE =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCJsRPYBQCHgxBRzPFw66AOkmuy-9AcNt_g2vsX57A8W5WkBn2NTvk8pFMWNVdsTfB9j5-00K7LwDAttKzEqCEUpxz40iWZklmWuCCcnJapH0ozdk-JNtRzP-j3d1u3JqLk8W02FSfkUNj4lT6eT9hyxMflOn3Fk36NJbW9YAjrVawmzPvEb1mC8y_lFK_h3vCesJQSqde1Kmut7D5DynM8blIyQOG-sWzPXphy32YPAxjvirdKML5-PQ";
 const PERSONAS = [
-  { key: "dog", label: "반려견", icon: "paw" as const, color: "#F97316" },
+  {
+    key: "walker",
+    label: "일반",
+    icon: "walk" as const,
+    color: "#087A3F",
+    activeBackground: "#E9FBEF",
+  },
+  {
+    key: "dog",
+    label: "반려견",
+    icon: "paw" as const,
+    color: "#F97316",
+    activeBackground: "#F4F7F4",
+  },
   {
     key: "senior",
     label: "시니어",
     icon: "accessibility" as const,
     color: "#A855F7",
+    activeBackground: "#F4F7F4",
   },
   {
     key: "stroller",
     label: "유모차",
     icon: "happy" as const,
     color: "#0EA5E9",
+    activeBackground: "#F4F7F4",
   },
 ];
 const MENUS = [
@@ -77,7 +91,6 @@ export default function ProfileScreen() {
     onSettled: async () => {
       await clearSession();
       queryClient.clear();
-      router.replace("/(auth)/login" as never);
     },
   });
   const withdrawMutation = useMutation({
@@ -85,12 +98,8 @@ export default function ProfileScreen() {
     onSuccess: async () => {
       await clearSession();
       queryClient.clear();
-      router.replace("/(auth)/login" as never);
     },
   });
-  useEffect(() => {
-    if (!isAuthenticated) router.replace("/(auth)/login" as never);
-  }, [isAuthenticated]);
   useEffect(() => {
     if (profileQuery.data) {
       setPersona(profileQuery.data.primaryPersona ?? "dog");
@@ -112,6 +121,39 @@ export default function ProfileScreen() {
       persona,
       tags.includes(tag) ? tags.filter((x) => x !== tag) : [...tags, tag],
     );
+  if (!isAuthenticated)
+    return (
+      <SafeAreaView
+        className="flex-1 items-center justify-center bg-[#F2F7F2] px-6"
+        edges={["top"]}
+      >
+        <View className="w-full max-w-md items-center rounded-3xl bg-white px-6 py-9 shadow-sm">
+          <View className="h-16 w-16 items-center justify-center rounded-full bg-[#E9FBEF]">
+            <Ionicons name="person-outline" size={30} color="#087A3F" />
+          </View>
+          <Text className="mt-5 text-xl font-extrabold text-[#191C1D]">
+            로그인하고 산책 기록을 관리하세요
+          </Text>
+          <Text className="mt-2 text-center text-sm leading-5 text-slate-500">
+            저장한 코스와 게시글, 나에게 맞는 걷기 유형을 한곳에서 확인할 수
+            있어요.
+          </Text>
+          <Button
+            className="mt-7 h-12 w-full rounded-xl bg-[#087A3F]"
+            onPress={() => router.push("/(auth)/login" as never)}
+          >
+            <Text className="font-extrabold text-white">로그인하기</Text>
+          </Button>
+          <Button
+            variant="secondary"
+            className="mt-2.5 h-12 w-full rounded-xl bg-[#BDF4CB]"
+            onPress={() => router.push("/(auth)/signup" as never)}
+          >
+            <Text className="font-bold text-[#075E34]">회원가입</Text>
+          </Button>
+        </View>
+      </SafeAreaView>
+    );
   if (profileQuery.isPending)
     return <LoadingState label="프로필을 불러오는 중이에요" />;
   if (profileQuery.isError)
@@ -125,11 +167,15 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView className="flex-1 bg-[#F2F7F2]" edges={["top"]}>
       <ScrollView contentContainerClassName="gap-3.5 p-5 pb-9">
-        <View className="rounded-xl bg-[#F9FCF9] p-4">
+        <View className="rounded-xl bg-white p-4">
           <View className="flex-row items-center gap-3">
             <View>
               <Image
-                source={{ uri: profile?.profileImageUrl || PROFILE }}
+                source={
+                  profile?.profileImageUrl
+                    ? { uri: profile.profileImageUrl }
+                    : DEFAULT_PROFILE_IMAGE
+                }
                 className="h-16 w-16 rounded-full border-2 border-slate-100"
               />
               <Pressable
@@ -156,31 +202,31 @@ export default function ProfileScreen() {
             </Text>
             <View className="flex-row gap-2">
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
-                className="h-9 flex-1 rounded-lg bg-slate-200 px-3"
+                className="h-10 flex-1 rounded-lg border-0 bg-[#EEF0EE] px-3"
                 disabled={logoutMutation.isPending}
                 onPress={() => logoutMutation.mutate()}
               >
-                <Text className="text-xs font-semibold text-slate-600">
+                <Text className="text-xs font-bold text-[#4B5563]">
                   로그아웃
                 </Text>
               </Button>
               <Button
-                variant="destructive"
+                variant="secondary"
                 size="sm"
-                className="h-9 flex-1 rounded-lg px-3"
+                className="h-10 flex-1 rounded-lg bg-[#FEE2E2] px-3"
                 disabled={withdrawMutation.isPending}
                 onPress={() => withdrawMutation.mutate()}
               >
-                <Text className="text-xs font-semibold text-white">
+                <Text className="text-xs font-extrabold text-[#B91C1C]">
                   계정 삭제
                 </Text>
               </Button>
             </View>
           </View>
         </View>
-        <View className="rounded-xl bg-[#F9FCF9] p-4">
+        <View className="rounded-xl bg-white p-4">
           <View className="flex-row items-center gap-2">
             <Ionicons name="person-circle" size={24} color="#22C55E" />
             <Text className="text-[17px] font-extrabold text-[#191C1D]">
@@ -190,14 +236,21 @@ export default function ProfileScreen() {
           <Text className="mb-3 mt-1.5 text-xs leading-[19px] text-slate-600">
             맞춤형 경로를 위해 주된 유형을 선택해주세요.
           </Text>
-          <View className="flex-row gap-1">
+          <View className="flex-row gap-1.5">
             {PERSONAS.map((item) => {
               const active = persona === item.key;
               return (
                 <Pressable
                   key={item.key}
-                  className={`h-20 flex-1 items-center justify-center gap-1 rounded-lg border-2 ${active ? "bg-orange-50" : "border-slate-200 bg-slate-100"}`}
-                  style={active ? { borderColor: item.color } : undefined}
+                  className={`h-20 flex-1 items-center justify-center gap-1 rounded-lg border-2 ${active ? "" : "border-slate-200 bg-[#F8FAF8]"}`}
+                  style={
+                    active
+                      ? {
+                          borderColor: item.color,
+                          backgroundColor: item.activeBackground,
+                        }
+                      : undefined
+                  }
                   onPress={() => savePreferences(item.key, tags)}
                 >
                   <Ionicons
@@ -216,7 +269,7 @@ export default function ProfileScreen() {
             })}
           </View>
         </View>
-        <View className="rounded-xl bg-[#F9FCF9] p-4">
+        <View className="rounded-xl bg-white p-4">
           <View className="flex-row items-center gap-2">
             <Ionicons name="pricetag" size={22} color="#22C55E" />
             <Text className="text-[17px] font-extrabold text-[#191C1D]">
@@ -248,7 +301,7 @@ export default function ProfileScreen() {
             ))}
           </View>
         </View>
-        <View className="overflow-hidden rounded-xl bg-[#F9FCF9] px-4">
+        <View className="overflow-hidden rounded-xl bg-white px-4">
           {MENUS.map((item, i) => (
             <Pressable
               key={item.label}

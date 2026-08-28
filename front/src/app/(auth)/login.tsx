@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -29,6 +30,15 @@ export default function LoginScreen() {
       router.replace("/(tabs)/map" as never);
     },
   });
+  useFocusEffect(
+    useCallback(() => {
+      const subscription = BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => true,
+      );
+      return () => subscription.remove();
+    }, []),
+  );
   const submit = () => {
     if (!email.trim() || !password) return;
     loginMutation.mutate({ email: email.trim(), password });
@@ -45,16 +55,7 @@ export default function LoginScreen() {
           contentContainerClassName="p-6 pb-10"
           keyboardShouldPersistTaps="handled"
         >
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel="뒤로 가기"
-            className="h-12 w-12"
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#33443A" />
-          </Button>
-          <View className="mt-5 h-[72px] w-[72px] self-center items-center justify-center rounded-3xl bg-[#DDF8E5]">
+          <View className="mt-8 h-[72px] w-[72px] self-center items-center justify-center rounded-3xl bg-[#DDF8E5]">
             <Ionicons name="leaf" size={38} color="#006E2F" />
           </View>
           <Text className="mt-5 text-center text-[32px] font-black text-[#0B1C30]">
@@ -74,6 +75,7 @@ export default function LoginScreen() {
               onChangeText={setEmail}
               className="flex-1 text-[15px] text-[#0B1C30]"
               placeholder="이메일을 입력하세요"
+              placeholderTextColor="#94A3B8"
               keyboardType="email-address"
               autoCapitalize="none"
               autoComplete="email"
@@ -89,6 +91,7 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               className="flex-1 text-[15px] text-[#0B1C30]"
               placeholder="비밀번호를 입력하세요"
+              placeholderTextColor="#94A3B8"
               secureTextEntry={secure}
               autoComplete="password"
               onSubmitEditing={submit}
@@ -118,6 +121,16 @@ export default function LoginScreen() {
               {loginMutation.isPending ? "로그인 중..." : "로그인"}
             </Text>
           </Button>
+          <Button
+            variant="secondary"
+            className="mt-3 h-12 rounded-xl bg-white"
+            onPress={() => router.replace("/(tabs)/map" as never)}
+          >
+            <Ionicons name="compass-outline" size={19} color="#365F49" />
+            <Text className="font-extrabold text-[#365F49]">
+              로그인 없이 이용하기
+            </Text>
+          </Button>
           <View className="my-6 flex-row items-center gap-2.5">
             <View className="h-px flex-1 bg-[#D7DED8]" />
             <Text className="text-xs text-[#7B867E]">
@@ -133,11 +146,13 @@ export default function LoginScreen() {
             <Text className="font-extrabold text-black">카카오로 시작하기</Text>
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             className="mb-2.5 h-[54px] rounded-xl bg-white"
             disabled
           >
-            <Text className="font-extrabold">G　Google로 시작하기</Text>
+            <Text className="font-extrabold text-black">
+              G　Google로 시작하기
+            </Text>
           </Button>
           <View className="mt-5 flex-row justify-center">
             <Text className="text-[13px] text-slate-500">

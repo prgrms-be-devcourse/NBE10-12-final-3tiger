@@ -19,10 +19,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getCourseDetail } from "@/api/course-api";
 import { getMyPosts } from "@/api/post-api";
 import { Button } from "@/components/ui/button";
-import { BottomSheetHandle, dismissBottomSheet } from "@/components/ui/bottom-sheet-handle";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/text";
+import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
 import type { Post } from "@/types/domain";
 
@@ -35,11 +39,17 @@ function PostDetailSheet({
 }) {
   const { height: windowHeight } = useWindowDimensions();
   const translateY = useRef(new Animated.Value(windowHeight)).current;
-  const dismissSheet = () => dismissBottomSheet(translateY, windowHeight, onClose);
+  const dismissSheet = () =>
+    dismissBottomSheet(translateY, windowHeight, onClose);
   useEffect(() => {
     if (!post) return;
     translateY.setValue(windowHeight);
-    Animated.timing(translateY, { toValue: 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(translateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
   }, [post, translateY, windowHeight]);
   const courseQuery = useQuery({
     queryKey: ["course", post?.courseId],
@@ -54,12 +64,19 @@ function PostDetailSheet({
       onRequestClose={dismissSheet}
     >
       <View className="flex-1 justify-end">
-        <Pressable className="absolute inset-0 bg-black/40" onPress={dismissSheet} />
+        <Pressable
+          className="absolute inset-0 bg-black/40"
+          onPress={dismissSheet}
+        />
         <Animated.View
           className="h-[76%] rounded-t-[30px] bg-white pt-2.5"
           style={{ transform: [{ translateY }] }}
         >
-          <BottomSheetHandle onDismiss={onClose} translateY={translateY} dismissDistance={windowHeight} />
+          <BottomSheetHandle
+            onDismiss={onClose}
+            translateY={translateY}
+            dismissDistance={windowHeight}
+          />
           {post && (
             <ScrollView
               showsVerticalScrollIndicator
@@ -163,9 +180,10 @@ export default function MyPostScreen() {
         <View className="w-11" />
       </View>
       <View className="h-[100px] flex-row items-center gap-[15px] px-5">
-        <View className="h-16 w-16 items-center justify-center rounded-full border-2 border-[#22C55E] bg-[#E8F7EC]">
-          <Ionicons name="person" size={30} color="#006E2F" />
-        </View>
+        <Image
+          source={DEFAULT_PROFILE_IMAGE}
+          className="h-16 w-16 rounded-full border-2 border-[#22C55E]"
+        />
         <View>
           <Text className="text-xl font-extrabold text-[#191C1D]">
             나의 산책 기록

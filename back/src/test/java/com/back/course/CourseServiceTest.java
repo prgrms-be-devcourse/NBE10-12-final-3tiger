@@ -137,4 +137,5 @@ class CourseServiceTest {
                 anyBoolean(), eq("score"), eq("senior"),
                 anyInt(), anyInt());
     }
+
 }

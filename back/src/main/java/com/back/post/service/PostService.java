@@ -1,5 +1,6 @@
 package com.back.post.service;
 
+import com.back.bookmark.repository.BookmarkRepository;
 import com.back.course.domain.Course;
 import com.back.course.repository.CourseRepository;
 import com.back.comment.repository.CommentRepository;
@@ -27,13 +28,16 @@ import java.util.stream.Collectors;
 public class PostService {
     private final PostRepository posts; private final UserRepository users; private final CourseRepository courses;
     private final PostLikeRepository postLikes; private final CommentRepository comments;
+    private final BookmarkRepository bookmarks;
     private final CommentUpvoteRepository commentUpvotes; private final PhotoStorage storage;
     public PostService(PostRepository posts, UserRepository users, CourseRepository courses,
                        PostLikeRepository postLikes, CommentRepository comments,
-                       CommentUpvoteRepository commentUpvotes, PhotoStorage storage) {
+                       CommentUpvoteRepository commentUpvotes, PhotoStorage storage,
+                       BookmarkRepository bookmarks) {
         this.posts = posts; this.users = users; this.courses = courses;
         this.postLikes = postLikes; this.comments = comments;
         this.commentUpvotes = commentUpvotes; this.storage = storage;
+        this.bookmarks = bookmarks;
     }
     public PageResponse<FeedItem> feed(Long userId, String sort, int page, int size) {
         Sort sorting = "popularity".equalsIgnoreCase(sort) ? Sort.by(Sort.Direction.DESC, "likeCount", "createdAt") : Sort.by(Sort.Direction.DESC, "createdAt");
@@ -44,7 +48,14 @@ public class PostService {
         Set<Long> likedPostIds = userId == null || postIds.isEmpty()
                 ? Set.of()
                 : Set.copyOf(postLikes.findLikedPostIds(userId, postIds));
-        return PageResponse.from(found.map(post -> toFeedItem(post, commentCounts, likedPostIds)));
+        List<Long> courseIds = found.getContent().stream()
+                .map(post -> post.getCourse().getId())
+                .distinct()
+                .toList();
+        Set<Long> bookmarkedCourseIds = userId == null || courseIds.isEmpty()
+                ? Set.of()
+                : bookmarks.findBookmarkedCourseIds(userId, courseIds);
+        return PageResponse.from(found.map(post -> toFeedItem(post, commentCounts, likedPostIds, bookmarkedCourseIds)));
     }
     public PageResponse<MyPostItem> mine(Long userId, int page, int size) {
         Page<Post> found = posts.findByUserId(userId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
@@ -70,10 +81,11 @@ public class PostService {
         postLikes.deleteAllByPostId(postId);
         posts.delete(post);
     }
-    private FeedItem toFeedItem(Post p, Map<Long, Long> commentCounts, Set<Long> likedPostIds) {
+    private FeedItem toFeedItem(Post p, Map<Long, Long> commentCounts, Set<Long> likedPostIds,
+                                Set<Long> bookmarkedCourseIds) {
         return new FeedItem(p.getId(), p.getCourse().getId(), p.getUser().getNickname(), p.getContent(),
                 p.getPhotoUrl(), p.getLikeCount(), commentCounts.getOrDefault(p.getId(), 0L),
-                likedPostIds.contains(p.getId()), p.getWalkedAt());
+                likedPostIds.contains(p.getId()), bookmarkedCourseIds.contains(p.getCourse().getId()), p.getWalkedAt());
     }
     private List<Long> postIds(Page<Post> found) {
         return found.getContent().stream().map(Post::getId).toList();
@@ -87,7 +99,8 @@ public class PostService {
     public record CreateCommand(Long courseId, String content, String photoUrl, LocalDateTime walkedAt) {}
     public record CreatedPost(Long postId) {}
     public record FeedItem(Long postId, Long courseId, String nickname, String content, String photoUrl,
-                           int likeCount, long commentCount, boolean isLiked, LocalDateTime walkedAt) {}
+                           int likeCount, long commentCount, boolean isLiked, boolean isBookmarked,
+                           LocalDateTime walkedAt) {}
     public record MyPostItem(Long postId, Long courseId, String content, String photoUrl,
                              int likeCount, long commentCount, LocalDateTime walkedAt) {}
 }

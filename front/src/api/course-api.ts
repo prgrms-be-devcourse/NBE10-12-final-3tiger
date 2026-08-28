@@ -1,5 +1,5 @@
 import type { PageParams, PageResponse } from "@/types/api";
-import type { Course, Region } from "@/types/domain";
+import type { BookmarkedCourse, Course, Region } from "@/types/domain";
 import { apiRequest } from "./client";
 
 export type CourseSearchParams = PageParams & {
@@ -31,7 +31,7 @@ export const unbookmarkCourse = (courseId: number) =>
     method: "DELETE",
   });
 export const getMyBookmarks = (params: PageParams) =>
-  apiRequest<PageResponse<Course>>({
+  apiRequest<PageResponse<BookmarkedCourse>>({
     url: "/api/v1/users/me/bookmarks",
     params,
   });
