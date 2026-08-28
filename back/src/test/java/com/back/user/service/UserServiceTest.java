@@ -8,6 +8,7 @@ import com.back.user.domain.User;
 import com.back.user.dto.MyPageResponse;
 import com.back.user.dto.SignupRequest;
 import com.back.user.dto.SignupResponse;
+import com.back.user.dto.UpdateProfileRequest;
 import com.back.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -153,5 +154,98 @@ class UserServiceTest {
 
         verify(userRepository, never()).save(any());
         verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void updateProfileAppliesNicknameAndPersonaChanges() {
+        Long userId = 1L;
+        User user = User.createLocal("walker@example.com", "hashed-password", "산책러");
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        userService.updateProfile(userId, new UpdateProfileRequest(
+                "새 닉네임",
+                "dog",
+                List.of("dog", "senior")
+        ));
+
+        assertThat(user.getNickname()).isEqualTo("새 닉네임");
+        assertThat(user.getPrimaryPersona()).isEqualTo(Persona.dog);
+        assertThat(user.getPersonaTags()).containsExactly(Persona.dog, Persona.senior);
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void updateProfileFiltersInvalidPersonaTagValues() {
+        Long userId = 1L;
+        User user = User.createLocal("walker@example.com", "hashed-password", "산책러");
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        userService.updateProfile(userId, new UpdateProfileRequest(
+                "산책러",
+                "walker",
+                List.of("park", "shade", "walker", "flat", "dog")
+        ));
+
+        assertThat(user.getPersonaTags()).containsExactly(Persona.walker, Persona.dog);
+    }
+
+    @Test
+    void updateProfileDropsDuplicatePersonaTags() {
+        Long userId = 1L;
+        User user = User.createLocal("walker@example.com", "hashed-password", "산책러");
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        userService.updateProfile(userId, new UpdateProfileRequest(
+                "산책러",
+                "walker",
+                List.of("dog", "dog", "senior")
+        ));
+
+        assertThat(user.getPersonaTags()).containsExactly(Persona.dog, Persona.senior);
+    }
+
+    @Test
+    void updateProfileKeepsExistingPrimaryPersonaWhenValueIsInvalid() {
+        Long userId = 1L;
+        User user = User.createLocal("walker@example.com", "hashed-password", "산책러");
+        assertThat(user.getPrimaryPersona()).isEqualTo(Persona.walker);
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        userService.updateProfile(userId, new UpdateProfileRequest(
+                "산책러",
+                "invalid-persona",
+                List.of()
+        ));
+
+        assertThat(user.getPrimaryPersona()).isEqualTo(Persona.walker);
+        assertThat(user.getPersonaTags()).isEmpty();
+    }
+
+    @Test
+    void updateProfileClearsPersonaTagsWhenNullList() {
+        Long userId = 1L;
+        User user = User.createLocal("walker@example.com", "hashed-password", "산책러");
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.of(user));
+
+        userService.updateProfile(userId, new UpdateProfileRequest(
+                "산책러",
+                "walker",
+                null
+        ));
+
+        assertThat(user.getPersonaTags()).isEmpty();
+    }
+
+    @Test
+    void updateProfileRejectsMissingOrWithdrawnUser() {
+        Long userId = 1L;
+        given(userRepository.findByIdAndDeletedAtIsNull(userId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.updateProfile(userId, new UpdateProfileRequest(
+                "산책러", "walker", List.of()
+        )))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode())
+                .isEqualTo(ErrorCode.USER_NOT_FOUND);
     }
 }
