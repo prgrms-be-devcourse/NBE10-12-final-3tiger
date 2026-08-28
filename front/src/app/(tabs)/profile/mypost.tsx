@@ -149,7 +149,7 @@ function PostDetailSheet({
 
 export default function MyPostScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const [selected, setSelected] = useState<Post | null>(null);
+  const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
   useEffect(() => {
     if (!isAuthenticated) router.replace("/(auth)/login" as never);
   }, [isAuthenticated]);
@@ -164,6 +164,10 @@ export default function MyPostScreen() {
         : undefined,
   });
   const posts = postsQuery.data?.pages.flatMap((page) => page.content) ?? [];
+  const selected =
+    selectedPostId === null
+      ? null
+      : (posts.find((post) => post.postId === selectedPostId) ?? null);
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
       <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
@@ -215,7 +219,7 @@ export default function MyPostScreen() {
               accessibilityRole="button"
               accessibilityLabel="게시글 상세 보기"
               className="aspect-square flex-1 overflow-hidden bg-slate-200"
-              onPress={() => setSelected(item)}
+              onPress={() => setSelectedPostId(item.postId)}
             >
               {item.photoUrl ? (
                 <Image
@@ -242,7 +246,10 @@ export default function MyPostScreen() {
           }
         />
       )}
-      <PostDetailSheet post={selected} onClose={() => setSelected(null)} />
+      <PostDetailSheet
+        post={selected}
+        onClose={() => setSelectedPostId(null)}
+      />
     </SafeAreaView>
   );
 }

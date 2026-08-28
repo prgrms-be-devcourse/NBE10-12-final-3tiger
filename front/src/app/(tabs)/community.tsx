@@ -84,23 +84,47 @@ function FeedPost({
     setContentLineCount(0);
   }, [item.postId]);
 
+  const updateMyPostLike = (isLiked: boolean, nextLikeCount: number) => {
+    queryClient.setQueriesData<{
+      pages: Array<{ content: PostFeedItem[] }>;
+      pageParams: unknown[];
+    }>({ queryKey: ["my-posts"] }, (data) => {
+      if (!data) return data;
+      return {
+        ...data,
+        pages: data.pages.map((page) => ({
+          ...page,
+          content: page.content.map((post) =>
+            post.postId === item.postId
+              ? { ...post, isLiked, likeCount: nextLikeCount }
+              : post,
+          ),
+        })),
+      };
+    });
+  };
+
   const likeMutation = useMutation({
     mutationFn: ({ desiredLiked }: { desiredLiked: boolean }) =>
       desiredLiked ? likePost(item.postId) : unlikePost(item.postId),
     onMutate: ({ desiredLiked }: { desiredLiked: boolean }) => {
       const previous = { liked, likeCount };
+      const nextLikeCount = Math.max(0, likeCount + (desiredLiked ? 1 : -1));
       setLiked(desiredLiked);
-      setLikeCount((count) => count + (desiredLiked ? 1 : -1));
+      setLikeCount(nextLikeCount);
+      updateMyPostLike(desiredLiked, nextLikeCount);
       return previous;
     },
     onError: (_error, _variables, context) => {
       if (!context) return;
       setLiked(context.liked);
       setLikeCount(context.likeCount);
+      updateMyPostLike(context.liked, context.likeCount);
     },
     onSuccess: (result) => {
       setLiked(result.isLiked);
       setLikeCount(result.likeCount);
+      updateMyPostLike(result.isLiked, result.likeCount);
       if (!result.isLiked) {
         queryClient.setQueriesData<{
           pages: Array<{ content: PostFeedItem[] }>;
@@ -121,6 +145,7 @@ function FeedPost({
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["posts"] });
+      void queryClient.invalidateQueries({ queryKey: ["my-posts"] });
       void queryClient.invalidateQueries({
         queryKey: ["liked-posts"],
         refetchType: "all",
