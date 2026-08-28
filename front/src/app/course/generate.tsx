@@ -62,13 +62,24 @@ export default function CourseGenerateScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    void Location.getLastKnownPositionAsync().then((position) => {
-      if (position)
-        setCoords({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-    });
+    const loadLastLocation = async () => {
+      try {
+        const permission = await Location.getForegroundPermissionsAsync();
+        if (permission.status !== Location.PermissionStatus.GRANTED) return;
+
+        const position = await Location.getLastKnownPositionAsync();
+        if (position) {
+          setCoords({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        }
+      } catch {
+        // Keep the default coordinates when the saved location is unavailable.
+      }
+    };
+
+    void loadLastLocation();
   }, []);
 
   const useMyLocation = async () => {

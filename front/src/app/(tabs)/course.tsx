@@ -57,13 +57,24 @@ export default function CourseScreen() {
       setShowDetails(false),
     );
   useEffect(() => {
-    void Location.getLastKnownPositionAsync().then((position) => {
-      if (position)
-        setCoords({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-    });
+    const loadLastLocation = async () => {
+      try {
+        const permission = await Location.getForegroundPermissionsAsync();
+        if (permission.status !== Location.PermissionStatus.GRANTED) return;
+
+        const position = await Location.getLastKnownPositionAsync();
+        if (position) {
+          setCoords({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        }
+      } catch {
+        // Keep the default coordinates when the saved location is unavailable.
+      }
+    };
+
+    void loadLastLocation();
   }, []);
   const coursesQuery = useQuery({
     queryKey: ["courses", coords, persona],
