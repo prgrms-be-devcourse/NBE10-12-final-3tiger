@@ -16,6 +16,7 @@ import {
   Image,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  RefreshControl,
   StyleSheet,
   View,
 } from "react-native";
@@ -511,44 +512,60 @@ export default function CommunityScreen() {
           className="bg-white dark:bg-[#111411]"
         />
       ) : (
-        <FlatList
-          ref={listRef}
-          data={posts}
-          keyExtractor={(item) => String(item.postId)}
-          renderItem={({ item }) => (
-            <FeedPost
-              item={item}
-              canDelete={item.isMine}
-              onOpenComments={() => setCommentPostId(item.postId)}
-              onRequireLogin={() => setLoginRequiredOpen(true)}
-            />
+        <View className="flex-1">
+          <FlatList
+            ref={listRef}
+            data={posts}
+            keyExtractor={(item) => String(item.postId)}
+            renderItem={({ item }) => (
+              <FeedPost
+                item={item}
+                canDelete={item.isMine}
+                onOpenComments={() => setCommentPostId(item.postId)}
+                onRequireLogin={() => setLoginRequiredOpen(true)}
+              />
+            )}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={() => void refreshPosts()}
+                tintColor="transparent"
+                colors={["transparent"]}
+              />
+            }
+            onScroll={handleFeedScroll}
+            scrollEventThrottle={16}
+            ListHeaderComponent={<View style={{ height: headerHeight }} />}
+            contentContainerClassName="grow pb-6"
+            ListEmptyComponent={<EmptyState title="아직 공유된 산책이 없어요" />}
+            onEndReached={() => {
+              if (postsQuery.hasNextPage && !postsQuery.isFetchingNextPage)
+                void postsQuery.fetchNextPage();
+            }}
+            onEndReachedThreshold={0.6}
+            onScrollToIndexFailed={({ index }) => {
+              listRef.current?.scrollToOffset({
+                offset: Math.max(0, index * 380),
+                animated: true,
+              });
+            }}
+            ListFooterComponent={
+              postsQuery.isFetchingNextPage ? (
+                <ActivityIndicator color="#087A3F" className="my-4" />
+              ) : null
+            }
+          />
+          {isRefreshing && (
+            <View
+              pointerEvents="none"
+              className="absolute inset-x-0 items-center"
+              style={{ top: headerHeight + 10 }}
+            >
+              <ActivityIndicator color={isDark ? "#AAB5AD" : "#087A3F"} />
+            </View>
           )}
-          showsVerticalScrollIndicator={false}
-          refreshing={isRefreshing}
-          onRefresh={() => void refreshPosts()}
-          progressViewOffset={headerHeight}
-          onScroll={handleFeedScroll}
-          scrollEventThrottle={16}
-          ListHeaderComponent={<View style={{ height: headerHeight }} />}
-          contentContainerClassName="grow pb-6"
-          ListEmptyComponent={<EmptyState title="아직 공유된 산책이 없어요" />}
-          onEndReached={() => {
-            if (postsQuery.hasNextPage && !postsQuery.isFetchingNextPage)
-              void postsQuery.fetchNextPage();
-          }}
-          onEndReachedThreshold={0.6}
-          onScrollToIndexFailed={({ index }) => {
-            listRef.current?.scrollToOffset({
-              offset: Math.max(0, index * 380),
-              animated: true,
-            });
-          }}
-          ListFooterComponent={
-            postsQuery.isFetchingNextPage ? (
-              <ActivityIndicator color="#087A3F" className="my-4" />
-            ) : null
-          }
-        />
+        </View>
       )}
       <PostCommentSheet
         postId={commentPostId}
