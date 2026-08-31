@@ -22,6 +22,7 @@ import {
   getCourses,
   unbookmarkCourse,
 } from "@/api/course-api";
+import { getMyProfile } from "@/api/user-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
@@ -92,7 +93,7 @@ export default function CourseScreen() {
   const [mapCenter, setMapCenter] = useState(serviceCoords ?? DEFAULT_COORDS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(true);
-  const [persona, setPersona] = useState<string | null>(null);
+  const [persona, setPersona] = useState<string | null | undefined>(undefined);
   const { height: windowHeight } = useWindowDimensions();
   const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
   const dismissDetails = () =>
@@ -127,8 +128,17 @@ export default function CourseScreen() {
   useEffect(() => {
     setMapCenter(coords);
   }, [coords]);
+  const profileQuery = useQuery({
+    queryKey: ["my-profile"],
+    queryFn: getMyProfile,
+    enabled: isAuthenticated,
+  });
+  const preferredPersona = isAuthenticated
+    ? (profileQuery.data?.primaryPersona ?? null)
+    : null;
+  const effectivePersona = persona === undefined ? preferredPersona : persona;
   const coursesQuery = useQuery({
-    queryKey: ["courses", regionCode, coords, persona],
+    queryKey: ["courses", regionCode, coords, effectivePersona],
     queryFn: () =>
       getCourses({
         ...(regionCode
@@ -141,8 +151,9 @@ export default function CourseScreen() {
         sort: "score",
         page: 0,
         size: 10,
-        persona: persona ?? undefined,
+        persona: effectivePersona ?? undefined,
       }),
+    enabled: !isAuthenticated || !profileQuery.isPending,
   });
   const courses = coursesQuery.data?.content ?? [];
   useEffect(() => {
@@ -295,7 +306,7 @@ export default function CourseScreen() {
           contentContainerClassName="gap-2 pt-3"
         >
           {PERSONA_FILTERS.map((filter) => {
-            const active = persona === filter.key;
+            const active = effectivePersona === filter.key;
             return (
               <Pressable
                 key={filter.label}
