@@ -17,6 +17,14 @@ export type CourseScores = {
   surfaceType?: string;
 };
 
+export type CourseScoreBars = {
+  flatness?: number | null;
+  avgSlopeDegree?: number | null;
+  shade?: number | null;
+  surfaceTemp?: number | null;
+  amenity?: number | null;
+};
+
 export type Course = {
   courseId: number;
   name: string;
@@ -34,6 +42,18 @@ export type Course = {
   imageUrl?: string;
   summary?: string;
   bookmarkedAt?: string;
+};
+
+export type CourseDetail = Course & {
+  elevationGainM?: number | null;
+  elevationLossM?: number | null;
+  source?: string | null;
+  scoreBars?: CourseScoreBars | null;
+  scoreWalker?: number | null;
+  scoreSenior?: number | null;
+  scoreStroller?: number | null;
+  scoreDog?: number | null;
+  surfaceType?: string | null;
 };
 
 export type BookmarkedCourse = Course & {

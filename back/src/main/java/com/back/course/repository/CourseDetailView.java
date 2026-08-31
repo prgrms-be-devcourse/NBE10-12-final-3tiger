@@ -14,5 +14,9 @@ public interface CourseDetailView {
     Double getShade();
     Double getSurfaceTemp();
     Double getAmenity();
+    Double getScoreWalker();
+    Double getScoreSenior();
+    Double getScoreStroller();
+    Double getScoreDog();
     String getSurfaceType();
 }

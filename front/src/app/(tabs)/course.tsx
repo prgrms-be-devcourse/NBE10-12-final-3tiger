@@ -175,6 +175,20 @@ export default function CourseScreen() {
     enabled: selectedId !== null,
   });
   const detail = detailQuery.data;
+  const personaScore = detail
+    ? effectivePersona === "walker"
+      ? detail.scoreWalker
+      : effectivePersona === "senior"
+        ? detail.scoreSenior
+        : effectivePersona === "stroller"
+          ? detail.scoreStroller
+          : effectivePersona === "dog"
+            ? detail.scoreDog
+            : null
+    : null;
+  const personaScoreLabel =
+    PERSONA_FILTERS.find((filter) => filter.key === effectivePersona)?.label ??
+    "페르소나";
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
   useEffect(() => {
@@ -414,11 +428,23 @@ export default function CourseScreen() {
                 <View className="mt-[15px] flex-row rounded-[18px] bg-[#F2F8F2] py-3 dark:bg-[#242B26]">
                   {[
                     [
-                      `${Math.round((detail.scores?.shadeSummer ?? 0) * 100)}%`,
+                      detail.scoreBars?.shade == null
+                        ? "-"
+                        : `${Math.round(detail.scoreBars.shade * 100)}%`,
                       "그늘",
                     ],
-                    [`${detail.scores?.avgSlopeDegree ?? "-"}°`, "평균 경사"],
-                    [detail.scores?.surfaceType ?? "-", "노면"],
+                    [
+                      detail.scoreBars?.avgSlopeDegree == null
+                        ? "-"
+                        : `${detail.scoreBars.avgSlopeDegree.toFixed(2)}°`,
+                      "평균 경사",
+                    ],
+                    [
+                      personaScore == null
+                        ? "-"
+                        : `${Math.round(personaScore * 100)}점`,
+                      `${personaScoreLabel} 점수`,
+                    ],
                   ].map(([value, label]) => (
                     <View key={label} className="flex-1 items-center">
                       <Text className="text-sm font-black text-[#25352B] dark:text-[#F1F5F2]">

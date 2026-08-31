@@ -29,6 +29,10 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                    (COALESCE(cs.bench_density, 0)
                     + COALESCE(cs.restroom_proximity, 0)
                     + COALESCE(cs.water_facility, 0)) / 3.0 AS amenity,
+                   cs.score_walker                     AS scoreWalker,
+                   cs.score_senior                     AS scoreSenior,
+                   cs.score_stroller                   AS scoreStroller,
+                   cs.score_dog                        AS scoreDog,
                    NULL::varchar                       AS surfaceType
               FROM course c
               LEFT JOIN course_score cs ON cs.course_id = c.course_id

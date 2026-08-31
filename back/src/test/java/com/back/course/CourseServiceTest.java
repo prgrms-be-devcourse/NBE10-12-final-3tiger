@@ -43,6 +43,10 @@ class CourseServiceTest {
         given(view.getEstimatedMinutes()).willReturn(35);
         given(view.getIsLoop()).willReturn(true);
         given(view.getFlatness()).willReturn(0.82);
+        given(view.getScoreWalker()).willReturn(0.91);
+        given(view.getScoreSenior()).willReturn(0.87);
+        given(view.getScoreStroller()).willReturn(0.83);
+        given(view.getScoreDog()).willReturn(0.79);
         given(courses.findDetailById(101L, true)).willReturn(Optional.of(view));
         given(bookmarks.existsByUserIdAndCourseId(1L, 101L)).willReturn(true);
 
@@ -53,6 +57,10 @@ class CourseServiceTest {
                 java.util.List.of(127.037, 37.544),
                 java.util.List.of(127.038, 37.545)
         );
+        assertThat(result.scoreWalker()).isEqualTo(0.91);
+        assertThat(result.scoreSenior()).isEqualTo(0.87);
+        assertThat(result.scoreStroller()).isEqualTo(0.83);
+        assertThat(result.scoreDog()).isEqualTo(0.79);
         assertThat(result.isBookmarked()).isTrue();
     }
 

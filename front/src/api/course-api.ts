@@ -2,6 +2,7 @@ import type { PageParams, PageResponse } from "@/types/api";
 import type {
   BookmarkedCourse,
   Course,
+  CourseDetail,
   GenerateResponse,
   GeoJsonLineString,
   Region,
@@ -37,7 +38,7 @@ export const getRegions = () =>
 export const getCourses = (params: CourseSearchParams) =>
   apiRequest<PageResponse<Course>>({ url: "/api/v1/courses", params });
 export const getCourseDetail = (courseId: number) =>
-  apiRequest<Course>({ url: `/api/v1/courses/${courseId}` });
+  apiRequest<CourseDetail>({ url: `/api/v1/courses/${courseId}` });
 export const bookmarkCourse = (courseId: number) =>
   apiRequest<{ isBookmarked: boolean }>({
     url: `/api/v1/courses/${courseId}/bookmarks`,

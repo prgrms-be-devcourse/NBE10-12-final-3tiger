@@ -26,7 +26,12 @@ export default function CourseDetailScreen() {
       ? [
           [`${(detail.distanceM / 1000).toFixed(1)}km`, "거리"],
           [`${detail.estimatedMinutes ?? "-"}분`, "예상 시간"],
-          [`${Math.round((detail.scores?.shadeSummer ?? 0) * 100)}%`, "그늘"],
+          [
+            detail.scoreBars?.shade == null
+              ? "-"
+              : `${Math.round(detail.scoreBars.shade * 100)}%`,
+            "그늘",
+          ],
         ]
       : [];
   }, [detailQuery.data]);
