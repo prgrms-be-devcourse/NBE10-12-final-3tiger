@@ -1,6 +1,9 @@
 package com.back.auth.service;
 
 import com.back.auth.dto.AuthResponse;
+import com.back.auth.kakao.KakaoClient;
+import com.back.auth.kakao.dto.KakaoTokenResponse;
+import com.back.auth.kakao.dto.KakaoUserInfoResponse;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.global.jwt.JwtProvider;
@@ -46,6 +49,7 @@ class AuthServiceTest {
     @Mock StringRedisTemplate redisTemplate;
     @Mock ValueOperations<String, String> valueOps;
     @Mock Cursor<String> cursor;
+    @Mock KakaoClient kakaoClient;
 
     @InjectMocks AuthService authService;
 
@@ -218,6 +222,109 @@ class AuthServiceTest {
         verify(jwtProvider, never()).generateAccessToken(anyLong());
         verify(jwtProvider, never()).generateRefreshToken(anyLong());
         verify(redisTemplate, never()).opsForValue();
+    }
+
+    @Test
+    void kakaoLogin_기존유저_로그인처리() {
+        given(kakaoClient.exchangeToken("auth-code")).willReturn(new KakaoTokenResponse("kakao-at"));
+        given(kakaoClient.getUserInfo("kakao-at")).willReturn(
+                new KakaoUserInfoResponse(12345L,
+                        new KakaoUserInfoResponse.KakaoAccount("user@kakao.com",
+                                new KakaoUserInfoResponse.KakaoProfile("홍길동"))));
+        User user = mock(User.class);
+        given(user.getId()).willReturn(1L);
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, "12345"))
+                .willReturn(Optional.of(user));
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(1L)).willReturn("at");
+        given(jwtProvider.generateRefreshToken(1L)).willReturn("rt");
+        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        AuthResponse result = authService.kakaoLogin("auth-code");
+
+        assertThat(result.accessToken()).isEqualTo("at");
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void kakaoLogin_신규유저_저장후토큰발급() {
+        given(kakaoClient.exchangeToken("auth-code")).willReturn(new KakaoTokenResponse("kakao-at"));
+        given(kakaoClient.getUserInfo("kakao-at")).willReturn(
+                new KakaoUserInfoResponse(12345L,
+                        new KakaoUserInfoResponse.KakaoAccount("user@kakao.com",
+                                new KakaoUserInfoResponse.KakaoProfile("홍길동"))));
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, "12345"))
+                .willReturn(Optional.empty());
+        User saved = mock(User.class);
+        given(saved.getId()).willReturn(2L);
+        given(userRepository.save(any(User.class))).willReturn(saved);
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(2L)).willReturn("at");
+        given(jwtProvider.generateRefreshToken(2L)).willReturn("rt");
+        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        AuthResponse result = authService.kakaoLogin("auth-code");
+
+        assertThat(result.accessToken()).isEqualTo("at");
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void kakaoLogin_토큰교환실패_KAKAO_AUTH_FAILED() {
+        given(kakaoClient.exchangeToken(anyString()))
+                .willThrow(new BusinessException(ErrorCode.KAKAO_AUTH_FAILED));
+
+        assertThatThrownBy(() -> authService.kakaoLogin("bad-code"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.KAKAO_AUTH_FAILED);
+    }
+
+    @Test
+    void kakaoLogin_이메일null_정상처리() {
+        given(kakaoClient.exchangeToken("auth-code")).willReturn(new KakaoTokenResponse("kakao-at"));
+        given(kakaoClient.getUserInfo("kakao-at")).willReturn(
+                new KakaoUserInfoResponse(12345L,
+                        new KakaoUserInfoResponse.KakaoAccount(null,
+                                new KakaoUserInfoResponse.KakaoProfile("홍길동"))));
+        User user = mock(User.class);
+        given(user.getId()).willReturn(1L);
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, "12345"))
+                .willReturn(Optional.of(user));
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(1L)).willReturn("at");
+        given(jwtProvider.generateRefreshToken(1L)).willReturn("rt");
+        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        assertThatCode(() -> authService.kakaoLogin("auth-code")).doesNotThrowAnyException();
+    }
+
+    @Test
+    void kakaoLogin_닉네임null_카카오사용자폴백() {
+        given(kakaoClient.exchangeToken("auth-code")).willReturn(new KakaoTokenResponse("kakao-at"));
+        given(kakaoClient.getUserInfo("kakao-at")).willReturn(
+                new KakaoUserInfoResponse(12345L,
+                        new KakaoUserInfoResponse.KakaoAccount("user@kakao.com",
+                                new KakaoUserInfoResponse.KakaoProfile(null))));
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, "12345"))
+                .willReturn(Optional.empty());
+        User saved = mock(User.class);
+        given(saved.getId()).willReturn(1L);
+        given(userRepository.save(any(User.class))).willReturn(saved);
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(1L)).willReturn("at");
+        given(jwtProvider.generateRefreshToken(1L)).willReturn("rt");
+        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        authService.kakaoLogin("auth-code");
+
+        var userCaptor = org.mockito.ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getNickname()).isEqualTo("카카오 사용자");
     }
 
     private Claims refreshClaims(Long userId, String jti) {

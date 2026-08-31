@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -34,7 +35,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = {
         "app.jwt.secret=dGVzdC1zZWNyZXQtdmFsdWUtZm9yLWp3dC10ZXN0aW5nLW9ubHktMjAyNCEh",
         "app.jwt.access-token-expiry=1800",
-        "app.jwt.refresh-token-expiry=1209600"
+        "app.jwt.refresh-token-expiry=1209600",
+        "app.kakao.client-id=test-client-id",
+        "app.kakao.redirect-uri=http://localhost/kakao"
 })
 class AuthControllerTest {
 
@@ -103,6 +106,30 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new LogoutRequest(""))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void kakaoLogin_성공_200() throws Exception {
+        given(authService.kakaoLogin("valid-code")).willReturn(new AuthResponse("at", "rt"));
+
+        mvc.perform(get("/api/v1/auth/kakao")
+                        .param("code", "valid-code"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("at"))
+                .andExpect(jsonPath("$.message").value("카카오 로그인이 완료되었습니다."));
+    }
+
+    @Test
+    void kakaoLogin_code없음_400() throws Exception {
+        mvc.perform(get("/api/v1/auth/kakao"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void kakaoLogin_빈code_400() throws Exception {
+        mvc.perform(get("/api/v1/auth/kakao")
+                        .param("code", ""))
                 .andExpect(status().isBadRequest());
     }
 }

@@ -1,6 +1,9 @@
 package com.back.auth.service;
 
 import com.back.auth.dto.AuthResponse;
+import com.back.auth.kakao.KakaoClient;
+import com.back.auth.kakao.dto.KakaoTokenResponse;
+import com.back.auth.kakao.dto.KakaoUserInfoResponse;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.global.jwt.JwtProvider;
@@ -29,6 +32,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate redisTemplate;
+    private final KakaoClient kakaoClient;
 
 
     @Transactional(readOnly = true)
@@ -78,6 +82,24 @@ public class AuthService {
         Long userId = Long.valueOf(claims.getSubject());
         String jti = claims.getId();
         redisTemplate.delete("RT:" + userId + ":" + jti);
+    }
+
+    @Transactional
+    public AuthResponse kakaoLogin(String code) {
+        KakaoTokenResponse tokenResponse = kakaoClient.exchangeToken(code);
+        KakaoUserInfoResponse userInfo = kakaoClient.getUserInfo(tokenResponse.accessToken());
+
+        String providerUid = String.valueOf(userInfo.id());
+        KakaoUserInfoResponse.KakaoAccount account = userInfo.kakaoAccount();
+        String email = account != null ? account.email() : null;
+        String nickname = (account != null && account.profile() != null && account.profile().nickname() != null)
+                ? account.profile().nickname()
+                : "카카오 사용자";
+
+        User user = userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, providerUid)
+                .orElseGet(() -> userRepository.save(User.createKakao(providerUid, email, nickname)));
+
+        return issueTokens(user.getId());
     }
 
     public void revokeAllRefreshTokens(Long userId) {
