@@ -9,6 +9,7 @@ back/build/local-uploads/
 *.iml
 
 .claude/
+.codex/
 
 .DS_Store
 **/.DS_Store

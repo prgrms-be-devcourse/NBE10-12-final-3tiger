@@ -288,6 +288,22 @@ export default function MapScreen() {
     [dismissRegionsSheet, moveTo],
   );
 
+  const exploreServiceRegion = useCallback(
+    (item: ServiceRegion) => {
+      dismissRegionsSheet();
+      router.push({
+        pathname: "/(tabs)/course",
+        params: {
+          regionCode: item.regionCode,
+          regionName: item.name,
+          lat: String(item.centerLat),
+          lng: String(item.centerLng),
+        },
+      });
+    },
+    [dismissRegionsSheet],
+  );
+
   return (
     <View className="flex-1 bg-[#E8F0E5]">
       <MapView
@@ -474,11 +490,13 @@ export default function MapScreen() {
                   탐색 구역을 불러오지 못했어요
                 </Text>
                 <Button
-                  variant="outline"
-                  className="mt-4 rounded-xl"
+                  variant="secondary"
+                  className="mt-4 rounded-xl bg-[#E9FBEF] px-5 active:bg-[#D8F3E0]"
                   onPress={() => void regionsQuery.refetch()}
                 >
-                  <Text className="font-bold text-[#365F49]">다시 시도</Text>
+                  <Text className="font-extrabold text-[#087A3F]">
+                    다시 시도
+                  </Text>
                 </Button>
               </View>
             ) : (
@@ -505,7 +523,24 @@ export default function MapScreen() {
                       </Text>
                     </View>
                     <Button
+                      variant="secondary"
                       size="sm"
+                      accessibilityLabel={`${item.name} 코스 탐색`}
+                      className="h-10 rounded-xl bg-[#E9FBEF] px-3 active:bg-[#D8F3E0]"
+                      onPress={() => exploreServiceRegion(item)}
+                    >
+                      <Ionicons
+                        name="compass-outline"
+                        size={15}
+                        color="#087A3F"
+                      />
+                      <Text className="text-xs font-extrabold text-[#087A3F]">
+                        탐색
+                      </Text>
+                    </Button>
+                    <Button
+                      size="sm"
+                      accessibilityLabel={`${item.name} 지도로 이동`}
                       className="h-10 rounded-xl bg-[#087A3F] px-4"
                       onPress={() => moveToServiceRegion(item)}
                     >

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Location from "expo-location";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -31,6 +31,7 @@ import {
   dismissBottomSheet,
 } from "@/components/ui/bottom-sheet-handle";
 import { useAuthStore } from "@/stores/auth-store";
+import type { Course } from "@/types/domain";
 
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
 
@@ -42,11 +43,51 @@ const PERSONA_FILTERS: Array<{ key: string | null; label: string }> = [
   { key: "stroller", label: "유모차" },
 ];
 
+const getCourseCenter = (course: Course) => {
+  const path = course.path;
+  const coordinates = Array.isArray(path) ? path : path?.coordinates;
+  const validCoordinates = coordinates?.filter(
+    ([longitude, latitude]) =>
+      Number.isFinite(latitude) && Number.isFinite(longitude),
+  );
+
+  if (validCoordinates?.length) {
+    const latitudes = validCoordinates.map(([, latitude]) => latitude);
+    const longitudes = validCoordinates.map(([longitude]) => longitude);
+    return {
+      latitude: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
+      longitude: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
+    };
+  }
+
+  return course.startPoint
+    ? { latitude: course.startPoint.lat, longitude: course.startPoint.lng }
+    : null;
+};
+
 export default function CourseScreen() {
+  const { regionCode, regionName, lat, lng } = useLocalSearchParams<{
+    regionCode?: string;
+    regionName?: string;
+    lat?: string;
+    lng?: string;
+  }>();
+  const serviceCoords = useMemo(() => {
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+    if (
+      !regionCode ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    )
+      return null;
+    return { latitude, longitude };
+  }, [lat, lng, regionCode]);
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
-  const [coords, setCoords] = useState(DEFAULT_COORDS);
+  const [coords, setCoords] = useState(serviceCoords ?? DEFAULT_COORDS);
+  const [mapCenter, setMapCenter] = useState(serviceCoords ?? DEFAULT_COORDS);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(true);
   const [persona, setPersona] = useState<string | null>(null);
@@ -57,6 +98,11 @@ export default function CourseScreen() {
       setShowDetails(false),
     );
   useEffect(() => {
+    if (serviceCoords) {
+      setCoords(serviceCoords);
+      return;
+    }
+
     const loadLastLocation = async () => {
       try {
         const permission = await Location.getForegroundPermissionsAsync();
@@ -75,14 +121,21 @@ export default function CourseScreen() {
     };
 
     void loadLastLocation();
-  }, []);
+  }, [serviceCoords]);
+  useEffect(() => {
+    setMapCenter(coords);
+  }, [coords]);
   const coursesQuery = useQuery({
-    queryKey: ["courses", coords, persona],
+    queryKey: ["courses", regionCode, coords, persona],
     queryFn: () =>
       getCourses({
-        lat: coords.latitude,
-        lng: coords.longitude,
-        radiusM: 5000,
+        ...(regionCode
+          ? { regionCode }
+          : {
+              lat: coords.latitude,
+              lng: coords.longitude,
+              radiusM: 5000,
+            }),
         sort: "score",
         page: 0,
         size: 10,
@@ -134,12 +187,26 @@ export default function CourseScreen() {
     );
   }, [detail]);
 
+  useEffect(() => {
+    if (!detail) return;
+    const center = getCourseCenter(detail);
+    if (center) setMapCenter(center);
+  }, [detail]);
+
+  const selectCourse = (course: Course) => {
+    setSelectedId(course.courseId);
+    const center = getCourseCenter(course);
+    if (center) setMapCenter(center);
+  };
+
   if (coursesQuery.isError)
     return (
-      <SafeAreaView className="flex-1">
+      <SafeAreaView className="flex-1 bg-[#F2F7F2]" edges={["top"]}>
         <ErrorState
           message={coursesQuery.error.message}
           onRetry={() => void coursesQuery.refetch()}
+          appearance="light"
+          className="bg-[#F2F7F2]"
         />
       </SafeAreaView>
     );
@@ -148,7 +215,7 @@ export default function CourseScreen() {
       <MapView
         style={StyleSheet.absoluteFill}
         onPress={dismissDetails}
-        region={{ ...coords, latitudeDelta: 0.014, longitudeDelta: 0.012 }}
+        region={{ ...mapCenter, latitudeDelta: 0.014, longitudeDelta: 0.012 }}
       >
         {route.length > 1 && (
           <Polyline coordinates={route} strokeColor="#087A3F" strokeWidth={7} />
@@ -162,7 +229,7 @@ export default function CourseScreen() {
                   latitude: course.startPoint.lat,
                   longitude: course.startPoint.lng,
                 }}
-                onPress={() => setSelectedId(course.courseId)}
+                onPress={() => selectCourse(course)}
                 pinColor={
                   course.courseId === selectedId ? "#087A3F" : "#94A09A"
                 }
@@ -186,7 +253,7 @@ export default function CourseScreen() {
             <Ionicons name="arrow-back" size={23} color="#203126" />
           </Button>
           <Text className="rounded-2xl bg-white px-[18px] py-[13px] text-lg font-black text-[#1A2B20]">
-            추천 코스
+            {regionName ? `${regionName} 추천 코스` : "추천 코스"}
           </Text>
           <View className="h-12 w-12" />
         </View>
@@ -221,7 +288,7 @@ export default function CourseScreen() {
             <Pressable
               key={course.courseId}
               className={`h-10 justify-center rounded-full px-[15px] ${course.courseId === selectedId ? "bg-[#087A3F]" : "bg-white"}`}
-              onPress={() => setSelectedId(course.courseId)}
+              onPress={() => selectCourse(course)}
             >
               <Text
                 className={`text-[13px] font-extrabold ${course.courseId === selectedId ? "text-white" : "text-[#536158]"}`}
@@ -264,8 +331,10 @@ export default function CourseScreen() {
                   <Button
                     variant="secondary"
                     size="icon"
-                    accessibilityLabel="코스 저장"
-                    className="rounded-2xl"
+                    accessibilityLabel={
+                      isBookmarked ? "코스 저장 해제" : "코스 저장"
+                    }
+                    className={`rounded-2xl ${isBookmarked ? "bg-[#087A3F] active:bg-[#066C38]" : "bg-[#E9FBEF] active:bg-[#D8F3E0]"}`}
                     disabled={bookmarkMutation.isPending}
                     onPress={() => {
                       if (!isAuthenticated) {
@@ -279,7 +348,7 @@ export default function CourseScreen() {
                     <Ionicons
                       name={isBookmarked ? "bookmark" : "bookmark-outline"}
                       size={23}
-                      color="#087A3F"
+                      color={isBookmarked ? "white" : "#087A3F"}
                     />
                   </Button>
                 </View>

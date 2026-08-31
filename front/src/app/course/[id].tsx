@@ -56,45 +56,44 @@ export default function CourseDetailScreen() {
       </View>
       <ScrollView contentContainerClassName="p-5 pb-10">
         <View className="rounded-3xl bg-white p-5">
-          <Text className="text-[11px] font-black text-primary">
+          <Text className="text-[11px] font-black text-[#087A3F]">
             추천 산책 코스
           </Text>
-          <Text className="mt-2 text-2xl font-black text-foreground">
+          <Text className="mt-2 text-2xl font-black text-[#18271D]">
             {detail.name}
           </Text>
-          <Text className="mt-2 text-sm leading-6 text-muted-foreground">
+          <Text className="mt-2 text-sm leading-6 text-[#6B756D]">
             {detail.summary ??
               detail.personaBadges?.join(" · ") ??
               "코스 환경과 상세 점수를 확인해 보세요."}
           </Text>
-          <View className="mt-5 flex-row rounded-2xl bg-secondary py-4">
+          <View className="mt-5 flex-row rounded-2xl bg-[#E9FBEF] py-4">
             {stats.map(([value, label]) => (
               <View key={label} className="flex-1 items-center">
-                <Text className="text-base font-black text-primary">
+                <Text className="text-base font-black text-[#087A3F]">
                   {value}
                 </Text>
-                <Text className="mt-1 text-xs text-muted-foreground">
-                  {label}
-                </Text>
+                <Text className="mt-1 text-xs text-[#5F6B62]">{label}</Text>
               </View>
             ))}
           </View>
           {detail.personaBadges && (
             <View className="mt-5 flex-row flex-wrap gap-2">
               {detail.personaBadges.map((badge) => (
-                <View key={badge} className="rounded-full bg-accent px-3 py-2">
-                  <Text className="text-xs font-bold text-accent-foreground">
+                <View
+                  key={badge}
+                  className="rounded-full bg-[#E9FBEF] px-3 py-2"
+                >
+                  <Text className="text-xs font-bold text-[#087A3F]">
                     {badge}
                   </Text>
                 </View>
               ))}
             </View>
           )}
-          <Button className="mt-6 h-14 rounded-2xl">
+          <Button className="mt-6 h-14 rounded-2xl bg-[#087A3F] active:bg-[#066C38]">
             <Ionicons name="navigate" size={20} color="white" />
-            <Text className="font-black text-primary-foreground">
-              안내 시작
-            </Text>
+            <Text className="font-black text-white">안내 시작</Text>
           </Button>
         </View>
       </ScrollView>

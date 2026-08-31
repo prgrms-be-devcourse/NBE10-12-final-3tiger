@@ -411,13 +411,18 @@ export default function CommunityScreen() {
         </View>
       </View>
       {postsQuery.isPending ? (
-        <View className="flex-1 items-center justify-center">
+        <View className="flex-1 items-center justify-center gap-3 bg-white px-6 py-12">
           <ActivityIndicator color="#087A3F" />
+          <Text className="text-sm text-slate-500">
+            피드를 불러오는 중이에요
+          </Text>
         </View>
       ) : postsQuery.isError ? (
         <ErrorState
           message={postsQuery.error.message}
           onRetry={() => void postsQuery.refetch()}
+          appearance="light"
+          className="bg-white"
         />
       ) : (
         <FlatList

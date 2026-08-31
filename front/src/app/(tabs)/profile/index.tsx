@@ -3,11 +3,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { logout } from "@/api/auth-api";
 import { getMyProfile, updateMyProfile, withdraw } from "@/api/user-api";
-import { ErrorState, LoadingState } from "@/components/ui/data-state";
+import { ErrorState } from "@/components/ui/data-state";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
 const PERSONAS = [
@@ -164,12 +171,23 @@ export default function ProfileScreen() {
       </SafeAreaView>
     );
   if (profileQuery.isPending)
-    return <LoadingState label="프로필을 불러오는 중이에요" />;
+    return (
+      <SafeAreaView className="flex-1 bg-[#F2F7F2]" edges={["top"]}>
+        <View className="flex-1 items-center justify-center gap-3 bg-[#F2F7F2] px-6 py-12">
+          <ActivityIndicator color="#087A3F" />
+          <Text className="text-sm text-slate-500">
+            프로필을 불러오는 중이에요
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
   if (profileQuery.isError)
     return (
       <ErrorState
         message={profileQuery.error.message}
         onRetry={() => void profileQuery.refetch()}
+        appearance="light"
+        className="bg-[#F2F7F2]"
       />
     );
   const profile = profileQuery.data;
