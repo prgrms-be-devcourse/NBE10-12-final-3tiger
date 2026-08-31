@@ -163,20 +163,42 @@ export default function CourseScreen() {
   });
   const detail = detailQuery.data;
   const [isBookmarked, setIsBookmarked] = useState(false);
+  const [bookmarkError, setBookmarkError] = useState<string | null>(null);
   useEffect(() => {
     setIsBookmarked(detail?.isBookmarked ?? false);
+    setBookmarkError(null);
   }, [detail?.isBookmarked, selectedId]);
   const bookmarkMutation = useMutation({
-    mutationFn: () =>
-      isBookmarked
-        ? unbookmarkCourse(selectedId!)
-        : bookmarkCourse(selectedId!),
-    onMutate: () => setIsBookmarked((value) => !value),
-    onError: () => setIsBookmarked((value) => !value),
-    onSuccess: (result) => setIsBookmarked(result.isBookmarked),
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ["course", selectedId] });
-      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+    mutationFn: ({
+      courseId,
+      desiredBookmarked,
+    }: {
+      courseId: number;
+      desiredBookmarked: boolean;
+    }) =>
+      desiredBookmarked ? bookmarkCourse(courseId) : unbookmarkCourse(courseId),
+    onMutate: ({ desiredBookmarked }) => {
+      const previous = isBookmarked;
+      setBookmarkError(null);
+      setIsBookmarked(desiredBookmarked);
+      return previous;
+    },
+    onError: (error: Error, _variables, previous) => {
+      if (previous !== undefined) setIsBookmarked(previous);
+      setBookmarkError(error.message);
+    },
+    onSuccess: (result, { courseId }) => {
+      setIsBookmarked(result.isBookmarked);
+      queryClient.setQueryData<Course>(["course", courseId], (current) =>
+        current ? { ...current, isBookmarked: result.isBookmarked } : current,
+      );
+    },
+    onSettled: (_result, _error, { courseId }) => {
+      void queryClient.invalidateQueries({ queryKey: ["course", courseId] });
+      void queryClient.invalidateQueries({
+        queryKey: ["bookmarks"],
+        refetchType: "all",
+      });
     },
   });
   const route = useMemo(() => {
@@ -342,7 +364,10 @@ export default function CourseScreen() {
                         return;
                       }
                       if (selectedId !== null && !bookmarkMutation.isPending)
-                        bookmarkMutation.mutate();
+                        bookmarkMutation.mutate({
+                          courseId: selectedId,
+                          desiredBookmarked: !isBookmarked,
+                        });
                     }}
                   >
                     <Ionicons
@@ -357,6 +382,14 @@ export default function CourseScreen() {
                   {detail.estimatedMinutes ?? "-"}분{" "}
                   {detail.isLoop ? "· 순환 코스" : ""}
                 </Text>
+                {bookmarkError && (
+                  <Text
+                    accessibilityLiveRegion="polite"
+                    className="mt-2 text-xs font-bold text-[#B91C1C]"
+                  >
+                    {bookmarkError}
+                  </Text>
+                )}
                 <View className="mt-[15px] flex-row rounded-[18px] bg-[#F2F8F2] py-3">
                   {[
                     [

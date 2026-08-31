@@ -34,7 +34,7 @@ import {
   dismissBottomSheet,
 } from "@/components/ui/bottom-sheet-handle";
 import { useAuthStore } from "@/stores/auth-store";
-import type { BookmarkedCourse } from "@/types/domain";
+import type { BookmarkedCourse, Course } from "@/types/domain";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1000";
@@ -75,6 +75,9 @@ export default function ProfileBookmarkScreen() {
   const removeBookmarkMutation = useMutation({
     mutationFn: (courseId: number) => unbookmarkCourse(courseId),
     onSuccess: (_result, courseId) => {
+      queryClient.setQueryData<Course>(["course", courseId], (current) =>
+        current ? { ...current, isBookmarked: false } : current,
+      );
       queryClient.setQueryData<{
         pages: Array<{
           content: BookmarkedCourse[];
@@ -99,7 +102,11 @@ export default function ProfileBookmarkScreen() {
         };
       });
     },
-    onSettled: () => {
+    onSettled: (_result, _error, courseId) => {
+      void queryClient.invalidateQueries({
+        queryKey: ["course", courseId],
+        refetchType: "all",
+      });
       void queryClient.invalidateQueries({
         queryKey: ["bookmarks"],
         refetchType: "all",
