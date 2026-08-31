@@ -55,23 +55,23 @@ export default function SplashScreen() {
       >
         <Animated.View style={{ transform: [{ scale }] }}>
           <Image
-            source={require("../../assets/logo.jpg")}
+            source={require("../../assets/logo-transparent.png")}
             className="h-40 w-40 rounded-[32px] dark:hidden"
             resizeMode="contain"
           />
           <Image
-            source={require("../../assets/logo-dark.png")}
+            source={require("../../assets/logo-transparent.png")}
             className="hidden h-40 w-40 rounded-[32px] dark:flex"
             resizeMode="contain"
           />
         </Animated.View>
         <Image
-          source={require("../../assets/title.png")}
+          source={require("../../assets/title-transparent.png")}
           className="mt-6 h-[54px] w-[205px] dark:hidden"
           resizeMode="contain"
         />
         <Image
-          source={require("../../assets/title-dark.png")}
+          source={require("../../assets/title-transparent.png")}
           className="mt-6 hidden h-[54px] w-[205px] dark:flex"
           resizeMode="contain"
         />

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import {
   useInfiniteQuery,
@@ -8,8 +9,17 @@ import {
 } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Image, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  ActivityIndicator,
+  Animated,
+  FlatList,
+  Image,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  StyleSheet,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { bookmarkCourse, unbookmarkCourse } from "@/api/course-api";
 import { getUnreadNotificationCount } from "@/api/notification-api";
@@ -24,7 +34,10 @@ import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
+import { useThemeStore } from "@/stores/theme-store";
 import type { PostFeedItem } from "@/types/domain";
+
+const HEADER_BAR_HEIGHT = 56;
 
 function formatTime(value: string) {
   const date = new Date(value);
@@ -329,8 +342,14 @@ export default function CommunityScreen() {
     openComments?: string;
   }>();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isDark = useThemeStore((state) => state.isDark);
+  const insets = useSafeAreaInsets();
+  const headerHeight = insets.top + HEADER_BAR_HEIGHT;
   const listRef = useRef<FlatList<PostFeedItem>>(null);
   const handledNotificationId = useRef<string | null>(null);
+  const headerTranslateY = useRef(new Animated.Value(0)).current;
+  const headerVisibleRef = useRef(true);
+  const lastScrollOffsetRef = useRef(0);
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -367,6 +386,26 @@ export default function CommunityScreen() {
       setIsRefreshing(false);
     }
   };
+  const setHeaderVisible = (visible: boolean) => {
+    if (headerVisibleRef.current === visible) return;
+    headerVisibleRef.current = visible;
+    Animated.timing(headerTranslateY, {
+      toValue: visible ? 0 : -headerHeight,
+      duration: visible ? 210 : 180,
+      useNativeDriver: true,
+    }).start();
+  };
+  const handleFeedScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offset = event.nativeEvent.contentOffset.y;
+    const delta = offset - lastScrollOffsetRef.current;
+    const velocity = event.nativeEvent.velocity?.y ?? 0;
+
+    if (offset <= 2) setHeaderVisible(true);
+    else if (delta > 5 && velocity >= -0.05) setHeaderVisible(false);
+    else if (delta < -7 || velocity < -0.35) setHeaderVisible(true);
+
+    lastScrollOffsetRef.current = Math.max(0, offset);
+  };
 
   useEffect(() => {
     if (
@@ -388,54 +427,75 @@ export default function CommunityScreen() {
   }, [notificationId, openComments, postId, posts]);
 
   return (
-    <SafeAreaView className="flex-1 bg-white dark:bg-[#111411]" edges={["top"]}>
-      <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-3 dark:border-[#343D36] dark:bg-[#1B211D]">
-        <View
+    <View className="flex-1 bg-white dark:bg-[#111411]">
+      <Animated.View
+        pointerEvents="box-none"
+        className="absolute inset-x-0 top-0 z-20"
+        style={{
+          height: headerHeight,
+          transform: [{ translateY: headerTranslateY }],
+        }}
+      >
+        <BlurView
           pointerEvents="none"
-          className="absolute inset-x-0 h-14 items-center justify-center"
-        >
-          <Image
-            source={require("../../../assets/title.png")}
-            className="h-[35px] w-[132px] dark:hidden"
-            resizeMode="contain"
-          />
-          <Image
-            source={require("../../../assets/title-gray.png")}
-            className="hidden h-[35px] w-[132px] dark:flex"
-            resizeMode="contain"
-          />
-        </View>
-        <IconButton
-          label="게시글 작성"
-          icon="add"
-          onPress={() => router.push("/review/write" as never)}
+          intensity={42}
+          tint={isDark ? "systemThinMaterialDark" : "systemThinMaterialLight"}
+          experimentalBlurMethod="dimezisBlurView"
+          blurReductionFactor={3}
+          style={StyleSheet.absoluteFillObject}
         />
-        <View className="ml-auto flex-row">
-          <IconButton label="피드 검색" icon="search" />
-          <View>
-            <IconButton
-              label="알림"
-              icon="notifications-outline"
-              onPress={() => {
-                if (!isAuthenticated) {
-                  setLoginRequiredOpen(true);
-                  return;
-                }
-                router.push("/notifications" as never);
-              }}
+        <View
+          className="flex-row items-center justify-between px-3"
+          style={{ height: headerHeight, paddingTop: insets.top }}
+        >
+          <View
+            pointerEvents="none"
+            className="absolute inset-x-0 h-14 items-center justify-center"
+            style={{ top: insets.top }}
+          >
+            <Image
+              source={require("../../../assets/title-transparent.png")}
+              className="h-[35px] w-[132px] dark:hidden"
+              resizeMode="contain"
             />
-            {(unreadQuery.data?.count ?? 0) > 0 && (
-              <View className="absolute right-0.5 top-0.5 min-w-[18px] items-center justify-center rounded-full bg-[#EF4444] px-1 py-0.5">
-                <Text className="text-[9px] font-black leading-3 text-white">
-                  {(unreadQuery.data?.count ?? 0) > 99
-                    ? "99+"
-                    : unreadQuery.data?.count}
-                </Text>
-              </View>
-            )}
+            <Image
+              source={require("../../../assets/title-transparent.png")}
+              className="hidden h-[35px] w-[132px] dark:flex"
+              resizeMode="contain"
+            />
+          </View>
+          <IconButton
+            label="게시글 작성"
+            icon="add"
+            onPress={() => router.push("/review/write" as never)}
+          />
+          <View className="ml-auto flex-row">
+            <IconButton label="피드 검색" icon="search" />
+            <View>
+              <IconButton
+                label="알림"
+                icon="notifications-outline"
+                onPress={() => {
+                  if (!isAuthenticated) {
+                    setLoginRequiredOpen(true);
+                    return;
+                  }
+                  router.push("/notifications" as never);
+                }}
+              />
+              {(unreadQuery.data?.count ?? 0) > 0 && (
+                <View className="absolute right-0.5 top-0.5 min-w-[18px] items-center justify-center rounded-full bg-[#EF4444] px-1 py-0.5">
+                  <Text className="text-[9px] font-black leading-3 text-white">
+                    {(unreadQuery.data?.count ?? 0) > 99
+                      ? "99+"
+                      : unreadQuery.data?.count}
+                  </Text>
+                </View>
+              )}
+            </View>
           </View>
         </View>
-      </View>
+      </Animated.View>
       {postsQuery.isPending ? (
         <View className="flex-1 items-center justify-center gap-3 bg-white px-6 py-12 dark:bg-[#111411]">
           <ActivityIndicator color="#087A3F" />
@@ -466,7 +526,10 @@ export default function CommunityScreen() {
           showsVerticalScrollIndicator={false}
           refreshing={isRefreshing}
           onRefresh={() => void refreshPosts()}
-          progressViewOffset={8}
+          progressViewOffset={headerHeight}
+          onScroll={handleFeedScroll}
+          scrollEventThrottle={16}
+          ListHeaderComponent={<View style={{ height: headerHeight }} />}
           contentContainerClassName="grow pb-6"
           ListEmptyComponent={<EmptyState title="아직 공유된 산책이 없어요" />}
           onEndReached={() => {
@@ -495,6 +558,6 @@ export default function CommunityScreen() {
         visible={loginRequiredOpen}
         onClose={() => setLoginRequiredOpen(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
