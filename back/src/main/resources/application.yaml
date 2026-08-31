@@ -26,6 +26,10 @@ app:
     secret: ${JWT_SECRET}
     access-token-expiry: 1800      # 30분
     refresh-token-expiry: 1209600  # 14일
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+    redirect-uri: ${KAKAO_REDIRECT_URI}
   storage:
     type: ${STORAGE_TYPE:local}
     public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080/local-uploads}

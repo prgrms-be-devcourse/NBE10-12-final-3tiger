@@ -75,7 +75,7 @@ class PostLikeControllerTest {
     void t3() throws Exception {
         // given
         var item = new PostLikeService.LikedPostItem(10L, 1L, "산책러", "좋은 산책이었습니다.",
-                "https://example.com/walk.jpg", 5, 2, true, true, LocalDateTime.of(2026, 8, 26, 9, 0));
+                "https://example.com/walk.jpg", 5, 2L, true, false, LocalDateTime.of(2026, 8, 26, 9, 0));
         given(postLikeService.myLikes(1L, 0, 20))
                 .willReturn(new PageResponse<>(List.of(item), 0, 20, 1));
 

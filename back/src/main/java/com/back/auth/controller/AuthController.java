@@ -6,9 +6,12 @@ import com.back.auth.dto.LogoutRequest;
 import com.back.auth.dto.RefreshRequest;
 import com.back.auth.service.AuthService;
 import com.back.global.api.ApiResponse;
+import com.back.global.exception.BusinessException;
+import com.back.global.exception.ErrorCode;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -35,5 +38,14 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request.refreshToken());
         return ResponseEntity.ok(ApiResponse.ok("로그아웃이 완료되었습니다.", null));
+    }
+
+    @GetMapping("/kakao")
+    public ResponseEntity<ApiResponse<AuthResponse>> kakaoLogin(@RequestParam String code) {
+        if (!StringUtils.hasText(code)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        AuthResponse response = authService.kakaoLogin(code);
+        return ResponseEntity.ok(ApiResponse.ok("카카오 로그인이 완료되었습니다.", response));
     }
 }
