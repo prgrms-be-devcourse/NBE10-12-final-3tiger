@@ -49,6 +49,10 @@ class CourseControllerTest {
                 true,
                 "auto_discovered",
                 new CourseService.ScoreBars(0.82, 5.4, 0.78, null, 0.73),
+                0.91,
+                0.87,
+                0.83,
+                0.79,
                 null,
                 null,
                 List.of(),
@@ -62,6 +66,10 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.data.path.type").value("LineString"))
                 .andExpect(jsonPath("$.data.path.coordinates[0][0]").value(127.037))
                 .andExpect(jsonPath("$.data.path.coordinates[0][1]").value(37.544))
+                .andExpect(jsonPath("$.data.scoreWalker").value(0.91))
+                .andExpect(jsonPath("$.data.scoreSenior").value(0.87))
+                .andExpect(jsonPath("$.data.scoreStroller").value(0.83))
+                .andExpect(jsonPath("$.data.scoreDog").value(0.79))
                 .andExpect(jsonPath("$.data.isBookmarked").value(true));
     }
 

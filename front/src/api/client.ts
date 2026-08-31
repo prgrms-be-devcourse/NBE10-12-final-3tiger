@@ -32,6 +32,13 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
 };
 
+type ApiErrorResponse = {
+  resultCode?: string;
+  code?: string;
+  message?: string;
+  data?: unknown;
+};
+
 let refreshPromise: Promise<AuthTokens> | null = null;
 
 const isAuthRequest = (url?: string) => Boolean(url?.includes("/api/v1/auth/"));
@@ -58,14 +65,17 @@ export function refreshAccessToken() {
   return refreshPromise;
 }
 
-const toApiError = (error: AxiosError<ApiResponse<unknown>>) =>
+const getErrorCode = (error: AxiosError<ApiErrorResponse>) =>
+  error.response?.data?.resultCode ?? error.response?.data?.code;
+
+const toApiError = (error: AxiosError<ApiErrorResponse>) =>
   new ApiError(
     error.response?.data?.message ??
       (error.request
         ? "서버에 연결할 수 없습니다."
         : "요청 처리 중 오류가 발생했습니다."),
     error.response?.status,
-    error.response?.data?.resultCode,
+    getErrorCode(error),
   );
 
 apiClient.interceptors.request.use((config) => {
@@ -76,8 +86,15 @@ apiClient.interceptors.request.use((config) => {
 
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError<ApiResponse<unknown>>) => {
+  async (error: AxiosError<ApiErrorResponse>) => {
     const originalRequest = error.config as RetryableRequestConfig | undefined;
+    const isMissingCurrentUser = getErrorCode(error) === "USER_404";
+
+    if (isMissingCurrentUser) {
+      await useAuthStore.getState().clearSession();
+      return Promise.reject(toApiError(error));
+    }
+
     const shouldRefresh =
       error.response?.status === 401 &&
       originalRequest !== undefined &&

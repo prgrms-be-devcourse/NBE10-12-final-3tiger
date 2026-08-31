@@ -17,6 +17,14 @@ export type CourseScores = {
   surfaceType?: string;
 };
 
+export type CourseScoreBars = {
+  flatness?: number | null;
+  avgSlopeDegree?: number | null;
+  shade?: number | null;
+  surfaceTemp?: number | null;
+  amenity?: number | null;
+};
+
 export type Course = {
   courseId: number;
   name: string;
@@ -34,6 +42,18 @@ export type Course = {
   imageUrl?: string;
   summary?: string;
   bookmarkedAt?: string;
+};
+
+export type CourseDetail = Course & {
+  elevationGainM?: number | null;
+  elevationLossM?: number | null;
+  source?: string | null;
+  scoreBars?: CourseScoreBars | null;
+  scoreWalker?: number | null;
+  scoreSenior?: number | null;
+  scoreStroller?: number | null;
+  scoreDog?: number | null;
+  surfaceType?: string | null;
 };
 
 export type BookmarkedCourse = Course & {
@@ -73,8 +93,8 @@ export type PostComment = {
   profileImageUrl?: string | null;
   content: string;
   upvoteCount: number;
-  /** 현재 로그인한 사용자가 공감했는지 여부(백엔드가 제공하는 경우) */
-  upvoted?: boolean;
+  /** 현재 로그인한 사용자가 공감했는지 여부 */
+  isUpvoted: boolean;
   createdAt: string;
 };
 
@@ -84,6 +104,22 @@ export type Region = {
   centerLat: number;
   centerLng: number;
   courseCount: number;
+};
+
+export type GridOverlay = {
+  gridId: number;
+  regionCode: string;
+  centroidLat: number;
+  centroidLng: number;
+  flatness: number | null;
+  shadeSummer: number | null;
+  shadeWinterSun: number | null;
+  trafficLow: number | null;
+  wheelchair: number | null;
+  surfaceNatural: number | null;
+  benchDensity: number | null;
+  restroomProximity: number | null;
+  waterFacility: number | null;
 };
 
 export type GeoJsonLineString = {

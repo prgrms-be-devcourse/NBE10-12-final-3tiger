@@ -3,13 +3,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { logout } from "@/api/auth-api";
 import { getMyProfile, updateMyProfile, withdraw } from "@/api/user-api";
-import { ErrorState, LoadingState } from "@/components/ui/data-state";
+import { ErrorState } from "@/components/ui/data-state";
+import { Switch } from "@/components/ui/switch";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
+import { useThemeStore } from "@/stores/theme-store";
 const PERSONAS = [
   {
     key: "walker",
@@ -82,6 +91,8 @@ export default function ProfileScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const refreshToken = useAuthStore((state) => state.refreshToken);
   const clearSession = useAuthStore((state) => state.clearSession);
+  const isDark = useThemeStore((state) => state.isDark);
+  const setDark = useThemeStore((state) => state.setDark);
   const [persona, setPersona] = useState("dog");
   const [tags, setTags] = useState<string[]>([]);
   const profileQuery = useQuery({
@@ -133,17 +144,17 @@ export default function ProfileScreen() {
   if (!isAuthenticated)
     return (
       <SafeAreaView
-        className="flex-1 items-center justify-center bg-[#F2F7F2] px-6"
+        className="flex-1 items-center justify-center bg-[#F2F7F2] px-6 dark:bg-[#111411]"
         edges={["top"]}
       >
-        <View className="w-full max-w-md items-center rounded-3xl bg-white px-6 py-9 shadow-sm">
-          <View className="h-16 w-16 items-center justify-center rounded-full bg-[#E9FBEF]">
+        <View className="w-full max-w-md items-center rounded-3xl bg-white px-6 py-9 shadow-sm dark:bg-[#1B211D]">
+          <View className="h-16 w-16 items-center justify-center rounded-full bg-[#E9FBEF] dark:bg-[#24382B]">
             <Ionicons name="person-outline" size={30} color="#087A3F" />
           </View>
-          <Text className="mt-5 text-xl font-extrabold text-[#191C1D]">
+          <Text className="mt-5 text-xl font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
             로그인하고 산책 기록을 관리하세요
           </Text>
-          <Text className="mt-2 text-center text-sm leading-5 text-slate-500">
+          <Text className="mt-2 text-center text-sm leading-5 text-slate-500 dark:text-[#AAB5AD]">
             저장한 코스와 게시글, 나에게 맞는 걷기 유형을 한곳에서 확인할 수
             있어요.
           </Text>
@@ -155,28 +166,59 @@ export default function ProfileScreen() {
           </Button>
           <Button
             variant="secondary"
-            className="mt-2.5 h-12 w-full rounded-xl bg-[#BDF4CB]"
+            className="mt-2.5 h-12 w-full rounded-xl bg-[#BDF4CB] dark:bg-[#24382B]"
             onPress={() => router.push("/(auth)/signup" as never)}
           >
-            <Text className="font-bold text-[#075E34]">회원가입</Text>
+            <Text className="font-bold text-[#075E34] dark:text-[#86EFAC]">
+              회원가입
+            </Text>
           </Button>
         </View>
       </SafeAreaView>
     );
   if (profileQuery.isPending)
-    return <LoadingState label="프로필을 불러오는 중이에요" />;
+    return (
+      <SafeAreaView
+        className="flex-1 bg-[#F2F7F2] dark:bg-[#111411]"
+        edges={["top"]}
+      >
+        <View className="flex-1 items-center justify-center gap-3 bg-[#F2F7F2] px-6 py-12 dark:bg-[#111411]">
+          <ActivityIndicator color="#087A3F" />
+          <Text className="text-sm text-slate-500 dark:text-[#AAB5AD]">
+            프로필을 불러오는 중이에요
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
   if (profileQuery.isError)
     return (
       <ErrorState
         message={profileQuery.error.message}
         onRetry={() => void profileQuery.refetch()}
+        appearance="light"
+        className="bg-[#F2F7F2] dark:bg-[#111411]"
       />
     );
   const profile = profileQuery.data;
   return (
-    <SafeAreaView className="flex-1 bg-[#F2F7F2]" edges={["top"]}>
+    <SafeAreaView
+      className="flex-1 bg-[#F2F7F2] dark:bg-[#111411]"
+      edges={["top"]}
+    >
       <ScrollView contentContainerClassName="gap-3.5 p-5 pb-9">
-        <View className="rounded-xl bg-white p-4">
+        <View className="relative rounded-xl bg-white p-4 dark:bg-[#1B211D]">
+          <View className="absolute right-3 top-3 z-10 flex-row items-center gap-1.5">
+            <Ionicons
+              name={isDark ? "moon" : "sunny-outline"}
+              size={16}
+              color={isDark ? "#86EFAC" : "#526056"}
+            />
+            <Switch
+              accessibilityLabel="다크 모드"
+              value={isDark}
+              onValueChange={(value) => void setDark(value)}
+            />
+          </View>
           <View className="flex-row items-center gap-3">
             <View>
               <Image
@@ -196,28 +238,28 @@ export default function ProfileScreen() {
                 <Ionicons name="pencil" size={11} color="#004B1E" />
               </Pressable>
             </View>
-            <View className="flex-1">
-              <Text className="text-[17px] font-semibold text-[#191C1D]">
+            <View className="flex-1 pr-16">
+              <Text className="text-[17px] font-semibold text-[#191C1D] dark:text-[#F1F5F2]">
                 {profile?.nickname}
               </Text>
-              <Text className="mt-0.5 text-xs text-slate-500">
+              <Text className="mt-0.5 text-xs text-slate-500 dark:text-[#AAB5AD]">
                 {profile?.email}
               </Text>
             </View>
           </View>
-          <View className="mt-3.5 border-t border-slate-200 pt-3">
-            <Text className="mb-2 text-[11px] font-medium text-slate-500">
+          <View className="mt-3.5 border-t border-slate-200 pt-3 dark:border-[#343D36]">
+            <Text className="mb-2 text-[11px] font-medium text-slate-500 dark:text-[#AAB5AD]">
               계정 관리
             </Text>
             <View className="flex-row gap-2">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-10 flex-1 rounded-lg border-0 bg-[#EEF0EE] px-3"
+                className="h-10 flex-1 rounded-lg border-0 bg-[#EEF0EE] px-3 dark:bg-[#2A312C]"
                 disabled={logoutMutation.isPending}
                 onPress={() => logoutMutation.mutate()}
               >
-                <Text className="text-xs font-bold text-[#4B5563]">
+                <Text className="text-xs font-bold text-[#4B5563] dark:text-[#D4DDD6]">
                   로그아웃
                 </Text>
               </Button>
@@ -235,14 +277,14 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
-        <View className="rounded-xl bg-white p-4">
+        <View className="rounded-xl bg-white p-4 dark:bg-[#1B211D]">
           <View className="flex-row items-center gap-2">
             <Ionicons name="person-circle" size={24} color="#22C55E" />
-            <Text className="text-[17px] font-extrabold text-[#191C1D]">
+            <Text className="text-[17px] font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
               나의 걷기 유형
             </Text>
           </View>
-          <Text className="mb-3 mt-1.5 text-xs leading-[19px] text-slate-600">
+          <Text className="mb-3 mt-1.5 text-xs leading-[19px] text-slate-600 dark:text-[#AAB5AD]">
             맞춤형 경로를 위해 주된 유형을 선택해주세요.
           </Text>
           <View className="flex-row gap-1.5">
@@ -251,7 +293,7 @@ export default function ProfileScreen() {
               return (
                 <Pressable
                   key={item.key}
-                  className={`h-20 flex-1 items-center justify-center gap-1 rounded-lg border-2 ${active ? "" : "border-slate-200 bg-[#F8FAF8]"}`}
+                  className={`h-20 flex-1 items-center justify-center gap-1 rounded-lg border-2 ${active ? "" : "border-slate-200 bg-[#F8FAF8] dark:border-[#343D36] dark:bg-[#242B26]"}`}
                   style={
                     active
                       ? {
@@ -269,7 +311,7 @@ export default function ProfileScreen() {
                   />
                   <Text
                     style={active ? { color: item.color } : undefined}
-                    className="text-xs font-bold text-slate-600"
+                    className="text-xs font-bold text-slate-600 dark:text-[#AAB5AD]"
                   >
                     {item.label}
                   </Text>
@@ -278,14 +320,14 @@ export default function ProfileScreen() {
             })}
           </View>
         </View>
-        <View className="rounded-xl bg-white p-4">
+        <View className="rounded-xl bg-white p-4 dark:bg-[#1B211D]">
           <View className="flex-row items-center gap-2">
             <Ionicons name="pricetag" size={22} color="#22C55E" />
-            <Text className="text-[17px] font-extrabold text-[#191C1D]">
+            <Text className="text-[17px] font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
               관심 태그
             </Text>
           </View>
-          <Text className="mb-3 mt-1.5 text-xs text-slate-600">
+          <Text className="mb-3 mt-1.5 text-xs text-slate-600 dark:text-[#AAB5AD]">
             선호하는 산책 환경을 알려주세요.
           </Text>
           <View className="flex-row gap-1.5">
@@ -298,11 +340,11 @@ export default function ProfileScreen() {
               <Pressable
                 key={tag}
                 onPress={() => toggle(tag)}
-                className={`h-10 flex-1 items-center justify-center rounded-full border px-1 ${tags.includes(tag) ? "border-[#22C55E] bg-[#22C55E]" : "border-[#BCCBB9] bg-slate-200"}`}
+                className={`h-10 flex-1 items-center justify-center rounded-full border px-1 ${tags.includes(tag) ? "border-[#22C55E] bg-[#22C55E]" : "border-[#BCCBB9] bg-slate-200 dark:border-[#475249] dark:bg-[#2A312C]"}`}
               >
                 <Text
                   numberOfLines={1}
-                  className="text-[11px] font-bold text-[#26372D]"
+                  className={`text-[11px] font-bold ${tags.includes(tag) ? "text-[#26372D] dark:text-white" : "text-[#26372D] dark:text-[#D4DDD6]"}`}
                 >
                   {label}
                 </Text>
@@ -310,11 +352,11 @@ export default function ProfileScreen() {
             ))}
           </View>
         </View>
-        <View className="overflow-hidden rounded-xl bg-white px-4">
+        <View className="overflow-hidden rounded-xl bg-white px-4 dark:bg-[#1B211D]">
           {MENUS.map((item, i) => (
             <Pressable
               key={item.label}
-              className={`min-h-[66px] flex-row items-center gap-3 ${i < MENUS.length - 1 ? "border-b border-slate-200" : ""}`}
+              className={`min-h-[66px] flex-row items-center gap-3 ${i < MENUS.length - 1 ? "border-b border-slate-200 dark:border-[#343D36]" : ""}`}
               onPress={() => router.push(item.route as never)}
             >
               <View
@@ -327,10 +369,10 @@ export default function ProfileScreen() {
                 />
               </View>
               <View className="flex-1">
-                <Text className="text-[15px] font-semibold text-[#191C1D]">
+                <Text className="text-[15px] font-semibold text-[#191C1D] dark:text-[#F1F5F2]">
                   {item.label}
                 </Text>
-                <Text className="mt-0.5 text-[11px] text-slate-500">
+                <Text className="mt-0.5 text-[11px] text-slate-500 dark:text-[#AAB5AD]">
                   {item.description}
                 </Text>
               </View>

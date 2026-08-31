@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import {
   useInfiniteQuery,
   useMutation,
@@ -20,6 +21,7 @@ import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
+import { useThemeStore } from "@/stores/theme-store";
 import type { LikedPostItem } from "@/types/domain";
 
 function LikedPostCard({
@@ -117,7 +119,7 @@ function LikedPostCard({
     },
   });
   return (
-    <View className="bg-white">
+    <View className="bg-white dark:bg-[#1B211D]">
       <View className="min-h-[52px] flex-row items-center gap-2 px-3 py-2">
         <Avatar
           alt={`${item.nickname ?? "사용자"} 프로필`}
@@ -133,10 +135,10 @@ function LikedPostCard({
           <AvatarFallback className="bg-[#E9F5EC]" />
         </Avatar>
         <View className="flex-1">
-          <Text className="text-[13px] font-semibold leading-4 text-[#191C1D]">
+          <Text className="text-[13px] font-semibold leading-4 text-[#191C1D] dark:text-[#F1F5F2]">
             {item.nickname ?? "산책러"}
           </Text>
-          <Text className="text-[10px] text-[#6B756D]">
+          <Text className="text-[10px] text-[#6B756D] dark:text-[#AAB5AD]">
             {new Date(item.likedAt ?? item.walkedAt).toLocaleDateString(
               "ko-KR",
             )}
@@ -168,22 +170,27 @@ function LikedPostCard({
         likeCount={likeCount}
         commentCount={item.commentCount ?? 0}
         onToggleLike={() => {
-          if (!mutation.isPending) mutation.mutate({ desiredLiked: !liked });
+          if (!mutation.isPending) {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            mutation.mutate({ desiredLiked: !liked });
+          }
         }}
         onOpenComments={onComments}
         bookmarked={bookmarked}
         onToggleBookmark={() => {
-          if (!bookmarkMutation.isPending)
+          if (!bookmarkMutation.isPending) {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             bookmarkMutation.mutate({ desiredBookmarked: !bookmarked });
+          }
         }}
       />
       <View className="px-3 pb-4">
         <View className="flex-row items-end">
           <Text
-            className="flex-1 text-[13px] leading-5 text-[#252A26]"
+            className="flex-1 text-[13px] leading-5 text-[#252A26] dark:text-[#D4DDD6]"
             numberOfLines={expanded ? undefined : 1}
           >
-            <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
+            <Text className="text-[13px] font-bold leading-5 text-[#191C1D] dark:text-[#F1F5F2]">
               {item.nickname ?? "산책러"}{" "}
             </Text>
             {item.content}
@@ -195,11 +202,13 @@ function LikedPostCard({
               className="ml-1 h-5 px-0"
               onPress={() => setExpanded(true)}
             >
-              <Text className="text-[11px] text-slate-500">더 보기</Text>
+              <Text className="text-[11px] text-slate-500 dark:text-[#AAB5AD]">
+                더 보기
+              </Text>
             </Button>
           )}
         </View>
-        <Text className="mt-1 text-[10px] text-[#758078]">
+        <Text className="mt-1 text-[10px] text-[#758078] dark:text-[#AAB5AD]">
           댓글 {item.commentCount ?? 0}개 모두 보기
         </Text>
       </View>
@@ -214,6 +223,7 @@ function LikedPostCard({
 }
 
 export default function LikedPostsScreen() {
+  const isDark = useThemeStore((state) => state.isDark);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
   useEffect(() => {
@@ -231,8 +241,8 @@ export default function LikedPostsScreen() {
   });
   const posts = likedQuery.data?.pages.flatMap((page) => page.content) ?? [];
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
+    <SafeAreaView className="flex-1 bg-white dark:bg-[#111411]" edges={["top"]}>
+      <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5 dark:border-[#343D36] dark:bg-[#1B211D]">
         <Button
           variant="ghost"
           size="icon"
@@ -240,9 +250,15 @@ export default function LikedPostsScreen() {
           className="h-11 w-11"
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={22} color="#223128" />
+          <Ionicons
+            name="arrow-back"
+            size={22}
+            color={isDark ? "#F1F5F2" : "#223128"}
+          />
         </Button>
-        <Text className="text-lg text-[#006E2F]">좋아요한 글</Text>
+        <Text className="text-lg text-[#006E2F] dark:text-[#F1F5F2]">
+          좋아요한 글
+        </Text>
         <View className="w-11" />
       </View>
       {likedQuery.isPending ? (

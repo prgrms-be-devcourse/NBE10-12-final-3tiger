@@ -26,10 +26,12 @@ import {
   BottomSheetHandle,
   dismissBottomSheet,
 } from "@/components/ui/bottom-sheet-handle";
+import { useThemeStore } from "@/stores/theme-store";
 import { Text } from "@/components/ui/text";
 import type { Course } from "@/types/domain";
 
 export default function WritePostScreen() {
+  const isDark = useThemeStore((state) => state.isDark);
   const queryClient = useQueryClient();
   const [asset, setAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [content, setContent] = useState("");
@@ -83,8 +85,11 @@ export default function WritePostScreen() {
   };
   const canSubmit = Boolean(asset && selectedCourse && content.trim());
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={["top"]}>
-      <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
+    <SafeAreaView
+      className="flex-1 bg-slate-50 dark:bg-[#111411]"
+      edges={["top"]}
+    >
+      <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5 dark:border-[#343D36] dark:bg-[#1B211D]">
         <Button
           variant="ghost"
           size="icon"
@@ -92,9 +97,15 @@ export default function WritePostScreen() {
           className="h-11 w-11"
           onPress={() => router.back()}
         >
-          <Ionicons name="close" size={22} color="#223128" />
+          <Ionicons
+            name="close"
+            size={22}
+            color={isDark ? "#F1F5F2" : "#223128"}
+          />
         </Button>
-        <Text className="text-lg text-[#006E2F]">새 게시글</Text>
+        <Text className="text-lg text-[#006E2F] dark:text-[#F1F5F2]">
+          새 게시글
+        </Text>
         <Button
           variant="ghost"
           size="sm"
@@ -112,7 +123,7 @@ export default function WritePostScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <Pressable
-          className="h-[300px] items-center justify-center overflow-hidden rounded-xl border border-dashed border-[#BCCBB9] bg-white"
+          className="h-[300px] items-center justify-center overflow-hidden rounded-xl border border-dashed border-[#BCCBB9] bg-white dark:border-[#475249] dark:bg-[#1B211D]"
           onPress={() => void pick()}
         >
           {asset ? (
@@ -122,27 +133,27 @@ export default function WritePostScreen() {
               <View className="h-[58px] w-[58px] items-center justify-center rounded-full bg-[#DDF8E5]">
                 <Ionicons name="camera" size={30} color="#006E2F" />
               </View>
-              <Text className="mt-3 text-base font-extrabold text-slate-900">
+              <Text className="mt-3 text-base font-extrabold text-slate-900 dark:text-[#F1F5F2]">
                 산책 사진을 업로드해주세요
               </Text>
-              <Text className="mt-1 text-xs text-slate-500">
+              <Text className="mt-1 text-xs text-slate-500 dark:text-[#AAB5AD]">
                 사진을 눌러 선택하세요
               </Text>
             </>
           )}
         </Pressable>
         <Pressable
-          className="min-h-[76px] flex-row items-center gap-3 rounded-xl bg-white p-3.5 shadow-sm"
+          className="min-h-[76px] flex-row items-center gap-3 rounded-xl bg-white p-3.5 shadow-sm dark:bg-[#1B211D]"
           onPress={() => setCourseSheetOpen(true)}
         >
           <View className="h-11 w-11 items-center justify-center rounded-[14px] bg-[#DDF8E5]">
             <Ionicons name="map" size={23} color="#006E2F" />
           </View>
           <View className="flex-1">
-            <Text className="mb-1 text-sm font-extrabold text-slate-900">
+            <Text className="mb-1 text-sm font-extrabold text-slate-900 dark:text-[#F1F5F2]">
               {selectedCourse?.name ?? "코스 선택하기"}
             </Text>
-            <Text className="text-xs text-slate-500">
+            <Text className="text-xs text-slate-500 dark:text-[#AAB5AD]">
               {selectedCourse
                 ? `${(selectedCourse.distanceM / 1000).toFixed(1)}km`
                 : "저장한 코스 중 다녀온 곳을 선택하세요"}
@@ -150,13 +161,13 @@ export default function WritePostScreen() {
           </View>
           <Ionicons name="chevron-forward" size={22} color="#64748B" />
         </Pressable>
-        <Text className="text-sm font-extrabold text-slate-900">
+        <Text className="text-sm font-extrabold text-slate-900 dark:text-[#F1F5F2]">
           산책 이야기
         </Text>
         <TextInput
           value={content}
           onChangeText={setContent}
-          className="h-[120px] rounded-xl border border-slate-200 bg-white p-3.5"
+          className="h-[120px] rounded-xl border border-slate-200 bg-white p-3.5 text-[#191C1D] dark:border-[#343D36] dark:bg-[#1B211D] dark:text-[#F1F5F2]"
           multiline
           placeholder="오늘의 산책은 어땠나요?"
           textAlignVertical="top"
@@ -179,7 +190,7 @@ export default function WritePostScreen() {
             onPress={dismissCourseSheet}
           ></Pressable>
           <Animated.View
-            className="h-[78%] rounded-t-[30px] bg-[#FCFDFC] pt-2.5"
+            className="h-[78%] rounded-t-[30px] bg-[#FCFDFC] pt-2.5 dark:bg-[#171C18]"
             style={{ transform: [{ translateY: sheetTranslateY }] }}
           >
             <BottomSheetHandle
@@ -188,7 +199,7 @@ export default function WritePostScreen() {
               dismissDistance={windowHeight}
             />
             <View className="h-10 items-center justify-center px-5">
-              <Text className="text-[17px] font-black text-[#191C1D]">
+              <Text className="text-[17px] font-black text-[#191C1D] dark:text-[#F1F5F2]">
                 코스 선택
               </Text>
             </View>
@@ -206,7 +217,8 @@ export default function WritePostScreen() {
                 className="flex-1"
                 data={coursesQuery.data?.content ?? []}
                 keyExtractor={(item) => String(item.courseId)}
-                contentContainerClassName="grow gap-3 px-5 py-4 pb-8"
+                contentContainerClassName="grow px-5 py-4 pb-8"
+                ItemSeparatorComponent={() => <View className="h-3" />}
                 showsVerticalScrollIndicator
                 nestedScrollEnabled
                 keyboardShouldPersistTaps="handled"
@@ -220,7 +232,7 @@ export default function WritePostScreen() {
                   <Button
                     variant="ghost"
                     accessibilityLabel={`${item.name} 선택`}
-                    className="min-h-[72px] flex-row items-center justify-start gap-3 rounded-2xl border border-[#E5EBE5] bg-white px-4 py-3"
+                    className="h-[76px] flex-row items-center justify-start gap-3 rounded-2xl border border-[#E5EBE5] bg-white px-4 py-3 dark:border-[#343D36] dark:bg-[#1B211D]"
                     onPress={() => {
                       setSelectedCourse(item);
                       dismissCourseSheet();
@@ -230,10 +242,10 @@ export default function WritePostScreen() {
                       <Ionicons name="map-outline" size={22} color="#087A3F" />
                     </View>
                     <View className="flex-1 items-start">
-                      <Text className="text-sm font-black text-[#6B756D]">
+                      <Text className="text-sm font-black text-[#6B756D] dark:text-[#F1F5F2]">
                         {item.name}
                       </Text>
-                      <Text className="mt-1 text-xs text-[#6B756D]">
+                      <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
                         {(item.distanceM / 1000).toFixed(1)}km · 약{" "}
                         {item.estimatedMinutes ?? "-"}분
                       </Text>

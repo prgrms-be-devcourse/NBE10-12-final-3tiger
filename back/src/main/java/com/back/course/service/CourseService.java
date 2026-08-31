@@ -45,6 +45,7 @@ public class CourseService {
                 view.getElevationGainM(), view.getElevationLossM(),
                 Boolean.TRUE.equals(view.getIsLoop()), view.getSource(),
                 new ScoreBars(flatness, avgSlopeDegree, view.getShade(), view.getSurfaceTemp(), view.getAmenity()),
+                view.getScoreWalker(), view.getScoreSenior(), view.getScoreStroller(), view.getScoreDog(),
                 view.getSurfaceType(), null, List.of(), isBookmarked
         );
     }
@@ -148,6 +149,10 @@ public class CourseService {
             boolean isLoop,
             String source,
             ScoreBars scoreBars,
+            Double scoreWalker,
+            Double scoreSenior,
+            Double scoreStroller,
+            Double scoreDog,
             String surfaceType,
             String summary,
             List<String> personaBadges,

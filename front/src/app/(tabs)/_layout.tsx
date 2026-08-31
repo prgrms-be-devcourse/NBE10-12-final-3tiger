@@ -1,9 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { useThemeStore } from "@/stores/theme-store";
 
 const GREEN = "#067A3D";
 
 export default function TabLayout() {
+  const isDark = useThemeStore((state) => state.isDark);
+  const surface = isDark ? "#1B211D" : "#FFFFFF";
+
   return (
     <Tabs
       initialRouteName="map"
@@ -12,7 +16,7 @@ export default function TabLayout() {
         headerShown: false,
         lazy: false,
         freezeOnBlur: false,
-        sceneStyle: { backgroundColor: "#FFFFFF" },
+        sceneStyle: { backgroundColor: surface },
         animation: "shift",
         transitionSpec: {
           animation: "timing",
@@ -25,8 +29,8 @@ export default function TabLayout() {
           height: 76,
           paddingTop: 9,
           paddingBottom: 10,
-          borderTopColor: "#E5EBE5",
-          backgroundColor: "#FFFFFF",
+          borderTopColor: isDark ? "#343D36" : "#E5EBE5",
+          backgroundColor: surface,
         },
       }}
     >

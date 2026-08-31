@@ -28,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { Text } from "@/components/ui/text";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
+import { useThemeStore } from "@/stores/theme-store";
 import type { Post } from "@/types/domain";
 
 function PostDetailSheet({
@@ -69,7 +70,7 @@ function PostDetailSheet({
           onPress={dismissSheet}
         />
         <Animated.View
-          className="h-[76%] rounded-t-[30px] bg-white pt-2.5"
+          className="h-[76%] rounded-t-[30px] bg-white pt-2.5 dark:bg-[#1B211D]"
           style={{ transform: [{ translateY }] }}
         >
           <BottomSheetHandle
@@ -98,33 +99,33 @@ function PostDetailSheet({
                   <Text className="text-[11px] font-extrabold text-[#087A3F]">
                     나의 산책 기록
                   </Text>
-                  <Text className="mt-1 text-[22px] font-black text-[#17251B]">
+                  <Text className="mt-1 text-[22px] font-black text-[#17251B] dark:text-[#F1F5F2]">
                     {courseQuery.data?.name ?? "산책 기록"}
                   </Text>
                 </View>
               </View>
-              <View className="mt-4 flex-row rounded-2xl bg-[#F2F8F2] py-3">
+              <View className="mt-4 flex-row rounded-2xl bg-[#F2F8F2] py-3 dark:bg-[#242B26]">
                 <View className="flex-1 items-center border-r border-[#DDE7DE]">
                   <Ionicons name="calendar-outline" size={18} color="#087A3F" />
-                  <Text className="mt-1 text-xs font-bold text-[#405047]">
+                  <Text className="mt-1 text-xs font-bold text-[#405047] dark:text-[#AAB5AD]">
                     {new Date(post.walkedAt).toLocaleDateString("ko-KR")}
                   </Text>
                 </View>
                 <View className="flex-1 items-center">
                   <Ionicons name="time-outline" size={18} color="#087A3F" />
-                  <Text className="mt-1 text-xs font-bold text-[#405047]">
+                  <Text className="mt-1 text-xs font-bold text-[#405047] dark:text-[#AAB5AD]">
                     {courseQuery.data?.estimatedMinutes ?? "-"}분
                   </Text>
                 </View>
               </View>
-              <Text className="mt-5 text-[15px] leading-6 text-[#2D3931]">
+              <Text className="mt-5 text-[15px] leading-6 text-[#2D3931] dark:text-[#D4DDD6]">
                 {post.content}
               </Text>
               <Separator className="my-5 bg-[#E6EBE7]" />
               <View className="flex-row items-center gap-6">
                 <View className="flex-row items-center gap-1.5">
                   <Ionicons name="heart" size={22} color="#22C55E" />
-                  <Text className="text-sm font-bold text-[#405047]">
+                  <Text className="text-sm font-bold text-[#405047] dark:text-[#AAB5AD]">
                     {post.likeCount}
                   </Text>
                 </View>
@@ -134,7 +135,7 @@ function PostDetailSheet({
                     size={21}
                     color="#526056"
                   />
-                  <Text className="text-sm font-bold text-[#405047]">
+                  <Text className="text-sm font-bold text-[#405047] dark:text-[#AAB5AD]">
                     {post.commentCount ?? 0}
                   </Text>
                 </View>
@@ -148,6 +149,7 @@ function PostDetailSheet({
 }
 
 export default function MyPostScreen() {
+  const isDark = useThemeStore((state) => state.isDark);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [selectedPostId, setSelectedPostId] = useState<number | null>(null);
   useEffect(() => {
@@ -169,8 +171,8 @@ export default function MyPostScreen() {
       ? null
       : (posts.find((post) => post.postId === selectedPostId) ?? null);
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
+    <SafeAreaView className="flex-1 bg-white dark:bg-[#111411]" edges={["top"]}>
+      <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5 dark:border-[#343D36] dark:bg-[#1B211D]">
         <Button
           variant="ghost"
           size="icon"
@@ -178,9 +180,15 @@ export default function MyPostScreen() {
           className="h-11 w-11"
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={22} color="#223128" />
+          <Ionicons
+            name="arrow-back"
+            size={22}
+            color={isDark ? "#F1F5F2" : "#223128"}
+          />
         </Button>
-        <Text className="text-lg text-[#006E2F]">나의 게시글</Text>
+        <Text className="text-lg text-[#006E2F] dark:text-[#F1F5F2]">
+          나의 게시글
+        </Text>
         <View className="w-11" />
       </View>
       <View className="h-[100px] flex-row items-center gap-[15px] px-5">
@@ -189,10 +197,10 @@ export default function MyPostScreen() {
           className="h-16 w-16 rounded-full border-2 border-[#22C55E]"
         />
         <View>
-          <Text className="text-xl font-extrabold text-[#191C1D]">
+          <Text className="text-xl font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
             나의 산책 기록
           </Text>
-          <Text className="mt-1 text-sm text-slate-600">
+          <Text className="mt-1 text-sm text-slate-600 dark:text-[#AAB5AD]">
             총 {postsQuery.data?.pages[0]?.totalElements ?? 0}개의 기록
           </Text>
         </View>

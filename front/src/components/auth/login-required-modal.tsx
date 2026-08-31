@@ -35,16 +35,16 @@ export function LoginRequiredModal({
       >
         <Pressable
           accessibilityRole="none"
-          className="w-full max-w-sm items-center rounded-[28px] bg-white px-6 pb-5 pt-7"
+          className="w-full max-w-sm items-center rounded-[28px] bg-white px-6 pb-5 pt-7 dark:bg-[#1B211D]"
           onPress={(event) => event.stopPropagation()}
         >
-          <View className="h-14 w-14 items-center justify-center rounded-full bg-[#E9FBEF]">
+          <View className="h-14 w-14 items-center justify-center rounded-full bg-[#E9FBEF] dark:bg-[#24382B]">
             <Ionicons name="lock-closed-outline" size={27} color="#087A3F" />
           </View>
-          <Text className="mt-4 text-xl font-extrabold text-[#191C1D]">
+          <Text className="mt-4 text-xl font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
             로그인이 필요합니다
           </Text>
-          <Text className="mt-2 text-center text-sm leading-5 text-[#6B756D]">
+          <Text className="mt-2 text-center text-sm leading-5 text-[#6B756D] dark:text-[#AAB5AD]">
             로그인하면 좋아요와 저장 기능을 사용할 수 있어요.
           </Text>
           <Button
@@ -58,7 +58,9 @@ export function LoginRequiredModal({
             className="mt-1 h-11 w-full rounded-xl"
             onPress={onClose}
           >
-            <Text className="font-bold text-[#6B756D]">나중에</Text>
+            <Text className="font-bold text-[#6B756D] dark:text-[#AAB5AD]">
+              나중에
+            </Text>
           </Button>
         </Pressable>
       </Pressable>

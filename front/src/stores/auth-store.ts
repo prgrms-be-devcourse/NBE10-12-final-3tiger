@@ -72,15 +72,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
   clearSession: async () => {
-    await Promise.all([
-      tokenStorage.remove(ACCESS_TOKEN_KEY),
-      tokenStorage.remove(REFRESH_TOKEN_KEY),
-    ]);
     set({
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
       isInitialized: true,
     });
+    await Promise.all([
+      tokenStorage.remove(ACCESS_TOKEN_KEY),
+      tokenStorage.remove(REFRESH_TOKEN_KEY),
+    ]);
   },
 }));

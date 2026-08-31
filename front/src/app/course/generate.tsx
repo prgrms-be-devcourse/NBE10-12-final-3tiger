@@ -21,6 +21,7 @@ import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useAuthStore } from "@/stores/auth-store";
+import { useThemeStore } from "@/stores/theme-store";
 import type { GenerateCandidate } from "@/types/domain";
 
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
@@ -52,6 +53,7 @@ export default function CourseGenerateScreen() {
   const queryClient = useQueryClient();
   const mapRef = useRef<MapView>(null);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isDark = useThemeStore((state) => state.isDark);
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const [coords, setCoords] = useState(DEFAULT_COORDS);
   const [locating, setLocating] = useState(false);
@@ -62,13 +64,24 @@ export default function CourseGenerateScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    void Location.getLastKnownPositionAsync().then((position) => {
-      if (position)
-        setCoords({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-    });
+    const loadLastLocation = async () => {
+      try {
+        const permission = await Location.getForegroundPermissionsAsync();
+        if (permission.status !== Location.PermissionStatus.GRANTED) return;
+
+        const position = await Location.getLastKnownPositionAsync();
+        if (position) {
+          setCoords({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        }
+      } catch {
+        // Keep the default coordinates when the saved location is unavailable.
+      }
+    };
+
+    void loadLastLocation();
   }, []);
 
   const useMyLocation = async () => {
@@ -160,26 +173,36 @@ export default function CourseGenerateScreen() {
   const isBusy = generateMutation.isPending || saveMutation.isPending;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F2F7F2]" edges={["top"]}>
-      <View className="h-14 flex-row items-center justify-between bg-white px-3">
+    <SafeAreaView
+      className="flex-1 bg-[#F2F7F2] dark:bg-[#111411]"
+      edges={["top"]}
+    >
+      <View className="h-14 flex-row items-center justify-between bg-white px-3 dark:bg-[#1B211D]">
         <Button
           variant="ghost"
           size="icon"
           accessibilityLabel="뒤로 가기"
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={23} color="#203126" />
+          <Ionicons
+            name="arrow-back"
+            size={23}
+            color={isDark ? "#F1F5F2" : "#203126"}
+          />
         </Button>
-        <Text className="text-lg font-black text-[#18271D]">코스 생성</Text>
+        <Text className="text-lg text-[#006E2F] dark:text-[#F1F5F2]">
+          코스 생성
+        </Text>
         <View className="w-10" />
       </View>
 
       <ScrollView contentContainerClassName="gap-3 p-4 pb-24">
-        <View className="overflow-hidden rounded-2xl bg-white">
+        <View className="overflow-hidden rounded-2xl bg-white dark:bg-[#1B211D]">
           <MapView
             ref={mapRef}
             style={styles.map}
             region={mapRegion}
+            userInterfaceStyle={isDark ? "dark" : "light"}
           >
             <Marker coordinate={coords} pinColor="#087A3F" />
             {candidates.map((candidate, index) => (
@@ -193,9 +216,9 @@ export default function CourseGenerateScreen() {
           </MapView>
         </View>
 
-        <View className="rounded-2xl bg-white p-4">
+        <View className="rounded-2xl bg-white p-4 dark:bg-[#1B211D]">
           <View className="flex-row items-center justify-between">
-            <Text className="text-sm font-extrabold text-[#18271D]">
+            <Text className="text-sm font-extrabold text-[#18271D] dark:text-[#F1F5F2]">
               출발 위치
             </Text>
             <Button
@@ -214,24 +237,26 @@ export default function CourseGenerateScreen() {
               </Text>
             </Button>
           </View>
-          <Text className="mt-1 text-xs text-[#6B756D]">
+          <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
             {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
           </Text>
         </View>
 
-        <View className="rounded-2xl bg-white p-4">
-          <Text className="text-sm font-extrabold text-[#18271D]">거리</Text>
+        <View className="rounded-2xl bg-white p-4 dark:bg-[#1B211D]">
+          <Text className="text-sm font-extrabold text-[#18271D] dark:text-[#F1F5F2]">
+            거리
+          </Text>
           <View className="mt-2 flex-row gap-2">
             {DISTANCE_OPTIONS.map((option) => {
               const active = distanceM === option.value;
               return (
                 <Pressable
                   key={option.value}
-                  className={`h-11 flex-1 items-center justify-center rounded-xl border ${active ? "border-[#087A3F] bg-[#E9FBEF]" : "border-slate-200 bg-[#F8FAF8]"}`}
+                  className={`h-11 flex-1 items-center justify-center rounded-xl border ${active ? "border-[#087A3F] bg-[#E9FBEF] dark:bg-[#24382B]" : "border-slate-200 bg-[#F8FAF8] dark:border-[#343D36] dark:bg-[#242B26]"}`}
                   onPress={() => setDistanceM(option.value)}
                 >
                   <Text
-                    className={`text-sm font-bold ${active ? "text-[#087A3F]" : "text-[#526056]"}`}
+                    className={`text-sm font-bold ${active ? "text-[#087A3F] dark:text-[#86EFAC]" : "text-[#526056] dark:text-[#AAB5AD]"}`}
                   >
                     {option.label}
                   </Text>
@@ -241,8 +266,8 @@ export default function CourseGenerateScreen() {
           </View>
         </View>
 
-        <View className="rounded-2xl bg-white p-4">
-          <Text className="text-sm font-extrabold text-[#18271D]">
+        <View className="rounded-2xl bg-white p-4 dark:bg-[#1B211D]">
+          <Text className="text-sm font-extrabold text-[#18271D] dark:text-[#F1F5F2]">
             페르소나
           </Text>
           <View className="mt-2 flex-row flex-wrap gap-2">
@@ -251,12 +276,12 @@ export default function CourseGenerateScreen() {
               return (
                 <Pressable
                   key={option.label}
-                  className={`h-10 rounded-full border px-4 ${active ? "border-[#087A3F] bg-[#E9FBEF]" : "border-slate-200 bg-[#F8FAF8]"}`}
+                  className={`h-10 rounded-full border px-4 ${active ? "border-[#087A3F] bg-[#E9FBEF] dark:bg-[#24382B]" : "border-slate-200 bg-[#F8FAF8] dark:border-[#343D36] dark:bg-[#242B26]"}`}
                   onPress={() => setPersona(option.key)}
                 >
                   <View className="h-full items-center justify-center">
                     <Text
-                      className={`text-xs font-bold ${active ? "text-[#087A3F]" : "text-[#526056]"}`}
+                      className={`text-xs font-bold ${active ? "text-[#087A3F] dark:text-[#86EFAC]" : "text-[#526056] dark:text-[#AAB5AD]"}`}
                     >
                       {option.label}
                     </Text>
@@ -292,7 +317,7 @@ export default function CourseGenerateScreen() {
 
         {candidates.length > 0 && (
           <View className="gap-2">
-            <Text className="mt-1 text-xs font-bold text-[#6B756D]">
+            <Text className="mt-1 text-xs font-bold text-[#6B756D] dark:text-[#AAB5AD]">
               마음에 드는 코스를 선택하고 저장하세요
             </Text>
             {candidates.map((candidate, index) => {
@@ -300,12 +325,11 @@ export default function CourseGenerateScreen() {
               return (
                 <Pressable
                   key={index}
-                  className={`flex-row items-center gap-3 rounded-2xl border-2 bg-white p-4 ${selected ? "" : "border-transparent"}`}
+                  className={`flex-row items-center gap-3 rounded-2xl border-2 bg-white p-4 dark:bg-[#1B211D] ${selected ? "" : "border-transparent"}`}
                   style={
                     selected
                       ? {
-                          borderColor:
-                            CANDIDATE_COLORS[index] ?? "#087A3F",
+                          borderColor: CANDIDATE_COLORS[index] ?? "#087A3F",
                         }
                       : undefined
                   }
@@ -314,8 +338,7 @@ export default function CourseGenerateScreen() {
                   <View
                     className="h-10 w-10 items-center justify-center rounded-full"
                     style={{
-                      backgroundColor:
-                        CANDIDATE_COLORS[index] ?? "#087A3F",
+                      backgroundColor: CANDIDATE_COLORS[index] ?? "#087A3F",
                     }}
                   >
                     <Text className="text-sm font-black text-white">
@@ -323,10 +346,10 @@ export default function CourseGenerateScreen() {
                     </Text>
                   </View>
                   <View className="flex-1">
-                    <Text className="text-sm font-extrabold text-[#18271D]">
+                    <Text className="text-sm font-extrabold text-[#18271D] dark:text-[#F1F5F2]">
                       {(candidate.totalM / 1000).toFixed(2)}km
                     </Text>
-                    <Text className="mt-0.5 text-[11px] text-[#6B756D]">
+                    <Text className="mt-0.5 text-[11px] text-[#6B756D] dark:text-[#AAB5AD]">
                       점수 {Number(candidate.avgScore ?? 0).toFixed(2)} · 오차{" "}
                       {Number(candidate.errorPct ?? 0).toFixed(1)}%
                     </Text>

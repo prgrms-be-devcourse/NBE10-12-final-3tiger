@@ -33,6 +33,11 @@ export const toggleCommentUpvote = (commentId: number) =>
     url: `/api/v1/comments/${commentId}/upvote`,
     method: "POST",
   });
+export const deleteComment = (commentId: number) =>
+  apiRequest<null>({
+    url: `/api/v1/comments/${commentId}`,
+    method: "DELETE",
+  });
 export const likePost = (postId: number) =>
   apiRequest<{ isLiked: boolean; likeCount: number }>({
     url: `/api/v1/posts/${postId}/likes`,
