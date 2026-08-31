@@ -106,6 +106,22 @@ export type Region = {
   courseCount: number;
 };
 
+export type GridOverlay = {
+  gridId: number;
+  regionCode: string;
+  centroidLat: number;
+  centroidLng: number;
+  flatness: number | null;
+  shadeSummer: number | null;
+  shadeWinterSun: number | null;
+  trafficLow: number | null;
+  wheelchair: number | null;
+  surfaceNatural: number | null;
+  benchDensity: number | null;
+  restroomProximity: number | null;
+  waterFacility: number | null;
+};
+
 export type GeoJsonLineString = {
   type?: string;
   coordinates: [number, number][];

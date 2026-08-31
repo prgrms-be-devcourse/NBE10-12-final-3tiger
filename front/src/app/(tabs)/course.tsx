@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Circle, Marker, Polyline } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -22,6 +22,7 @@ import {
   getCourses,
   unbookmarkCourse,
 } from "@/api/course-api";
+import { getGridOverlays } from "@/api/grid-api";
 import { getMyProfile } from "@/api/user-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { Button } from "@/components/ui/button";
@@ -33,9 +34,62 @@ import {
 } from "@/components/ui/bottom-sheet-handle";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
-import type { Course } from "@/types/domain";
+import type { Course, GridOverlay } from "@/types/domain";
 
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
+const COURSE_MAP_VIEW = {
+  latitudeDelta: 0.014,
+  longitudeDelta: 0.012,
+} as const;
+
+type GridLayer = "shade" | "flatness" | "amenity";
+
+const GRID_LAYERS: Array<{
+  key: GridLayer | null;
+  label: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+}> = [
+  { key: null, label: "끄기", icon: "eye-off-outline" },
+  { key: "shade", label: "그늘", icon: "leaf-outline" },
+  { key: "flatness", label: "평탄도", icon: "trail-sign-outline" },
+  { key: "amenity", label: "편의시설", icon: "water-outline" },
+];
+
+const toGridBbox = (center: typeof DEFAULT_COORDS) =>
+  [
+    center.longitude - COURSE_MAP_VIEW.longitudeDelta / 2,
+    center.latitude - COURSE_MAP_VIEW.latitudeDelta / 2,
+    center.longitude + COURSE_MAP_VIEW.longitudeDelta / 2,
+    center.latitude + COURSE_MAP_VIEW.latitudeDelta / 2,
+  ]
+    .map((value) => value.toFixed(6))
+    .join(",");
+
+const average = (values: Array<number | null>) => {
+  const available = values.filter((value): value is number => value !== null);
+  return available.length
+    ? available.reduce((sum, value) => sum + value, 0) / available.length
+    : null;
+};
+
+const getLayerScore = (grid: GridOverlay, layer: GridLayer) => {
+  if (layer === "flatness") return grid.flatness;
+  if (layer === "shade") {
+    const month = new Date().getMonth() + 1;
+    return month >= 6 && month <= 8 ? grid.shadeSummer : grid.shadeWinterSun;
+  }
+  return average([
+    grid.benchDensity,
+    grid.restroomProximity,
+    grid.waterFacility,
+  ]);
+};
+
+const getScoreColor = (score: number) => {
+  if (score >= 0.67) return "rgba(34, 197, 94, 0.38)";
+  if (score >= 0.34) return "rgba(234, 179, 8, 0.34)";
+  return "rgba(249, 115, 22, 0.32)";
+};
 
 const PERSONA_FILTERS: Array<{ key: string | null; label: string }> = [
   { key: null, label: "전체" },
@@ -94,6 +148,7 @@ export default function CourseScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(true);
   const [persona, setPersona] = useState<string | null | undefined>(undefined);
+  const [gridLayer, setGridLayer] = useState<GridLayer | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
   const dismissDetails = () =>
@@ -156,6 +211,13 @@ export default function CourseScreen() {
     enabled: !isAuthenticated || !profileQuery.isPending,
   });
   const courses = coursesQuery.data?.content ?? [];
+  const gridBbox = useMemo(() => toGridBbox(mapCenter), [mapCenter]);
+  const gridsQuery = useQuery({
+    queryKey: ["grid-overlays", gridBbox],
+    queryFn: () => getGridOverlays(gridBbox),
+    enabled: gridLayer !== null,
+    staleTime: 60_000,
+  });
   useEffect(() => {
     setSelectedId(courses[0]?.courseId ?? null);
   }, [courses]);
@@ -267,9 +329,27 @@ export default function CourseScreen() {
       <MapView
         style={StyleSheet.absoluteFill}
         onPress={dismissDetails}
-        region={{ ...mapCenter, latitudeDelta: 0.014, longitudeDelta: 0.012 }}
+        region={{ ...mapCenter, ...COURSE_MAP_VIEW }}
         userInterfaceStyle={isDark ? "dark" : "light"}
       >
+        {gridLayer !== null &&
+          gridsQuery.data?.map((grid) => {
+            const score = getLayerScore(grid, gridLayer);
+            return score == null ? null : (
+              <Circle
+                key={grid.gridId}
+                center={{
+                  latitude: grid.centroidLat,
+                  longitude: grid.centroidLng,
+                }}
+                radius={42}
+                fillColor={getScoreColor(score)}
+                strokeColor={getScoreColor(Math.min(1, score + 0.12))}
+                strokeWidth={1}
+                zIndex={1}
+              />
+            );
+          })}
         {route.length > 1 && (
           <Polyline coordinates={route} strokeColor="#087A3F" strokeWidth={7} />
         )}
@@ -335,6 +415,71 @@ export default function CourseScreen() {
               </Pressable>
             );
           })}
+        </ScrollView>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerClassName="items-center gap-2 pt-2"
+        >
+          <View className="h-9 flex-row items-center gap-1 rounded-full bg-white px-3 dark:bg-[#1B211D]">
+            <Ionicons name="layers-outline" size={15} color="#087A3F" />
+            <Text className="text-xs font-extrabold text-[#24372A] dark:text-[#D4DDD6]">
+              환경
+            </Text>
+          </View>
+          {GRID_LAYERS.map((layer) => {
+            const active = gridLayer === layer.key;
+            return (
+              <Button
+                key={layer.label}
+                variant="secondary"
+                size="sm"
+                accessibilityLabel={`${layer.label} 환경 레이어`}
+                accessibilityState={{ selected: active }}
+                className={`h-9 rounded-full px-3 ${active ? "bg-[#087A3F]" : "bg-white dark:bg-[#1B211D]"}`}
+                onPress={() => setGridLayer(layer.key)}
+              >
+                <Ionicons
+                  name={layer.icon}
+                  size={15}
+                  color={active ? "white" : "#087A3F"}
+                />
+                <Text
+                  className={`text-xs font-extrabold ${active ? "text-white" : "text-[#24372A] dark:text-[#D4DDD6]"}`}
+                >
+                  {layer.label}
+                </Text>
+              </Button>
+            );
+          })}
+          {gridLayer !== null && gridsQuery.isFetching && (
+            <ActivityIndicator size="small" color="#087A3F" />
+          )}
+          {gridLayer !== null && gridsQuery.isError && (
+            <Text className="text-xs font-bold text-[#B91C1C] dark:text-[#FCA5A5]">
+              환경 정보를 불러오지 못했어요
+            </Text>
+          )}
+          {gridLayer !== null &&
+            !gridsQuery.isFetching &&
+            !gridsQuery.isError &&
+            gridsQuery.data?.length === 0 && (
+              <Text className="text-xs font-bold text-[#6B756D] dark:text-[#AAB5AD]">
+                이 지역에는 환경 데이터가 없어요
+              </Text>
+            )}
+          {gridLayer !== null && (gridsQuery.data?.length ?? 0) > 0 && (
+            <View className="h-9 flex-row items-center gap-1.5 rounded-full bg-white px-3 dark:bg-[#1B211D]">
+              <View className="h-2.5 w-2.5 rounded-full bg-orange-500/70" />
+              <Text className="text-[10px] font-bold text-[#6B756D] dark:text-[#AAB5AD]">
+                낮음
+              </Text>
+              <View className="h-2.5 w-2.5 rounded-full bg-green-500/70" />
+              <Text className="text-[10px] font-bold text-[#6B756D] dark:text-[#AAB5AD]">
+                높음
+              </Text>
+            </View>
+          )}
         </ScrollView>
         <ScrollView
           horizontal
