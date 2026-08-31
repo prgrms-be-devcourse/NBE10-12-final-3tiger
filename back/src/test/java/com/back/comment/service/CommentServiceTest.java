@@ -131,7 +131,7 @@ class CommentServiceTest {
                 .willReturn(new PageImpl<>(List.of(comment)));
 
         // when
-        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, null, PageRequest.of(0, 20));
+        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, PageRequest.of(0, 20));
 
         // then
         assertThat(response.content()).hasSize(1);
@@ -141,7 +141,6 @@ class CommentServiceTest {
         assertThat(item.nickname()).isEqualTo("산책러");
         assertThat(item.content()).isEqualTo("좋은 코스네요");
         assertThat(item.upvoteCount()).isEqualTo(0);
-        assertThat(item.isUpvoted()).isFalse();
         assertThat(item.createdAt()).isEqualTo(comment.getCreatedAt());
     }
 
@@ -153,7 +152,7 @@ class CommentServiceTest {
         given(postRepository.findById(postId)).willReturn(Optional.empty());
 
         // when
-        ApiException exception = catchThrowableOfType(() -> commentService.getComments(postId, null, PageRequest.of(0, 20)), ApiException.class);
+        ApiException exception = catchThrowableOfType(() -> commentService.getComments(postId, PageRequest.of(0, 20)), ApiException.class);
 
         // then
         assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -344,55 +343,4 @@ class CommentServiceTest {
         verify(commentRepository, never()).decreaseUpvote(any());
     }
 
-    @Test
-    @DisplayName("t13: 로그인 사용자의 댓글 목록 조회 시 공감한 댓글은 isUpvoted=true, 안 한 댓글은 false")
-    void t13() {
-        // given
-        Long postId = 1L;
-        Long userId = 7L;
-        Post post = newPost();
-        User author = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
-        Comment upvoted = new Comment(post, author, "내가 공감한 댓글");
-        ReflectionTestUtils.setField(upvoted, "id", 10L);
-        Comment notUpvoted = new Comment(post, author, "공감 안 한 댓글");
-        ReflectionTestUtils.setField(notUpvoted, "id", 20L);
-        given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findByPost_IdOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
-                .willReturn(new PageImpl<>(List.of(upvoted, notUpvoted)));
-        given(commentUpvoteRepository.findUpvotedCommentIds(userId, List.of(10L, 20L)))
-                .willReturn(List.of(10L));
-
-        // when
-        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, userId, PageRequest.of(0, 20));
-
-        // then
-        assertThat(response.content()).hasSize(2);
-        assertThat(response.content().get(0).commentId()).isEqualTo(10L);
-        assertThat(response.content().get(0).isUpvoted()).isTrue();
-        assertThat(response.content().get(1).commentId()).isEqualTo(20L);
-        assertThat(response.content().get(1).isUpvoted()).isFalse();
-    }
-
-    @Test
-    @DisplayName("t14: 비로그인(userId=null) 댓글 목록 조회 시 모든 댓글 isUpvoted=false이고 공감 조회를 하지 않는다")
-    void t14() {
-        // given
-        Long postId = 1L;
-        Post post = newPost();
-        User author = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
-        Comment c1 = new Comment(post, author, "댓글1");
-        ReflectionTestUtils.setField(c1, "id", 10L);
-        Comment c2 = new Comment(post, author, "댓글2");
-        ReflectionTestUtils.setField(c2, "id", 20L);
-        given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findByPost_IdOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
-                .willReturn(new PageImpl<>(List.of(c1, c2)));
-
-        // when
-        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, null, PageRequest.of(0, 20));
-
-        // then
-        assertThat(response.content()).allMatch(item -> !item.isUpvoted());
-        verify(commentUpvoteRepository, never()).findUpvotedCommentIds(any(), any());
-    }
 }

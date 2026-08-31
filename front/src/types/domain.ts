@@ -94,7 +94,7 @@ export type PostComment = {
   content: string;
   upvoteCount: number;
   /** 현재 로그인한 사용자가 공감했는지 여부 */
-  isUpvoted: boolean;
+  upvoted?: boolean;
   createdAt: string;
 };
 

@@ -56,7 +56,7 @@ function CommentRow({
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDark = useThemeStore((state) => state.isDark);
-  const [upvoted, setUpvoted] = useState(item.isUpvoted);
+  const [upvoted, setUpvoted] = useState(item.upvoted ?? false);
   const [upvoteCount, setUpvoteCount] = useState(item.upvoteCount);
   const [profileImageReady, setProfileImageReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -64,9 +64,9 @@ function CommentRow({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const commentRef = useRef<View>(null);
   useEffect(() => {
-    setUpvoted(item.isUpvoted);
+    setUpvoted(item.upvoted ?? false);
     setUpvoteCount(item.upvoteCount);
-  }, [item.isUpvoted, item.upvoteCount]);
+  }, [item.upvoted, item.upvoteCount]);
   useEffect(() => {
     setProfileImageReady(false);
   }, [item.profileImageUrl]);
@@ -92,7 +92,7 @@ function CommentRow({
               comment.commentId === item.commentId
                 ? {
                     ...comment,
-                    isUpvoted: result.upvoted,
+                    upvoted: result.upvoted,
                     upvoteCount: result.upvoteCount,
                   }
                 : comment,

@@ -16,10 +16,9 @@ public class CommentController {
     public CommentController(CommentService service) { this.service = service; }
 
     @GetMapping("/posts/{postId}/comments")
-    ApiResponse<PageResponse<CommentService.CommentResponse>> comments(@CurrentUserId(required = false) Long userId,
-            @PathVariable Long postId,
+    ApiResponse<PageResponse<CommentService.CommentResponse>> comments(@PathVariable Long postId,
             @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("댓글 목록 조회 성공", service.getComments(postId, userId, PageRequest.of(page, size)));
+        return ApiResponse.ok("댓글 목록 조회 성공", service.getComments(postId, PageRequest.of(page, size)));
     }
     @PostMapping("/posts/{postId}/comments")
     ApiResponse<Long> create(@CurrentUserId Long userId, @PathVariable Long postId, @Valid @RequestBody CreateRequest request) {
