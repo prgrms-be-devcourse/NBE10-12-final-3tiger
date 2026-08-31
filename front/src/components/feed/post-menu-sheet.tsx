@@ -98,7 +98,7 @@ export function PostMenuSheet({
           />
           <Animated.View
             accessibilityRole="menu"
-            className="rounded-t-[30px] bg-[#FCFDFC] pt-2.5"
+            className="rounded-t-[30px] bg-[#FCFDFC] pt-2.5 dark:bg-[#171C18]"
             style={{
               height: sheetHeight,
               paddingBottom: bottomPadding,
@@ -111,7 +111,7 @@ export function PostMenuSheet({
               dismissDistance={windowHeight}
             />
             <View className="h-10 items-center justify-center px-5">
-              <Text className="text-[17px] font-black text-[#191C1D]">
+              <Text className="text-[17px] font-black text-[#191C1D] dark:text-[#F1F5F2]">
                 게시물 메뉴
               </Text>
             </View>
@@ -134,7 +134,7 @@ export function PostMenuSheet({
               onPress={() => dismiss()}
             >
               <Ionicons name="flag-outline" size={20} color="#33443A" />
-              <Text className="text-[15px] font-semibold text-[#33443A]">
+              <Text className="text-[15px] font-semibold text-[#33443A] dark:text-[#D4DDD6]">
                 신고
               </Text>
             </Button>
@@ -151,14 +151,14 @@ export function PostMenuSheet({
         }}
       >
         <View className="flex-1 items-center justify-center bg-black/40 px-6">
-          <View className="w-full max-w-[360px] rounded-2xl bg-white p-5 shadow-lg">
+          <View className="w-full max-w-[360px] rounded-2xl bg-white p-5 shadow-lg dark:bg-[#1B211D]">
             <View className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-[#FEECEC]">
               <Ionicons name="trash-outline" size={22} color="#DC2626" />
             </View>
-            <Text className="text-lg font-extrabold text-[#17251B]">
+            <Text className="text-lg font-extrabold text-[#17251B] dark:text-[#F1F5F2]">
               게시물을 삭제할까요?
             </Text>
-            <Text className="mt-2 text-sm leading-5 text-[#667168]">
+            <Text className="mt-2 text-sm leading-5 text-[#667168] dark:text-[#AAB5AD]">
               삭제한 게시물은 다시 복구할 수 없습니다.
             </Text>
             {deleteMutation.isError && (
@@ -169,11 +169,13 @@ export function PostMenuSheet({
             <View className="mt-6 flex-row gap-2.5">
               <Button
                 variant="secondary"
-                className="h-12 flex-1 rounded-xl bg-[#EEF2EF]"
+                className="h-12 flex-1 rounded-xl bg-[#EEF2EF] dark:bg-[#2A312C]"
                 disabled={deleteMutation.isPending}
                 onPress={() => setDeleteConfirmOpen(false)}
               >
-                <Text className="font-bold text-[#33443A]">취소</Text>
+                <Text className="font-bold text-[#33443A] dark:text-[#D4DDD6]">
+                  취소
+                </Text>
               </Button>
               <Button
                 variant="destructive"

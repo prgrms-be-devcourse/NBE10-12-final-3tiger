@@ -15,8 +15,10 @@ import { Button } from "@/components/ui/button";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
+import { useThemeStore } from "@/stores/theme-store";
 
 export default function SettingsScreen() {
+  const isDark = useThemeStore((state) => state.isDark);
   const queryClient = useQueryClient();
   const [image, setImage] = useState<string | null>(null);
   const [imageAsset, setImageAsset] =
@@ -79,15 +81,19 @@ export default function SettingsScreen() {
       </SafeAreaView>
     );
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="h-[58px] flex-row items-center justify-between bg-white px-5">
+    <SafeAreaView className="flex-1 bg-white dark:bg-[#111411]">
+      <View className="h-[58px] flex-row items-center justify-between bg-white px-5 dark:bg-[#1B211D]">
         <Button
           variant="ghost"
           size="icon"
           accessibilityLabel="뒤로 가기"
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={24} color="#33443A" />
+          <Ionicons
+            name="arrow-back"
+            size={24}
+            color={isDark ? "#F1F5F2" : "#33443A"}
+          />
         </Button>
         <Text className="text-2xl font-black text-[#006E2F]">설정</Text>
         <View className="w-11" />
@@ -113,13 +119,13 @@ export default function SettingsScreen() {
         <Button variant="link" onPress={() => void pick()}>
           <Text className="font-extrabold text-[#006E2F]">이미지 변경</Text>
         </Button>
-        <Text className="mb-2 mt-3.5 text-sm font-extrabold text-slate-900">
+        <Text className="mb-2 mt-3.5 text-sm font-extrabold text-slate-900 dark:text-[#F1F5F2]">
           이름
         </Text>
         <TextInput
           value={name}
           onChangeText={setName}
-          className="h-14 rounded-xl border border-[#BCCBB9] px-[15px] text-[15px]"
+          className="h-14 rounded-xl border border-[#BCCBB9] px-[15px] text-[15px] text-[#191C1D] dark:border-[#475249] dark:bg-[#1B211D] dark:text-[#F1F5F2]"
         />
         {saveMutation.isError && (
           <Text className="mt-3 text-sm text-destructive">

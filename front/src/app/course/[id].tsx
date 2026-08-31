@@ -9,8 +9,10 @@ import { getCourseDetail } from "@/api/course-api";
 import { Button } from "@/components/ui/button";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
+import { useThemeStore } from "@/stores/theme-store";
 
 export default function CourseDetailScreen() {
+  const isDark = useThemeStore((state) => state.isDark);
   const { id } = useLocalSearchParams<{ id: string }>();
   const courseId = Number(id);
   const detailQuery = useQuery({
@@ -41,39 +43,48 @@ export default function CourseDetailScreen() {
     );
   const detail = detailQuery.data;
   return (
-    <SafeAreaView className="flex-1 bg-[#F4F8F4]" edges={["top"]}>
-      <View className="h-14 flex-row items-center justify-between bg-white px-5">
+    <SafeAreaView
+      className="flex-1 bg-[#F4F8F4] dark:bg-[#111411]"
+      edges={["top"]}
+    >
+      <View className="h-14 flex-row items-center justify-between bg-white px-5 dark:bg-[#1B211D]">
         <Button
           variant="ghost"
           size="icon"
           accessibilityLabel="뒤로 가기"
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={23} color="#203126" />
+          <Ionicons
+            name="arrow-back"
+            size={23}
+            color={isDark ? "#F1F5F2" : "#203126"}
+          />
         </Button>
         <Text className="text-xl font-black text-[#087A3F]">코스 상세</Text>
         <View className="w-10" />
       </View>
       <ScrollView contentContainerClassName="p-5 pb-10">
-        <View className="rounded-3xl bg-white p-5">
+        <View className="rounded-3xl bg-white p-5 dark:bg-[#1B211D]">
           <Text className="text-[11px] font-black text-[#087A3F]">
             추천 산책 코스
           </Text>
-          <Text className="mt-2 text-2xl font-black text-[#18271D]">
+          <Text className="mt-2 text-2xl font-black text-[#18271D] dark:text-[#F1F5F2]">
             {detail.name}
           </Text>
-          <Text className="mt-2 text-sm leading-6 text-[#6B756D]">
+          <Text className="mt-2 text-sm leading-6 text-[#6B756D] dark:text-[#AAB5AD]">
             {detail.summary ??
               detail.personaBadges?.join(" · ") ??
               "코스 환경과 상세 점수를 확인해 보세요."}
           </Text>
-          <View className="mt-5 flex-row rounded-2xl bg-[#E9FBEF] py-4">
+          <View className="mt-5 flex-row rounded-2xl bg-[#E9FBEF] py-4 dark:bg-[#24382B]">
             {stats.map(([value, label]) => (
               <View key={label} className="flex-1 items-center">
                 <Text className="text-base font-black text-[#087A3F]">
                   {value}
                 </Text>
-                <Text className="mt-1 text-xs text-[#5F6B62]">{label}</Text>
+                <Text className="mt-1 text-xs text-[#5F6B62] dark:text-[#AAB5AD]">
+                  {label}
+                </Text>
               </View>
             ))}
           </View>
@@ -82,7 +93,7 @@ export default function CourseDetailScreen() {
               {detail.personaBadges.map((badge) => (
                 <View
                   key={badge}
-                  className="rounded-full bg-[#E9FBEF] px-3 py-2"
+                  className="rounded-full bg-[#E9FBEF] px-3 py-2 dark:bg-[#24382B]"
                 >
                   <Text className="text-xs font-bold text-[#087A3F]">
                     {badge}

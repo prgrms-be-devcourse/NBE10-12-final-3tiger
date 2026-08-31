@@ -31,6 +31,7 @@ import {
   dismissBottomSheet,
 } from "@/components/ui/bottom-sheet-handle";
 import { useAuthStore } from "@/stores/auth-store";
+import { useThemeStore } from "@/stores/theme-store";
 import type { Course } from "@/types/domain";
 
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
@@ -85,6 +86,7 @@ export default function CourseScreen() {
   }, [lat, lng, regionCode]);
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isDark = useThemeStore((state) => state.isDark);
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const [coords, setCoords] = useState(serviceCoords ?? DEFAULT_COORDS);
   const [mapCenter, setMapCenter] = useState(serviceCoords ?? DEFAULT_COORDS);
@@ -223,21 +225,25 @@ export default function CourseScreen() {
 
   if (coursesQuery.isError)
     return (
-      <SafeAreaView className="flex-1 bg-[#F2F7F2]" edges={["top"]}>
+      <SafeAreaView
+        className="flex-1 bg-[#F2F7F2] dark:bg-[#111411]"
+        edges={["top"]}
+      >
         <ErrorState
           message={coursesQuery.error.message}
           onRetry={() => void coursesQuery.refetch()}
           appearance="light"
-          className="bg-[#F2F7F2]"
+          className="bg-[#F2F7F2] dark:bg-[#111411]"
         />
       </SafeAreaView>
     );
   return (
-    <View className="flex-1 bg-[#E8F0E5]">
+    <View className="flex-1 bg-[#E8F0E5] dark:bg-[#111411]">
       <MapView
         style={StyleSheet.absoluteFill}
         onPress={dismissDetails}
         region={{ ...mapCenter, latitudeDelta: 0.014, longitudeDelta: 0.012 }}
+        userInterfaceStyle={isDark ? "dark" : "light"}
       >
         {route.length > 1 && (
           <Polyline coordinates={route} strokeColor="#087A3F" strokeWidth={7} />
@@ -269,12 +275,16 @@ export default function CourseScreen() {
             variant="secondary"
             size="icon"
             accessibilityLabel="뒤로 가기"
-            className="h-12 w-12 rounded-[17px] bg-white"
+            className="h-12 w-12 rounded-[17px] bg-white dark:bg-[#1B211D]"
             onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={23} color="#203126" />
+            <Ionicons
+              name="arrow-back"
+              size={23}
+              color={isDark ? "#F1F5F2" : "#203126"}
+            />
           </Button>
-          <Text className="rounded-2xl bg-white px-[18px] py-[13px] text-lg font-black text-[#1A2B20]">
+          <Text className="rounded-2xl bg-white px-[18px] py-[13px] text-lg font-black text-[#1A2B20] dark:bg-[#1B211D] dark:text-[#F1F5F2]">
             {regionName ? `${regionName} 추천 코스` : "추천 코스"}
           </Text>
           <View className="h-12 w-12" />
@@ -289,11 +299,11 @@ export default function CourseScreen() {
             return (
               <Pressable
                 key={filter.label}
-                className={`h-9 justify-center rounded-full px-3 ${active ? "bg-[#087A3F]" : "bg-white"}`}
+                className={`h-9 justify-center rounded-full px-3 ${active ? "bg-[#087A3F]" : "bg-white dark:bg-[#1B211D]"}`}
                 onPress={() => setPersona(filter.key)}
               >
                 <Text
-                  className={`text-xs font-extrabold ${active ? "text-white" : "text-[#536158]"}`}
+                  className={`text-xs font-extrabold ${active ? "text-white" : "text-[#536158] dark:text-[#AAB5AD]"}`}
                 >
                   {filter.label}
                 </Text>
@@ -309,11 +319,11 @@ export default function CourseScreen() {
           {courses.map((course) => (
             <Pressable
               key={course.courseId}
-              className={`h-10 justify-center rounded-full px-[15px] ${course.courseId === selectedId ? "bg-[#087A3F]" : "bg-white"}`}
+              className={`h-10 justify-center rounded-full px-[15px] ${course.courseId === selectedId ? "bg-[#087A3F]" : "bg-white dark:bg-[#1B211D]"}`}
               onPress={() => selectCourse(course)}
             >
               <Text
-                className={`text-[13px] font-extrabold ${course.courseId === selectedId ? "text-white" : "text-[#536158]"}`}
+                className={`text-[13px] font-extrabold ${course.courseId === selectedId ? "text-white" : "text-[#536158] dark:text-[#AAB5AD]"}`}
               >
                 {course.name}
               </Text>
@@ -323,7 +333,7 @@ export default function CourseScreen() {
       </SafeAreaView>
       {showDetails && (
         <Animated.View
-          className="absolute inset-x-0 bottom-0 h-[36%] rounded-t-[30px] bg-white px-5 pb-[22px] pt-2.5 shadow-2xl"
+          className="absolute inset-x-0 bottom-0 h-[36%] rounded-t-[30px] bg-white px-5 pb-[22px] pt-2.5 shadow-2xl dark:bg-[#1B211D]"
           style={{ transform: [{ translateY: sheetTranslateY }] }}
         >
           <BottomSheetHandle
@@ -346,7 +356,7 @@ export default function CourseScreen() {
                     <Text className="text-[11px] font-black text-[#087A3F]">
                       현재 위치 추천 코스
                     </Text>
-                    <Text className="mt-1 text-[22px] font-black text-[#18271D]">
+                    <Text className="mt-1 text-[22px] font-black text-[#18271D] dark:text-[#F1F5F2]">
                       {detail.name}
                     </Text>
                   </View>
@@ -377,7 +387,7 @@ export default function CourseScreen() {
                     />
                   </Button>
                 </View>
-                <Text className="mt-1.5 text-[13px] text-[#78837B]">
+                <Text className="mt-1.5 text-[13px] text-[#78837B] dark:text-[#AAB5AD]">
                   {(detail.distanceM / 1000).toFixed(1)}km · 약{" "}
                   {detail.estimatedMinutes ?? "-"}분{" "}
                   {detail.isLoop ? "· 순환 코스" : ""}
@@ -390,7 +400,7 @@ export default function CourseScreen() {
                     {bookmarkError}
                   </Text>
                 )}
-                <View className="mt-[15px] flex-row rounded-[18px] bg-[#F2F8F2] py-3">
+                <View className="mt-[15px] flex-row rounded-[18px] bg-[#F2F8F2] py-3 dark:bg-[#242B26]">
                   {[
                     [
                       `${Math.round((detail.scores?.shadeSummer ?? 0) * 100)}%`,
@@ -400,10 +410,10 @@ export default function CourseScreen() {
                     [detail.scores?.surfaceType ?? "-", "노면"],
                   ].map(([value, label]) => (
                     <View key={label} className="flex-1 items-center">
-                      <Text className="text-sm font-black text-[#25352B]">
+                      <Text className="text-sm font-black text-[#25352B] dark:text-[#F1F5F2]">
                         {value}
                       </Text>
-                      <Text className="mt-0.5 text-[10px] text-slate-500">
+                      <Text className="mt-0.5 text-[10px] text-slate-500 dark:text-[#AAB5AD]">
                         {label}
                       </Text>
                     </View>

@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
+import { useThemeStore } from "@/stores/theme-store";
 import {
   BottomSheetHandle,
   dismissBottomSheet,
@@ -40,6 +41,7 @@ const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1000";
 
 export default function ProfileBookmarkScreen() {
+  const isDark = useThemeStore((state) => state.isDark);
   const queryClient = useQueryClient();
   const pathname = usePathname();
   const isTabRoot = pathname === "/bookmark";
@@ -138,9 +140,9 @@ export default function ProfileBookmarkScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-white dark:bg-[#111411]" edges={["top"]}>
       {!isTabRoot && (
-        <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5">
+        <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-5 dark:border-[#343D36] dark:bg-[#1B211D]">
           <Button
             variant="ghost"
             size="icon"
@@ -148,9 +150,15 @@ export default function ProfileBookmarkScreen() {
             className="h-11 w-11"
             onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={24} color="#191C1D" />
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={isDark ? "#F1F5F2" : "#191C1D"}
+            />
           </Button>
-          <Text className="text-lg text-[#006E2F]">저장한 코스</Text>
+          <Text className="text-lg text-[#006E2F] dark:text-[#F1F5F2]">
+            저장한 코스
+          </Text>
           <View className="w-11" />
         </View>
       )}
@@ -169,7 +177,7 @@ export default function ProfileBookmarkScreen() {
           keyExtractor={(item) => String(item.courseId)}
           contentContainerClassName="grow gap-6 p-5 pb-[30px]"
           ListHeaderComponent={
-            <Text className="mb-0.5 text-sm text-slate-600">
+            <Text className="mb-0.5 text-sm text-slate-600 dark:text-[#AAB5AD]">
               총 {bookmarksQuery.data?.pages[0]?.totalElements ?? 0}개의 코스
             </Text>
           }
@@ -219,7 +227,7 @@ export default function ProfileBookmarkScreen() {
             onPress={dismissSheet}
           />
           <Animated.View
-            className="h-[66%] rounded-t-[28px] bg-white pt-2.5"
+            className="h-[66%] rounded-t-[28px] bg-white pt-2.5 dark:bg-[#1B211D]"
             style={{ transform: [{ translateY: sheetTranslateY }] }}
           >
             <BottomSheetHandle
@@ -250,7 +258,7 @@ export default function ProfileBookmarkScreen() {
                     <Text className="text-[11px] font-extrabold text-[#006E2F]">
                       저장한 코스 상세
                     </Text>
-                    <Text className="mt-1 text-[22px] font-black text-[#191C1D]">
+                    <Text className="mt-1 text-[22px] font-black text-[#191C1D] dark:text-[#F1F5F2]">
                       {selected.name}
                     </Text>
                   </View>
@@ -261,15 +269,15 @@ export default function ProfileBookmarkScreen() {
                     size={18}
                     color="#006E2F"
                   />
-                  <Text className="font-semibold text-black">
+                  <Text className="font-semibold text-black dark:text-white">
                     {(selected.distanceM / 1000).toFixed(1)}km
                   </Text>
                   <Ionicons name="timer-outline" size={18} color="#006E2F" />
-                  <Text className="font-semibold text-black">
+                  <Text className="font-semibold text-black dark:text-white">
                     {selected.estimatedMinutes ?? "-"}분
                   </Text>
                 </View>
-                <Text className="mt-[13px] text-sm leading-[21px] text-slate-600">
+                <Text className="mt-[13px] text-sm leading-[21px] text-slate-600 dark:text-[#AAB5AD]">
                   {selected.summary ??
                     selected.personaBadges?.join(" · ") ??
                     "코스 상세 정보를 확인해 보세요."}
@@ -316,7 +324,7 @@ function CourseCard({
           variant="ghost"
           size="icon"
           accessibilityLabel="북마크 취소"
-          className="absolute right-[9px] top-[9px] h-[34px] w-[34px] rounded-full bg-white/85"
+          className="absolute right-[9px] top-[9px] h-[34px] w-[34px] rounded-full bg-white/85 dark:bg-[#1B211D]/90"
           disabled={bookmarkPending}
           onPress={(event) => {
             event.stopPropagation();
@@ -327,7 +335,7 @@ function CourseCard({
         </Button>
       </View>
       <View className="mt-3 flex-row items-center gap-2 px-1">
-        <Text className="flex-1 text-[17px] font-bold text-[#191C1D]">
+        <Text className="flex-1 text-[17px] font-bold text-[#191C1D] dark:text-[#F1F5F2]">
           {item.name}
         </Text>
         {item.personaBadges?.[0] && (
@@ -340,11 +348,11 @@ function CourseCard({
       </View>
       <View className="mt-2 flex-row items-center gap-1 px-1">
         <Ionicons name="git-branch-outline" size={17} color="#475569" />
-        <Text className="mr-[9px] text-[13px] text-slate-600">
+        <Text className="mr-[9px] text-[13px] text-slate-600 dark:text-[#AAB5AD]">
           {(item.distanceM / 1000).toFixed(1)}km
         </Text>
         <Ionicons name="timer-outline" size={17} color="#475569" />
-        <Text className="text-[13px] text-slate-600">
+        <Text className="text-[13px] text-slate-600 dark:text-[#AAB5AD]">
           {item.estimatedMinutes ??
             Math.max(1, Math.round(item.distanceM / 80))}
           분

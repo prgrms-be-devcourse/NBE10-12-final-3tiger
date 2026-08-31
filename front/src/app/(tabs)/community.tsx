@@ -198,7 +198,7 @@ function FeedPost({
   });
 
   return (
-    <View className="w-full bg-white">
+    <View className="w-full bg-white dark:bg-[#1B211D]">
       <View className="min-h-[52px] flex-row items-center gap-2 px-3 py-2">
         <Avatar
           alt={`${item.nickname ?? "사용자"} 프로필`}
@@ -214,10 +214,10 @@ function FeedPost({
           <AvatarFallback className="bg-[#E9F5EC]" />
         </Avatar>
         <View className="flex-1">
-          <Text className="text-[13px] font-semibold leading-4 text-[#191C1D]">
+          <Text className="text-[13px] font-semibold leading-4 text-[#191C1D] dark:text-[#F1F5F2]">
             {item.nickname ?? "산책러"}
           </Text>
-          <Text className="text-[10px] text-[#6B756D]">
+          <Text className="text-[10px] text-[#6B756D] dark:text-[#AAB5AD]">
             {formatTime(item.walkedAt)}
           </Text>
         </View>
@@ -281,10 +281,10 @@ function FeedPost({
         </Text>
         <View className="flex-row items-end">
           <Text
-            className="flex-1 text-[13px] leading-5 text-[#252A26]"
+            className="flex-1 text-[13px] leading-5 text-[#252A26] dark:text-[#D4DDD6]"
             numberOfLines={expanded ? undefined : 2}
           >
-            <Text className="text-[13px] font-bold leading-5 text-[#191C1D]">
+            <Text className="text-[13px] font-bold leading-5 text-[#191C1D] dark:text-[#F1F5F2]">
               {item.nickname ?? "산책러"}{" "}
             </Text>
             {item.content}
@@ -296,11 +296,13 @@ function FeedPost({
               className="ml-1 h-5 px-0"
               onPress={() => setExpanded(true)}
             >
-              <Text className="text-[11px] text-slate-500">더 보기</Text>
+              <Text className="text-[11px] text-slate-500 dark:text-[#AAB5AD]">
+                더 보기
+              </Text>
             </Button>
           )}
         </View>
-        <Text className="mt-1 text-[10px] text-[#758078]">
+        <Text className="mt-1 text-[10px] text-[#758078] dark:text-[#AAB5AD]">
           댓글 {item.commentCount ?? 0}개 모두 보기
         </Text>
       </View>
@@ -367,15 +369,20 @@ export default function CommunityScreen() {
   }, [notificationId, openComments, postId, posts]);
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-      <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-3">
+    <SafeAreaView className="flex-1 bg-white dark:bg-[#111411]" edges={["top"]}>
+      <View className="h-14 flex-row items-center justify-between border-b border-[#EEF1EE] bg-white px-3 dark:border-[#343D36] dark:bg-[#1B211D]">
         <View
           pointerEvents="none"
           className="absolute inset-x-0 h-14 items-center justify-center"
         >
           <Image
             source={require("../../../assets/title.png")}
-            className="h-[35px] w-[132px]"
+            className="h-[35px] w-[132px] dark:hidden"
+            resizeMode="contain"
+          />
+          <Image
+            source={require("../../../assets/title-gray.png")}
+            className="hidden h-[35px] w-[132px] dark:flex"
             resizeMode="contain"
           />
         </View>
@@ -411,9 +418,9 @@ export default function CommunityScreen() {
         </View>
       </View>
       {postsQuery.isPending ? (
-        <View className="flex-1 items-center justify-center gap-3 bg-white px-6 py-12">
+        <View className="flex-1 items-center justify-center gap-3 bg-white px-6 py-12 dark:bg-[#111411]">
           <ActivityIndicator color="#087A3F" />
-          <Text className="text-sm text-slate-500">
+          <Text className="text-sm text-slate-500 dark:text-[#AAB5AD]">
             피드를 불러오는 중이에요
           </Text>
         </View>
@@ -422,7 +429,7 @@ export default function CommunityScreen() {
           message={postsQuery.error.message}
           onRetry={() => void postsQuery.refetch()}
           appearance="light"
-          className="bg-white"
+          className="bg-white dark:bg-[#111411]"
         />
       ) : (
         <FlatList

@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useRef } from "react";
 import { Animated, Easing, View } from "react-native";
+import { useThemeStore } from "@/stores/theme-store";
 
 export const LIKED_COLOR = "#22C55E";
-const IDLE_COLOR = "#526056";
 
 type PostActionsProps = {
   liked: boolean;
@@ -26,6 +26,8 @@ export function PostActions({
   bookmarked,
   onToggleBookmark,
 }: PostActionsProps) {
+  const isDark = useThemeStore((state) => state.isDark);
+  const idleColor = isDark ? "#AAB5AD" : "#526056";
   const heartScale = useRef(new Animated.Value(1)).current;
   const burstProgress = useRef(new Animated.Value(0)).current;
 
@@ -118,12 +120,12 @@ export function PostActions({
               <Ionicons
                 name={liked ? "heart" : "heart-outline"}
                 size={21}
-                color={liked ? LIKED_COLOR : IDLE_COLOR}
+                color={liked ? LIKED_COLOR : idleColor}
               />
             </Animated.View>
           </View>
           <Text
-            className={`text-xs font-semibold ${liked ? "text-[#22C55E]" : "text-[#526056]"}`}
+            className={`text-xs font-semibold ${liked ? "text-[#22C55E]" : "text-[#526056] dark:text-[#AAB5AD]"}`}
           >
             {likeCount}
           </Text>
@@ -134,8 +136,8 @@ export function PostActions({
           className="h-10 flex-row gap-1 rounded-full px-1 active:bg-[#F1F4F1]"
           onPress={onOpenComments}
         >
-          <Ionicons name="chatbubble-outline" size={20} color={IDLE_COLOR} />
-          <Text className="text-xs font-semibold text-[#526056]">
+          <Ionicons name="chatbubble-outline" size={20} color={idleColor} />
+          <Text className="text-xs font-semibold text-[#526056] dark:text-[#AAB5AD]">
             {commentCount}
           </Text>
         </Button>
@@ -151,7 +153,7 @@ export function PostActions({
           <Ionicons
             name={bookmarked ? "bookmark" : "bookmark-outline"}
             size={21}
-            color={bookmarked ? "#087A3F" : IDLE_COLOR}
+            color={bookmarked ? "#087A3F" : idleColor}
           />
         </Button>
       )}

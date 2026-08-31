@@ -22,6 +22,7 @@ import { Text } from "@/components/ui/text";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { useThemeStore } from "@/stores/theme-store";
 import type { NotificationItem } from "@/types/notification";
 
 const notificationCopy = {
@@ -59,6 +60,7 @@ function formatNotificationTime(value: string) {
 }
 
 export default function NotificationsScreen() {
+  const isDark = useThemeStore((state) => state.isDark);
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   useEffect(() => {
@@ -150,8 +152,11 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F6F9F6]" edges={["top"]}>
-      <View className="h-14 flex-row items-center border-b border-[#E5EBE5] bg-white px-3">
+    <SafeAreaView
+      className="flex-1 bg-[#F6F9F6] dark:bg-[#111411]"
+      edges={["top"]}
+    >
+      <View className="h-14 flex-row items-center border-b border-[#E5EBE5] bg-white px-3 dark:border-[#343D36] dark:bg-[#1B211D]">
         <Button
           variant="ghost"
           size="icon"
@@ -159,9 +164,13 @@ export default function NotificationsScreen() {
           className="h-11 w-11 rounded-full"
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={23} color="#191C1D" />
+          <Ionicons
+            name="arrow-back"
+            size={23}
+            color={isDark ? "#F1F5F2" : "#191C1D"}
+          />
         </Button>
-        <Text className="flex-1 text-center text-lg font-extrabold text-[#191C1D]">
+        <Text className="flex-1 text-center text-lg font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
           알림
         </Text>
         <Button
@@ -208,7 +217,9 @@ export default function NotificationsScreen() {
                 accessibilityLabel={item.actorNickname + "님의 알림"}
                 className={cn(
                   "min-h-[92px] flex-row items-center gap-3 px-5 py-4",
-                  item.read ? "bg-white" : "bg-[#F0FAF3]",
+                  item.read
+                    ? "bg-white dark:bg-[#1B211D]"
+                    : "bg-[#F0FAF3] dark:bg-[#203026]",
                 )}
                 onPress={() => void openNotification(item)}
               >
@@ -228,7 +239,7 @@ export default function NotificationsScreen() {
                   </Avatar>
                   <View
                     className={cn(
-                      "absolute -bottom-1 -right-1 h-6 w-6 items-center justify-center rounded-full border-2 border-white",
+                      "absolute -bottom-1 -right-1 h-6 w-6 items-center justify-center rounded-full border-2 border-white dark:border-[#1B211D]",
                       copy.background,
                     )}
                   >
@@ -236,13 +247,13 @@ export default function NotificationsScreen() {
                   </View>
                 </View>
                 <View className="flex-1">
-                  <Text className="text-sm leading-5 text-[#28352C]">
-                    <Text className="font-extrabold text-[#191C1D]">
+                  <Text className="text-sm leading-5 text-[#28352C] dark:text-[#D4DDD6]">
+                    <Text className="font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
                       {item.actorNickname}님이{" "}
                     </Text>
                     {copy.message}
                   </Text>
-                  <Text className="mt-1 text-[11px] text-[#738078]">
+                  <Text className="mt-1 text-[11px] text-[#738078] dark:text-[#AAB5AD]">
                     {formatNotificationTime(item.createdAt)}
                   </Text>
                 </View>

@@ -14,8 +14,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { checkEmail, signup } from "@/api/auth-api";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
+import { useThemeStore } from "@/stores/theme-store";
 
 export default function SignupScreen() {
+  const isDark = useThemeStore((state) => state.isDark);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -83,7 +85,7 @@ export default function SignupScreen() {
   ];
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F6FBF6]">
+    <SafeAreaView className="flex-1 bg-[#F6FBF6] dark:bg-[#111411]">
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -100,23 +102,27 @@ export default function SignupScreen() {
               className="h-12 w-12"
               onPress={() => router.back()}
             >
-              <Ionicons name="arrow-back" size={24} color="#33443A" />
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color={isDark ? "#F1F5F2" : "#33443A"}
+              />
             </Button>
-            <Text className="text-xl font-semibold text-[#0B1C30]">
+            <Text className="text-xl font-semibold text-[#0B1C30] dark:text-[#F1F5F2]">
               회원가입
             </Text>
             <View className="w-12" />
           </View>
-          <Text className="mb-[22px] mt-[22px] text-[15px] text-slate-500">
+          <Text className="mb-[22px] mt-[22px] text-[15px] text-slate-500 dark:text-[#AAB5AD]">
             오늘의산책과 함께 건강한 일상을 시작하세요
           </Text>
           {fields.map((field, index) => (
             <View key={field.label}>
-              <Text className="mb-2 mt-3 text-sm font-extrabold text-[#26372D]">
+              <Text className="mb-2 mt-3 text-sm font-extrabold text-[#26372D] dark:text-[#D4DDD6]">
                 {field.label}
               </Text>
               <View className="flex-row gap-2">
-                <View className="h-14 flex-1 flex-row items-center gap-2.5 rounded-xl border border-[#BCCBB9] bg-white px-[15px]">
+                <View className="h-14 flex-1 flex-row items-center gap-2.5 rounded-xl border border-[#BCCBB9] bg-white px-[15px] dark:border-[#475249] dark:bg-[#1B211D]">
                   <Ionicons name={field.icon} size={21} color="#64748B" />
                   <TextInput
                     value={field.value}
@@ -167,7 +173,7 @@ export default function SignupScreen() {
             </Text>
           </Button>
           <View className="mt-[22px] flex-row justify-center">
-            <Text className="text-[13px] text-slate-500">
+            <Text className="text-[13px] text-slate-500 dark:text-[#AAB5AD]">
               이미 계정이 있으신가요?{" "}
             </Text>
             <Button

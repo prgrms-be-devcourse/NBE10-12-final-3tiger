@@ -45,7 +45,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F6FBF6]">
+    <SafeAreaView className="flex-1 bg-[#F6FBF6] dark:bg-[#111411]">
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -58,22 +58,22 @@ export default function LoginScreen() {
           <View className="mt-8 h-[72px] w-[72px] self-center items-center justify-center rounded-3xl bg-[#DDF8E5]">
             <Ionicons name="leaf" size={38} color="#006E2F" />
           </View>
-          <Text className="mt-5 text-center text-[32px] font-black text-[#0B1C30]">
+          <Text className="mt-5 text-center text-[32px] font-black text-[#0B1C30] dark:text-[#F1F5F2]">
             환영합니다
           </Text>
-          <Text className="mb-[34px] mt-2 text-center text-base text-slate-500">
+          <Text className="mb-[34px] mt-2 text-center text-base text-slate-500 dark:text-[#AAB5AD]">
             안전하고 즐거운 산책을 시작하세요
           </Text>
 
-          <Text className="mb-2 mt-3.5 text-sm font-extrabold text-[#26372D]">
+          <Text className="mb-2 mt-3.5 text-sm font-extrabold text-[#26372D] dark:text-[#D4DDD6]">
             이메일
           </Text>
-          <View className="h-14 flex-row items-center gap-2.5 rounded-xl border border-[#BCCBB9] bg-white px-4">
+          <View className="h-14 flex-row items-center gap-2.5 rounded-xl border border-[#BCCBB9] bg-white px-4 dark:border-[#475249] dark:bg-[#1B211D]">
             <Ionicons name="mail-outline" size={21} color="#64748B" />
             <TextInput
               value={email}
               onChangeText={setEmail}
-              className="flex-1 text-[15px] text-[#0B1C30]"
+              className="flex-1 text-[15px] text-[#0B1C30] dark:text-[#F1F5F2]"
               placeholder="이메일을 입력하세요"
               placeholderTextColor="#94A3B8"
               keyboardType="email-address"
@@ -81,15 +81,15 @@ export default function LoginScreen() {
               autoComplete="email"
             />
           </View>
-          <Text className="mb-2 mt-3.5 text-sm font-extrabold text-[#26372D]">
+          <Text className="mb-2 mt-3.5 text-sm font-extrabold text-[#26372D] dark:text-[#D4DDD6]">
             비밀번호
           </Text>
-          <View className="h-14 flex-row items-center gap-2.5 rounded-xl border border-[#BCCBB9] bg-white px-4">
+          <View className="h-14 flex-row items-center gap-2.5 rounded-xl border border-[#BCCBB9] bg-white px-4 dark:border-[#475249] dark:bg-[#1B211D]">
             <Ionicons name="lock-closed-outline" size={21} color="#64748B" />
             <TextInput
               value={password}
               onChangeText={setPassword}
-              className="flex-1 text-[15px] text-[#0B1C30]"
+              className="flex-1 text-[15px] text-[#0B1C30] dark:text-[#F1F5F2]"
               placeholder="비밀번호를 입력하세요"
               placeholderTextColor="#94A3B8"
               secureTextEntry={secure}
@@ -123,17 +123,17 @@ export default function LoginScreen() {
           </Button>
           <Button
             variant="secondary"
-            className="mt-3 h-12 rounded-xl bg-white"
+            className="mt-3 h-12 rounded-xl bg-white dark:bg-[#1B211D]"
             onPress={() => router.replace("/(tabs)/map" as never)}
           >
             <Ionicons name="compass-outline" size={19} color="#365F49" />
-            <Text className="font-extrabold text-[#365F49]">
+            <Text className="font-extrabold text-[#365F49] dark:text-[#86EFAC]">
               로그인 없이 이용하기
             </Text>
           </Button>
           <View className="my-6 flex-row items-center gap-2.5">
             <View className="h-px flex-1 bg-[#D7DED8]" />
-            <Text className="text-xs text-[#7B867E]">
+            <Text className="text-xs text-[#7B867E] dark:text-[#AAB5AD]">
               소셜 로그인은 인가 코드 설정 후 사용할 수 있어요
             </Text>
             <View className="h-px flex-1 bg-[#D7DED8]" />
@@ -147,7 +147,7 @@ export default function LoginScreen() {
           </Button>
           <Button
             variant="secondary"
-            className="mb-2.5 h-[54px] rounded-xl bg-white"
+            className="mb-2.5 h-[54px] rounded-xl bg-white dark:bg-[#1B211D]"
             disabled
           >
             <Text className="font-extrabold text-black">
@@ -155,7 +155,7 @@ export default function LoginScreen() {
             </Text>
           </Button>
           <View className="mt-5 flex-row justify-center">
-            <Text className="text-[13px] text-slate-500">
+            <Text className="text-[13px] text-slate-500 dark:text-[#AAB5AD]">
               아직 계정이 없으신가요?{" "}
             </Text>
             <Pressable

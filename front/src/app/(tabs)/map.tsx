@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/bottom-sheet-handle";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
+import { useThemeStore } from "@/stores/theme-store";
 import type { Region as ServiceRegion } from "@/types/domain";
 
 // 위도 약 0.009도는 남북 약 1km로, 화면 중심 기준 반경 약 500m다.
@@ -73,65 +74,9 @@ async function getCurrentLocationWithin(
   }
 }
 
-const CALM_DARK_MAP_STYLE = [
-  { elementType: "geometry", stylers: [{ color: "#111411" }] },
-  { elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#8F9891" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#111411" }] },
-  {
-    featureType: "administrative",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#343A35" }],
-  },
-  {
-    featureType: "landscape",
-    elementType: "geometry",
-    stylers: [{ color: "#101310" }],
-  },
-  {
-    featureType: "poi",
-    elementType: "geometry",
-    stylers: [{ color: "#171B18" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "geometry",
-    stylers: [{ color: "#18211B" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#5E645F" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#2F3430" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry",
-    stylers: [{ color: "#777D78" }],
-  },
-  {
-    featureType: "road.local",
-    elementType: "geometry",
-    stylers: [{ color: "#4D524E" }],
-  },
-  {
-    featureType: "transit",
-    elementType: "geometry",
-    stylers: [{ color: "#242925" }],
-  },
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [{ color: "#090C0A" }],
-  },
-];
-
 export default function MapScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isDark = useThemeStore((state) => state.isDark);
   const mapRef = useRef<MapView>(null);
   const lastViewedRegionRef = useRef<MapRegion | null>(null);
   const [query, setQuery] = useState("");
@@ -305,7 +250,7 @@ export default function MapScreen() {
   );
 
   return (
-    <View className="flex-1 bg-[#E8F0E5]">
+    <View className="flex-1 bg-[#E8F0E5] dark:bg-[#111411]">
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
@@ -313,8 +258,8 @@ export default function MapScreen() {
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
-        customMapStyle={CALM_DARK_MAP_STYLE}
-        userInterfaceStyle="dark"
+        mapType="standard"
+        userInterfaceStyle={isDark ? "dark" : "light"}
         mapPadding={{ top: 120, right: 16, bottom: 170, left: 16 }}
         onRegionChangeComplete={updateRegion}
       />
@@ -325,12 +270,14 @@ export default function MapScreen() {
           className="z-20 items-center justify-center bg-[#111411]/80"
           accessibilityLiveRegion="polite"
         >
-          <View className="items-center gap-3 rounded-3xl bg-white px-7 py-6 shadow-lg">
+          <View className="items-center gap-3 rounded-3xl bg-white px-7 py-6 shadow-lg dark:bg-[#1B211D]">
             <ActivityIndicator size="large" color="#22C55E" />
-            <Text className="text-[15px] font-bold text-[#24372A]">
+            <Text className="text-[15px] font-bold text-[#24372A] dark:text-[#F1F5F2]">
               내 위치를 찾고 있어요
             </Text>
-            <Text className="text-xs text-[#6D7B6D]">잠시만 기다려 주세요</Text>
+            <Text className="text-xs text-[#6D7B6D] dark:text-[#AAB5AD]">
+              잠시만 기다려 주세요
+            </Text>
           </View>
         </View>
       )}
@@ -341,10 +288,10 @@ export default function MapScreen() {
         pointerEvents="box-none"
       >
         <View className="mt-1.5 flex-row items-center">
-          <View className="h-[54px] flex-1 flex-row items-center gap-2.5 rounded-[18px] bg-white px-[17px] shadow-md">
+          <View className="h-[54px] flex-1 flex-row items-center gap-2.5 rounded-[18px] bg-white px-[17px] shadow-md dark:bg-[#1B211D]">
             <Ionicons name="search" size={21} color="#526056" />
             <TextInput
-              className="flex-1 text-[15px] font-semibold text-[#24372A]"
+              className="flex-1 text-[15px] font-semibold text-[#24372A] dark:text-[#F1F5F2]"
               placeholder="동네나 공원을 검색해 보세요"
               placeholderTextColor="#7A847C"
               returnKeyType="search"
@@ -381,20 +328,20 @@ export default function MapScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="gap-2 pt-3 pr-[18px]"
         >
-          <View className="h-[38px] flex-row items-center gap-1 rounded-full bg-[#E9FBEF] px-3">
+          <View className="h-[38px] flex-row items-center gap-1 rounded-full bg-[#E9FBEF] px-3 dark:bg-[#24382B]">
             <Ionicons name="location" size={16} color="#087A3F" />
-            <Text className="text-[13px] font-bold text-[#24372A]">
+            <Text className="text-[13px] font-bold text-[#24372A] dark:text-[#D4DDD6]">
               내 주변
             </Text>
           </View>
           <Button
             variant="secondary"
             accessibilityLabel="탐색 가능 구역 보기"
-            className="h-[38px] rounded-full bg-white px-3"
+            className="h-[38px] rounded-full bg-white px-3 dark:bg-[#1B211D]"
             onPress={() => setRegionsOpen(true)}
           >
             <Ionicons name="map-outline" size={16} color="#087A3F" />
-            <Text className="text-[13px] font-bold text-[#24372A]">
+            <Text className="text-[13px] font-bold text-[#24372A] dark:text-[#D4DDD6]">
               탐색 가능 구역
             </Text>
           </Button>
@@ -456,7 +403,7 @@ export default function MapScreen() {
             onPress={dismissRegionsSheet}
           />
           <Animated.View
-            className="h-[78%] rounded-t-[30px] bg-[#FCFDFC] pt-2.5"
+            className="h-[78%] rounded-t-[30px] bg-[#FCFDFC] pt-2.5 dark:bg-[#171C18]"
             style={{ transform: [{ translateY: regionsSheetTranslateY }] }}
           >
             <BottomSheetHandle
@@ -465,17 +412,17 @@ export default function MapScreen() {
               dismissDistance={windowHeight}
             />
             <View className="px-5 pb-3">
-              <Text className="text-xl font-extrabold text-[#191C1D]">
+              <Text className="text-xl font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
                 탐색 가능 구역
               </Text>
-              <Text className="mt-1 text-sm text-[#6B756D]">
+              <Text className="mt-1 text-sm text-[#6B756D] dark:text-[#AAB5AD]">
                 코스를 제공하는 지역으로 지도를 이동할 수 있어요.
               </Text>
             </View>
             {regionsQuery.isPending ? (
               <View className="items-center gap-3 px-5 py-12">
                 <ActivityIndicator color="#087A3F" />
-                <Text className="text-sm text-[#6B756D]">
+                <Text className="text-sm text-[#6B756D] dark:text-[#AAB5AD]">
                   탐색 구역을 불러오는 중이에요
                 </Text>
               </View>
@@ -486,7 +433,7 @@ export default function MapScreen() {
                   size={30}
                   color="#DC2626"
                 />
-                <Text className="mt-3 text-sm font-bold text-[#191C1D]">
+                <Text className="mt-3 text-sm font-bold text-[#191C1D] dark:text-[#F1F5F2]">
                   탐색 구역을 불러오지 못했어요
                 </Text>
                 <Button
@@ -509,16 +456,16 @@ export default function MapScreen() {
                 {regionsQuery.data?.map((item) => (
                   <View
                     key={item.regionCode}
-                    className="flex-row items-center gap-3 rounded-2xl border border-[#E1E8E2] bg-white p-4"
+                    className="flex-row items-center gap-3 rounded-2xl border border-[#E1E8E2] bg-white p-4 dark:border-[#343D36] dark:bg-[#1B211D]"
                   >
                     <View className="h-10 w-10 items-center justify-center rounded-full bg-[#E9FBEF]">
                       <Ionicons name="location" size={19} color="#087A3F" />
                     </View>
                     <View className="flex-1">
-                      <Text className="font-extrabold text-[#191C1D]">
+                      <Text className="font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
                         {item.name}
                       </Text>
-                      <Text className="mt-0.5 text-xs text-[#6B756D]">
+                      <Text className="mt-0.5 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
                         이용 가능한 코스 {item.courseCount}개
                       </Text>
                     </View>

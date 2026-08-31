@@ -39,11 +39,13 @@ import {
 } from "@/components/ui/bottom-sheet-handle";
 import { LIKED_COLOR } from "@/components/feed/post-actions";
 import { useAuthStore } from "@/stores/auth-store";
+import { useThemeStore } from "@/stores/theme-store";
 import type { PostComment } from "@/types/domain";
 
 function CommentRow({ item }: { item: PostComment }) {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isDark = useThemeStore((state) => state.isDark);
   const [upvoted, setUpvoted] = useState(item.upvoted ?? false);
   const [upvoteCount, setUpvoteCount] = useState(item.upvoteCount);
   const [profileImageReady, setProfileImageReady] = useState(false);
@@ -144,14 +146,14 @@ function CommentRow({ item }: { item: PostComment }) {
       </Avatar>
       <View className="flex-1 pt-0.5">
         <View className="flex-row items-center gap-1.5">
-          <Text className="text-xs font-bold text-[#191C1D]">
+          <Text className="text-xs font-bold text-[#191C1D] dark:text-[#F1F5F2]">
             {item.nickname}
           </Text>
-          <Text className="text-[10px] text-[#6B756D]">
+          <Text className="text-[10px] text-[#6B756D] dark:text-[#AAB5AD]">
             {new Date(item.createdAt).toLocaleDateString("ko-KR")}
           </Text>
         </View>
-        <Text className="mt-0.5 text-xs leading-[18px] text-[#34443A]">
+        <Text className="mt-0.5 text-xs leading-[18px] text-[#34443A] dark:text-[#D4DDD6]">
           {item.content}
         </Text>
       </View>
@@ -185,12 +187,12 @@ function CommentRow({ item }: { item: PostComment }) {
             <Ionicons
               name={upvoted ? "heart" : "heart-outline"}
               size={21}
-              color={upvoted ? LIKED_COLOR : "#64748B"}
+              color={upvoted ? LIKED_COLOR : isDark ? "#AAB5AD" : "#64748B"}
             />
           </Animated.View>
         </View>
         <Text
-          className={`text-[11px] font-bold ${upvoted ? "text-[#22C55E]" : "text-[#64748B]"}`}
+          className={`text-[11px] font-bold ${upvoted ? "text-[#22C55E]" : "text-[#64748B] dark:text-[#AAB5AD]"}`}
         >
           {upvoteCount}
         </Text>
@@ -286,7 +288,7 @@ export function PostCommentSheet({
           keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
         >
           <Animated.View
-            className="flex-1 rounded-t-[30px] bg-[#FCFDFC] pt-2.5"
+            className="flex-1 rounded-t-[30px] bg-[#FCFDFC] pt-2.5 dark:bg-[#171C18]"
             style={{ transform: [{ translateY: sheetTranslateY }] }}
           >
             <BottomSheetHandle
@@ -295,7 +297,7 @@ export function PostCommentSheet({
               dismissDistance={windowHeight}
             />
             <View className="h-10 items-center justify-center px-5">
-              <Text className="text-[17px] font-black text-[#191C1D]">
+              <Text className="text-[17px] font-black text-[#191C1D] dark:text-[#F1F5F2]">
                 댓글
               </Text>
             </View>
@@ -323,10 +325,10 @@ export function PostCommentSheet({
                 ListEmptyComponent={
                   <View className="flex-1 items-center justify-center px-6 py-12">
                     <Ionicons name="leaf-outline" size={36} color="#94A09A" />
-                    <Text className="mt-3 font-bold text-[#191C1D]">
+                    <Text className="mt-3 font-bold text-[#191C1D] dark:text-[#F1F5F2]">
                       아직 댓글이 없어요
                     </Text>
-                    <Text className="mt-1 text-center text-sm text-[#6B756D]">
+                    <Text className="mt-1 text-center text-sm text-[#6B756D] dark:text-[#AAB5AD]">
                       첫 댓글을 남겨보세요.
                     </Text>
                   </View>
@@ -348,7 +350,7 @@ export function PostCommentSheet({
               />
             )}
             <Separator className="bg-[#E5EBE5]" />
-            <View className="flex-row items-start gap-3 bg-white px-4 pb-4 pt-3">
+            <View className="flex-row items-start gap-3 bg-white px-4 pb-4 pt-3 dark:bg-[#1B211D]">
               <Avatar
                 alt={`${profileQuery.data?.nickname ?? "내"} 프로필`}
                 className="h-11 w-11 border border-[#DDE7DE]"
@@ -362,12 +364,12 @@ export function PostCommentSheet({
                 />
                 <AvatarFallback className="bg-[#E9F5EC]" />
               </Avatar>
-              <View className="min-h-11 flex-1 flex-row items-end rounded-[22px] border border-[#DCE5DE] bg-[#F8FAF8] pl-4 pr-1.5 py-1.5">
+              <View className="min-h-11 flex-1 flex-row items-end rounded-[22px] border border-[#DCE5DE] bg-[#F8FAF8] pl-4 pr-1.5 py-1.5 dark:border-[#343D36] dark:bg-[#242B26]">
                 <TextInput
                   value={content}
                   onChangeText={setContent}
                   editable={isAuthenticated && !createMutation.isPending}
-                  className="max-h-24 min-h-8 flex-1 py-1 text-[14px] text-[#191C1D]"
+                  className="max-h-24 min-h-8 flex-1 py-1 text-[14px] text-[#191C1D] dark:text-[#F1F5F2]"
                   multiline
                   maxLength={1000}
                   placeholder={
