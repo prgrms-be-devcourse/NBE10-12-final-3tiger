@@ -328,6 +328,7 @@ export default function CommunityScreen() {
   const handledNotificationId = useRef<string | null>(null);
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const postsQuery = useInfiniteQuery({
     queryKey: ["posts", "latest"],
     queryFn: ({ pageParam }) =>
@@ -348,6 +349,19 @@ export default function CommunityScreen() {
     enabled: isAuthenticated,
     staleTime: 15_000,
   });
+  const refreshPosts = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    const startedAt = Date.now();
+    try {
+      await postsQuery.refetch();
+    } finally {
+      const remaining = Math.max(0, 1_000 - (Date.now() - startedAt));
+      if (remaining > 0)
+        await new Promise((resolve) => setTimeout(resolve, remaining));
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     if (
@@ -445,6 +459,9 @@ export default function CommunityScreen() {
             />
           )}
           showsVerticalScrollIndicator={false}
+          refreshing={isRefreshing}
+          onRefresh={() => void refreshPosts()}
+          progressViewOffset={8}
           contentContainerClassName="grow pb-6"
           ListEmptyComponent={<EmptyState title="아직 공유된 산책이 없어요" />}
           onEndReached={() => {

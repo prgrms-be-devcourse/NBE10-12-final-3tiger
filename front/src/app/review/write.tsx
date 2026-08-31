@@ -217,7 +217,8 @@ export default function WritePostScreen() {
                 className="flex-1"
                 data={coursesQuery.data?.content ?? []}
                 keyExtractor={(item) => String(item.courseId)}
-                contentContainerClassName="grow gap-3 px-5 py-4 pb-8"
+                contentContainerClassName="grow px-5 py-4 pb-8"
+                ItemSeparatorComponent={() => <View className="h-3" />}
                 showsVerticalScrollIndicator
                 nestedScrollEnabled
                 keyboardShouldPersistTaps="handled"
@@ -231,7 +232,7 @@ export default function WritePostScreen() {
                   <Button
                     variant="ghost"
                     accessibilityLabel={`${item.name} 선택`}
-                    className="min-h-[72px] flex-row items-center justify-start gap-3 rounded-2xl border border-[#E5EBE5] bg-white px-4 py-3 dark:border-[#343D36] dark:bg-[#1B211D]"
+                    className="h-[76px] flex-row items-center justify-start gap-3 rounded-2xl border border-[#E5EBE5] bg-white px-4 py-3 dark:border-[#343D36] dark:bg-[#1B211D]"
                     onPress={() => {
                       setSelectedCourse(item);
                       dismissCourseSheet();

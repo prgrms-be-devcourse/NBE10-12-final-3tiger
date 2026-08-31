@@ -73,8 +73,8 @@ export type PostComment = {
   profileImageUrl?: string | null;
   content: string;
   upvoteCount: number;
-  /** 현재 로그인한 사용자가 공감했는지 여부(백엔드가 제공하는 경우) */
-  upvoted?: boolean;
+  /** 현재 로그인한 사용자가 공감했는지 여부 */
+  isUpvoted: boolean;
   createdAt: string;
 };
 
