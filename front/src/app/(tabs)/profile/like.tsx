@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import {
   useInfiniteQuery,
   useMutation,
@@ -169,13 +170,18 @@ function LikedPostCard({
         likeCount={likeCount}
         commentCount={item.commentCount ?? 0}
         onToggleLike={() => {
-          if (!mutation.isPending) mutation.mutate({ desiredLiked: !liked });
+          if (!mutation.isPending) {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            mutation.mutate({ desiredLiked: !liked });
+          }
         }}
         onOpenComments={onComments}
         bookmarked={bookmarked}
         onToggleBookmark={() => {
-          if (!bookmarkMutation.isPending)
+          if (!bookmarkMutation.isPending) {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             bookmarkMutation.mutate({ desiredBookmarked: !bookmarked });
+          }
         }}
       />
       <View className="px-3 pb-4">

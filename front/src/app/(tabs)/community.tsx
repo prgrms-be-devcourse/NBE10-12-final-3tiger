@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import {
   useInfiniteQuery,
   useMutation,
@@ -251,8 +252,10 @@ function FeedPost({
             onRequireLogin();
             return;
           }
-          if (!likeMutation.isPending)
+          if (!likeMutation.isPending) {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             likeMutation.mutate({ desiredLiked: !liked });
+          }
         }}
         onOpenComments={onOpenComments}
         bookmarked={bookmarked}
@@ -261,8 +264,10 @@ function FeedPost({
             onRequireLogin();
             return;
           }
-          if (!bookmarkMutation.isPending)
+          if (!bookmarkMutation.isPending) {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             bookmarkMutation.mutate({ desiredBookmarked: !bookmarked });
+          }
         }}
       />
       <View className="relative px-3 pb-4">

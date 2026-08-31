@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import {
   useInfiniteQuery,
   useMutation,
@@ -23,6 +24,7 @@ import { useRef } from "react";
 
 import {
   addPostComment,
+  deleteComment,
   getPostComments,
   toggleCommentUpvote,
 } from "@/api/post-api";
@@ -42,13 +44,25 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { PostComment } from "@/types/domain";
 
-function CommentRow({ item }: { item: PostComment }) {
+function CommentRow({
+  item,
+  canDelete,
+  postId,
+}: {
+  item: PostComment;
+  canDelete: boolean;
+  postId: number;
+}) {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDark = useThemeStore((state) => state.isDark);
   const [upvoted, setUpvoted] = useState(item.isUpvoted);
   const [upvoteCount, setUpvoteCount] = useState(item.upvoteCount);
   const [profileImageReady, setProfileImageReady] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ left: 20, top: 0 });
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const commentRef = useRef<View>(null);
   useEffect(() => {
     setUpvoted(item.isUpvoted);
     setUpvoteCount(item.upvoteCount);
@@ -88,8 +102,36 @@ function CommentRow({ item }: { item: PostComment }) {
       });
     },
   });
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteComment(item.commentId),
+    onSuccess: async () => {
+      setDeleteConfirmOpen(false);
+      queryClient.setQueriesData<{
+        pages: Array<{ content: PostComment[] }>;
+        pageParams: unknown[];
+      }>({ queryKey: ["post-comments", postId] }, (data) => {
+        if (!data) return data;
+        return {
+          ...data,
+          pages: data.pages.map((page) => ({
+            ...page,
+            content: page.content.filter(
+              (comment) => comment.commentId !== item.commentId,
+            ),
+          })),
+        };
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["post-comments", postId] }),
+        queryClient.invalidateQueries({ queryKey: ["posts"] }),
+        queryClient.invalidateQueries({ queryKey: ["liked-posts"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-posts"] }),
+      ]);
+    },
+  });
   const handleUpvote = () => {
     if (!isAuthenticated || mutation.isPending) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     scale.stopAnimation();
     burst.stopAnimation();
     scale.setValue(1);
@@ -130,73 +172,189 @@ function CommentRow({ item }: { item: PostComment }) {
 
   return (
     <View
-      className={`w-full flex-row items-start gap-3 px-5 ${profileImageReady ? "opacity-100" : "opacity-0"}`}
+      className={`w-full ${profileImageReady ? "opacity-100" : "opacity-0"}`}
     >
-      <Avatar alt={`${item.nickname} 프로필`} className="h-10 w-10">
-        <AvatarImage
-          source={
-            item.profileImageUrl
-              ? { uri: item.profileImageUrl }
-              : DEFAULT_PROFILE_IMAGE
-          }
-          onLoad={() => setProfileImageReady(true)}
-          onError={() => setProfileImageReady(true)}
-        />
-        <AvatarFallback className="bg-[#E9F5EC]" />
-      </Avatar>
-      <View className="flex-1 pt-0.5">
-        <View className="flex-row items-center gap-1.5">
-          <Text className="text-xs font-bold text-[#191C1D] dark:text-[#F1F5F2]">
-            {item.nickname}
-          </Text>
-          <Text className="text-[10px] text-[#6B756D] dark:text-[#AAB5AD]">
-            {new Date(item.createdAt).toLocaleDateString("ko-KR")}
-          </Text>
-        </View>
-        <Text className="mt-0.5 text-xs leading-[18px] text-[#34443A] dark:text-[#D4DDD6]">
-          {item.content}
-        </Text>
-      </View>
-      <Button
-        variant="ghost"
-        accessibilityLabel={upvoted ? "댓글 공감 취소" : "댓글 공감"}
-        className="-mr-2 h-12 w-10 flex-col gap-0 rounded-full px-0 py-1"
-        disabled={!isAuthenticated || mutation.isPending}
-        onPress={handleUpvote}
+      <Pressable
+        ref={commentRef}
+        accessibilityLabel={`${item.nickname}님의 댓글, 길게 눌러 메뉴 열기`}
+        delayLongPress={450}
+        onLongPress={() => {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          commentRef.current?.measureInWindow((x, y, width, height) => {
+            setMenuPosition({ left: x + 20, top: y + height + 6 });
+            setMenuOpen(true);
+          });
+        }}
+        className="w-full flex-row items-start gap-3 bg-[#FCFDFC] px-5 dark:bg-[#171C18]"
       >
-        <View className="h-[22px] w-[22px] items-center justify-center">
-          <Animated.View
-            pointerEvents="none"
-            className="absolute h-[22px] w-[22px] rounded-full border border-[#22C55E]"
-            style={{
-              opacity: burst.interpolate({
-                inputRange: [0, 0.15, 1],
-                outputRange: [0, 0.45, 0],
-              }),
-              transform: [
-                {
-                  scale: burst.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.5, 1.75],
-                  }),
-                },
-              ],
-            }}
+        <Avatar alt={`${item.nickname} 프로필`} className="h-10 w-10">
+          <AvatarImage
+            source={
+              item.profileImageUrl
+                ? { uri: item.profileImageUrl }
+                : DEFAULT_PROFILE_IMAGE
+            }
+            onLoad={() => setProfileImageReady(true)}
+            onError={() => setProfileImageReady(true)}
           />
-          <Animated.View style={{ transform: [{ scale }] }}>
-            <Ionicons
-              name={upvoted ? "heart" : "heart-outline"}
-              size={21}
-              color={upvoted ? LIKED_COLOR : isDark ? "#AAB5AD" : "#64748B"}
-            />
-          </Animated.View>
+          <AvatarFallback className="bg-[#E9F5EC]" />
+        </Avatar>
+        <View className="flex-1 pt-0.5">
+          <View className="flex-row items-center gap-1.5">
+            <Text className="text-xs font-bold text-[#191C1D] dark:text-[#F1F5F2]">
+              {item.nickname}
+            </Text>
+            <Text className="text-[10px] text-[#6B756D] dark:text-[#AAB5AD]">
+              {new Date(item.createdAt).toLocaleDateString("ko-KR")}
+            </Text>
+          </View>
+          <Text className="mt-0.5 text-xs leading-[18px] text-[#34443A] dark:text-[#D4DDD6]">
+            {item.content}
+          </Text>
         </View>
-        <Text
-          className={`text-[11px] font-bold ${upvoted ? "text-[#22C55E]" : "text-[#64748B] dark:text-[#AAB5AD]"}`}
+        <Button
+          variant="ghost"
+          accessibilityLabel={upvoted ? "댓글 공감 취소" : "댓글 공감"}
+          className="-mr-2 h-12 w-10 flex-col gap-0 rounded-full px-0 py-1"
+          disabled={!isAuthenticated || mutation.isPending}
+          onPress={handleUpvote}
         >
-          {upvoteCount}
-        </Text>
-      </Button>
+          <View className="h-[22px] w-[22px] items-center justify-center">
+            <Animated.View
+              pointerEvents="none"
+              className="absolute h-[22px] w-[22px] rounded-full border border-[#22C55E]"
+              style={{
+                opacity: burst.interpolate({
+                  inputRange: [0, 0.15, 1],
+                  outputRange: [0, 0.45, 0],
+                }),
+                transform: [
+                  {
+                    scale: burst.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.5, 1.75],
+                    }),
+                  },
+                ],
+              }}
+            />
+            <Animated.View style={{ transform: [{ scale }] }}>
+              <Ionicons
+                name={upvoted ? "heart" : "heart-outline"}
+                size={21}
+                color={upvoted ? LIKED_COLOR : isDark ? "#AAB5AD" : "#64748B"}
+              />
+            </Animated.View>
+          </View>
+          <Text
+            className={`text-[11px] font-bold ${upvoted ? "text-[#22C55E]" : "text-[#64748B] dark:text-[#AAB5AD]"}`}
+          >
+            {upvoteCount}
+          </Text>
+        </Button>
+      </Pressable>
+
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <View className="flex-1">
+          <Pressable
+            accessibilityLabel="댓글 메뉴 닫기"
+            className="absolute inset-0"
+            onPress={() => setMenuOpen(false)}
+          />
+          <View
+            accessibilityRole="menu"
+            className="absolute w-[148px] overflow-hidden rounded-xl border border-[#DDE5DA] bg-white shadow-lg dark:border-[#343D36] dark:bg-[#242B26]"
+            style={menuPosition}
+          >
+            <Button
+              variant="ghost"
+              accessibilityLabel="댓글 신고"
+              className="h-12 justify-start rounded-none px-4"
+              onPress={() => {}}
+            >
+              <Ionicons name="flag-outline" size={18} color="#526056" />
+              <Text className="text-sm font-bold text-[#33443A] dark:text-[#D4DDD6]">
+                신고
+              </Text>
+            </Button>
+            {canDelete && (
+              <>
+                <View className="mx-3 h-px bg-[#EEF1EE] dark:bg-[#343D36]" />
+                <Button
+                  variant="ghost"
+                  accessibilityLabel="댓글 삭제"
+                  className="h-12 justify-start rounded-none px-4"
+                  onPress={() => {
+                    setMenuOpen(false);
+                    setDeleteConfirmOpen(true);
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                  <Text className="text-sm font-bold text-[#DC2626]">삭제</Text>
+                </Button>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={deleteConfirmOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!deleteMutation.isPending) setDeleteConfirmOpen(false);
+        }}
+      >
+        <View className="flex-1 items-center justify-center bg-black/40 px-6">
+          <View className="w-full max-w-[360px] rounded-2xl bg-white p-5 shadow-lg dark:bg-[#1B211D]">
+            <View className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-[#FEECEC]">
+              <Ionicons name="trash-outline" size={22} color="#DC2626" />
+            </View>
+            <Text className="text-lg font-extrabold text-[#17251B] dark:text-[#F1F5F2]">
+              댓글을 삭제할까요?
+            </Text>
+            <Text className="mt-2 text-sm leading-5 text-[#667168] dark:text-[#AAB5AD]">
+              삭제한 댓글은 다시 복구할 수 없습니다.
+            </Text>
+            {deleteMutation.isError && (
+              <Text className="mt-3 text-sm text-[#DC2626]">
+                {deleteMutation.error.message}
+              </Text>
+            )}
+            <View className="mt-6 flex-row gap-2.5">
+              <Button
+                variant="secondary"
+                className="h-12 flex-1 rounded-xl bg-[#EEF2EF] dark:bg-[#2A312C]"
+                disabled={deleteMutation.isPending}
+                onPress={() => setDeleteConfirmOpen(false)}
+              >
+                <Text className="font-bold text-[#33443A] dark:text-[#D4DDD6]">
+                  취소
+                </Text>
+              </Button>
+              <Button
+                variant="destructive"
+                className="h-12 flex-1 rounded-xl bg-[#DC2626]"
+                disabled={deleteMutation.isPending}
+                onPress={() => deleteMutation.mutate()}
+              >
+                {deleteMutation.isPending && (
+                  <ActivityIndicator size="small" color="white" />
+                )}
+                <Text className="font-bold text-white">
+                  {deleteMutation.isPending ? "삭제 중" : "삭제"}
+                </Text>
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -333,7 +491,13 @@ export function PostCommentSheet({
                     </Text>
                   </View>
                 }
-                renderItem={({ item }) => <CommentRow item={item} />}
+                renderItem={({ item }) => (
+                  <CommentRow
+                    item={item}
+                    postId={numericPostId!}
+                    canDelete={profileQuery.data?.userId === item.userId}
+                  />
+                )}
                 onEndReached={() => {
                   if (
                     commentsQuery.hasNextPage &&
