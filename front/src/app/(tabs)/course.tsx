@@ -323,7 +323,7 @@ export default function CourseScreen() {
       </SafeAreaView>
       {showDetails && (
         <Animated.View
-          className="absolute inset-x-0 bottom-0 h-[68%] rounded-t-[30px] bg-white px-5 pb-[22px] pt-2.5 shadow-2xl"
+          className="absolute inset-x-0 bottom-0 h-[36%] rounded-t-[30px] bg-white px-5 pb-[22px] pt-2.5 shadow-2xl"
           style={{ transform: [{ translateY: sheetTranslateY }] }}
         >
           <BottomSheetHandle
