@@ -1,5 +1,6 @@
 package com.back.user.repository;
 
+import com.back.user.domain.Provider;
 import com.back.user.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -12,4 +13,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmailAndDeletedAtIsNull(String email);
 
     Optional<User> findByIdAndDeletedAtIsNull(Long id);
+
+    Optional<User> findByProviderAndProviderUidAndDeletedAtIsNull(Provider provider, String providerUid);
 }

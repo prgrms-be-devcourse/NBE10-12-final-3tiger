@@ -39,6 +39,12 @@ public enum ErrorCode {
             HttpStatus.UNAUTHORIZED,
             "AUTH_401_2",
             "유효하지 않거나 만료된 리프레시 토큰입니다."
+    ),
+
+    KAKAO_AUTH_FAILED(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH_401_3",
+            "카카오 인증에 실패했습니다."
     );
 
     private final HttpStatus status;
