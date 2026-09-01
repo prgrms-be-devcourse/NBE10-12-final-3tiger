@@ -413,15 +413,16 @@ export default function CourseGenerateScreen() {
 
         <View className="rounded-2xl bg-white p-4 dark:bg-[#1B211D]">
           <View className="flex-row items-center justify-between">
-            <Text className="text-sm font-extrabold text-[#18271D] dark:text-[#F1F5F2]">
-              출발 위치
-            </Text>
+            <View className="flex-1 pr-2">
+              <Text className="text-left text-sm font-extrabold text-[#18271D] dark:text-[#F1F5F2]">
+                출발 위치
+              </Text>
+              <Text className="mt-1 text-left text-xs text-[#6B756D] dark:text-[#AAB5AD]">
+                {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
+              </Text>
+            </View>
             <View className="flex-row items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onPress={openPlaceSearch}
-              >
+              <Button variant="ghost" size="sm" onPress={openPlaceSearch}>
                 <Ionicons name="search" size={16} color="#087A3F" />
                 <Text className="text-xs font-bold text-[#087A3F]">검색</Text>
               </Button>
@@ -442,9 +443,6 @@ export default function CourseGenerateScreen() {
               </Button>
             </View>
           </View>
-          <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
-            {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
-          </Text>
         </View>
 
         {isOneway && (
