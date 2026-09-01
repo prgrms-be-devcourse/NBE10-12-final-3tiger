@@ -2,15 +2,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import MapView, {
@@ -27,9 +31,13 @@ import {
 } from "@/api/course-api";
 import { searchPlaces, type PlaceSearchItem } from "@/api/place-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
+import { getMyProfile } from "@/api/user-api";
+import {
+  BottomSheetHandle,
+  dismissBottomSheet,
+} from "@/components/ui/bottom-sheet-handle";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
-import { getMyProfile } from "@/api/user-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { GenerateCandidate } from "@/types/domain";
@@ -68,6 +76,10 @@ const toPolyline = (candidate: GenerateCandidate) =>
 export default function CourseGenerateScreen() {
   const queryClient = useQueryClient();
   const mapRef = useRef<MapView>(null);
+  const { height: windowHeight } = useWindowDimensions();
+  const placeSearchTranslateY = useRef(
+    new Animated.Value(windowHeight),
+  ).current;
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDark = useThemeStore((state) => state.isDark);
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
@@ -207,6 +219,25 @@ export default function CourseGenerateScreen() {
     setPlaceSearchError(null);
     setPlaceSearchOpen(true);
   };
+
+  const dismissPlaceSearch = useCallback(
+    () =>
+      dismissBottomSheet(placeSearchTranslateY, windowHeight, () =>
+        setPlaceSearchOpen(false),
+      ),
+    [placeSearchTranslateY, windowHeight],
+  );
+
+  useEffect(() => {
+    if (!placeSearchOpen) return;
+    placeSearchTranslateY.setValue(windowHeight);
+    Animated.timing(placeSearchTranslateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [placeSearchOpen, placeSearchTranslateY, windowHeight]);
 
   const handlePlaceSearch = async () => {
     const keyword = placeQuery.trim();
@@ -652,83 +683,111 @@ export default function CourseGenerateScreen() {
       <Modal
         visible={placeSearchOpen}
         transparent
-        animationType="slide"
-        onRequestClose={() => setPlaceSearchOpen(false)}
+        animationType="none"
+        onRequestClose={dismissPlaceSearch}
       >
-        <KeyboardAvoidingView behavior="padding" className="flex-1 justify-end">
+        <View className="flex-1 justify-end">
           <Pressable
             className="absolute inset-0 bg-black/40"
-            onPress={() => setPlaceSearchOpen(false)}
+            onPress={dismissPlaceSearch}
           />
-          <View className="h-[78%] rounded-t-[30px] bg-[#FCFDFC] px-5 pt-5 dark:bg-[#171C18]">
-            <View className="mb-4 flex-row items-center justify-between">
-              <Text className="text-[17px] font-black text-[#191C1D] dark:text-[#F1F5F2]">
-                출발 위치 검색
-              </Text>
-              <Button
-                variant="ghost"
-                size="icon"
-                accessibilityLabel="검색 닫기"
-                onPress={() => setPlaceSearchOpen(false)}
-              >
-                <Ionicons name="close" size={22} color={isDark ? "#F1F5F2" : "#334139"} />
-              </Button>
-            </View>
-            <View className="flex-row items-center rounded-xl border border-[#D7E2D8] bg-white px-3 dark:border-[#475249] dark:bg-[#1B211D]">
-              <Ionicons name="search" size={19} color="#7A847C" />
-              <TextInput
-                value={placeQuery}
-                onChangeText={setPlaceQuery}
-                onSubmitEditing={() => void handlePlaceSearch()}
-                returnKeyType="search"
-                placeholder="공원이나 장소를 검색해 보세요"
-                placeholderTextColor={isDark ? "#758078" : "#94A09A"}
-                className="h-12 flex-1 px-2 text-[#18271D] dark:text-[#F1F5F2]"
+          <KeyboardAvoidingView
+            className="h-[78%]"
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+          >
+            <Animated.View
+              className="flex-1 rounded-t-[30px] bg-[#FCFDFC] pt-2.5 dark:bg-[#171C18]"
+              style={{ transform: [{ translateY: placeSearchTranslateY }] }}
+            >
+              <BottomSheetHandle
+                onDismiss={() => setPlaceSearchOpen(false)}
+                translateY={placeSearchTranslateY}
+                dismissDistance={windowHeight}
               />
-              {placeSearching ? (
-                <ActivityIndicator size="small" color="#087A3F" />
-              ) : (
-                <Pressable accessibilityLabel="장소 검색" onPress={() => void handlePlaceSearch()}>
-                  <Ionicons name="arrow-forward-circle" size={23} color="#087A3F" />
-                </Pressable>
-              )}
-            </View>
-            {placeSearchError && (
-              <Text className="mt-3 text-xs font-bold text-[#B91C1C]">
-                {placeSearchError}
-              </Text>
-            )}
-            <ScrollView className="mt-3" contentContainerClassName="gap-2 pb-8">
-              {placeResults.map((place, index) => (
-                <Pressable
-                  key={`${place.latitude}-${place.longitude}-${index}`}
-                  disabled={!place.supportedRegion}
-                  className={`flex-row items-center rounded-2xl border p-4 ${place.supportedRegion ? "border-[#E5EBE5] bg-white dark:border-[#343D36] dark:bg-[#1B211D]" : "border-[#E5EBE5] bg-[#F2F4F2] opacity-60 dark:border-[#343D36] dark:bg-[#202520]"}`}
-                  onPress={() => selectPlace(place)}
-                >
-                  <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#E9F5EC] dark:bg-[#24382B]">
-                    <Ionicons name="location" size={20} color="#087A3F" />
-                  </View>
-                  <View className="ml-3 flex-1">
-                    <Text className="text-sm font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
-                      {place.name}
-                    </Text>
-                    <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
-                      {place.roadAddress || place.address || "주소 정보 없음"}
-                    </Text>
-                  </View>
-                  {place.supportedRegion ? (
-                    <Ionicons name="chevron-forward" size={20} color="#64748B" />
+              <View className="px-5 pb-4">
+                <Text className="text-[17px] font-black text-[#191C1D] dark:text-[#F1F5F2]">
+                  출발 위치 검색
+                </Text>
+              </View>
+              <View className="flex-1 px-5">
+                <View className="flex-row items-center rounded-xl border border-[#D7E2D8] bg-white px-3 dark:border-[#475249] dark:bg-[#1B211D]">
+                  <Ionicons name="search" size={19} color="#7A847C" />
+                  <TextInput
+                    value={placeQuery}
+                    onChangeText={setPlaceQuery}
+                    onSubmitEditing={() => void handlePlaceSearch()}
+                    returnKeyType="search"
+                    placeholder="공원이나 장소를 검색해 보세요"
+                    placeholderTextColor={isDark ? "#758078" : "#94A09A"}
+                    className="h-12 flex-1 px-2 text-[#18271D] dark:text-[#F1F5F2]"
+                  />
+                  {placeSearching ? (
+                    <ActivityIndicator size="small" color="#087A3F" />
                   ) : (
-                    <Text className="text-[10px] font-bold text-[#7A847C]">
-                      서비스 지역 밖
-                    </Text>
+                    <Pressable
+                      accessibilityLabel="장소 검색"
+                      onPress={() => void handlePlaceSearch()}
+                    >
+                      <Ionicons
+                        name="arrow-forward-circle"
+                        size={23}
+                        color="#087A3F"
+                      />
+                    </Pressable>
                   )}
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+                </View>
+                {placeSearchError && (
+                  <Text className="mt-3 text-xs font-bold text-[#B91C1C]">
+                    {placeSearchError}
+                  </Text>
+                )}
+                <ScrollView
+                  className="mt-3"
+                  contentContainerClassName="gap-2 pb-8"
+                >
+                  {placeResults.map((place, index) => (
+                    <Pressable
+                      key={`${place.latitude}-${place.longitude}-${index}`}
+                      disabled={!place.supportedRegion}
+                      className={`flex-row items-center rounded-2xl border p-4 ${place.supportedRegion ? "border-[#E5EBE5] bg-white dark:border-[#343D36] dark:bg-[#1B211D]" : "border-[#E5EBE5] bg-[#F2F4F2] opacity-60 dark:border-[#343D36] dark:bg-[#202520]"}`}
+                      onPress={() => selectPlace(place)}
+                    >
+                      <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#E9F5EC] dark:bg-[#24382B]">
+                        <Ionicons
+                          name="location"
+                          size={20}
+                          color="#087A3F"
+                        />
+                      </View>
+                      <View className="ml-3 flex-1">
+                        <Text className="text-sm font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
+                          {place.name}
+                        </Text>
+                        <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
+                          {place.roadAddress ||
+                            place.address ||
+                            "주소 정보 없음"}
+                        </Text>
+                      </View>
+                      {place.supportedRegion ? (
+                        <Ionicons
+                          name="chevron-forward"
+                          size={20}
+                          color="#64748B"
+                        />
+                      ) : (
+                        <Text className="text-[10px] font-bold text-[#7A847C]">
+                          서비스 지역 밖
+                        </Text>
+                      )}
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+            </Animated.View>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
 
       <LoginRequiredModal
