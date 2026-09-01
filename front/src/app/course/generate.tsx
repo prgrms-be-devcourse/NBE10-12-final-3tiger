@@ -25,6 +25,7 @@ import {
   generateCourseCandidates,
   saveGeneratedCourse,
 } from "@/api/course-api";
+import { searchPlaces, type PlaceSearchItem } from "@/api/place-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -58,11 +59,6 @@ const PERSONA_OPTIONS: Array<{ key: string | null; label: string }> = [
 ];
 
 const CANDIDATE_COLORS = ["#087A3F", "#F97316", "#A855F7"];
-type PlaceSearchResult = {
-  location: Location.LocationGeocodedLocation;
-  address?: Location.LocationGeocodedAddress;
-};
-
 const toPolyline = (candidate: GenerateCandidate) =>
   (candidate.path.coordinates ?? []).map(([lng, lat]) => ({
     latitude: lat,
@@ -83,7 +79,7 @@ export default function CourseGenerateScreen() {
   } | null>(null);
   const [placeSearchOpen, setPlaceSearchOpen] = useState(false);
   const [placeQuery, setPlaceQuery] = useState("");
-  const [placeResults, setPlaceResults] = useState<PlaceSearchResult[]>([]);
+  const [placeResults, setPlaceResults] = useState<PlaceSearchItem[]>([]);
   const [placeSearching, setPlaceSearching] = useState(false);
   const [placeSearchError, setPlaceSearchError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
@@ -212,25 +208,15 @@ export default function CourseGenerateScreen() {
     setPlaceSearchOpen(true);
   };
 
-  const searchPlaces = async () => {
+  const handlePlaceSearch = async () => {
     const keyword = placeQuery.trim();
     if (!keyword || placeSearching) return;
     setPlaceSearching(true);
     setPlaceSearchError(null);
     try {
-      const results = await Location.geocodeAsync(keyword);
-      const enrichedResults = await Promise.all(
-        results.map(async (location) => {
-          try {
-            const [address] = await Location.reverseGeocodeAsync(location);
-            return { location, address };
-          } catch {
-            return { location };
-          }
-        }),
-      );
-      setPlaceResults(enrichedResults);
-      if (enrichedResults.length === 0)
+      const results = await searchPlaces(keyword);
+      setPlaceResults(results);
+      if (results.length === 0)
         setPlaceSearchError("검색 결과가 없어요. 장소명을 다시 입력해 주세요.");
     } catch {
       setPlaceResults([]);
@@ -240,28 +226,14 @@ export default function CourseGenerateScreen() {
     }
   };
 
-  const selectPlace = (place: PlaceSearchResult) => {
-    setCoords({
-      latitude: place.location.latitude,
-      longitude: place.location.longitude,
-    });
+  const selectPlace = (place: PlaceSearchItem) => {
+    if (!place.supportedRegion) return;
+    setCoords({ latitude: place.latitude, longitude: place.longitude });
     setCandidates([]);
     setSelectedIndex(null);
     setErrorMessage(null);
     setPlaceSearchOpen(false);
   };
-
-  const formatPlace = (place: PlaceSearchResult) =>
-    [
-      place.address?.name,
-      place.address?.street,
-      place.address?.district,
-      place.address?.city,
-      place.address?.region,
-    ]
-      .filter(Boolean)
-      .filter((value, index, values) => values.indexOf(value) === index)
-      .join(" ") || "검색된 위치";
 
   const generateMutation = useMutation({
     mutationFn: generateCourseCandidates,
@@ -709,7 +681,7 @@ export default function CourseGenerateScreen() {
               <TextInput
                 value={placeQuery}
                 onChangeText={setPlaceQuery}
-                onSubmitEditing={() => void searchPlaces()}
+                onSubmitEditing={() => void handlePlaceSearch()}
                 returnKeyType="search"
                 placeholder="공원이나 장소를 검색해 보세요"
                 placeholderTextColor={isDark ? "#758078" : "#94A09A"}
@@ -718,7 +690,7 @@ export default function CourseGenerateScreen() {
               {placeSearching ? (
                 <ActivityIndicator size="small" color="#087A3F" />
               ) : (
-                <Pressable accessibilityLabel="장소 검색" onPress={() => void searchPlaces()}>
+                <Pressable accessibilityLabel="장소 검색" onPress={() => void handlePlaceSearch()}>
                   <Ionicons name="arrow-forward-circle" size={23} color="#087A3F" />
                 </Pressable>
               )}
@@ -731,8 +703,9 @@ export default function CourseGenerateScreen() {
             <ScrollView className="mt-3" contentContainerClassName="gap-2 pb-8">
               {placeResults.map((place, index) => (
                 <Pressable
-                  key={`${place.location.latitude}-${place.location.longitude}-${index}`}
-                  className="flex-row items-center rounded-2xl border border-[#E5EBE5] bg-white p-4 dark:border-[#343D36] dark:bg-[#1B211D]"
+                  key={`${place.latitude}-${place.longitude}-${index}`}
+                  disabled={!place.supportedRegion}
+                  className={`flex-row items-center rounded-2xl border p-4 ${place.supportedRegion ? "border-[#E5EBE5] bg-white dark:border-[#343D36] dark:bg-[#1B211D]" : "border-[#E5EBE5] bg-[#F2F4F2] opacity-60 dark:border-[#343D36] dark:bg-[#202520]"}`}
                   onPress={() => selectPlace(place)}
                 >
                   <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#E9F5EC] dark:bg-[#24382B]">
@@ -740,13 +713,19 @@ export default function CourseGenerateScreen() {
                   </View>
                   <View className="ml-3 flex-1">
                     <Text className="text-sm font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
-                      {formatPlace(place)}
+                      {place.name}
                     </Text>
                     <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
-                      {place.location.latitude.toFixed(5)}, {place.location.longitude.toFixed(5)}
+                      {place.roadAddress || place.address || "주소 정보 없음"}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#64748B" />
+                  {place.supportedRegion ? (
+                    <Ionicons name="chevron-forward" size={20} color="#64748B" />
+                  ) : (
+                    <Text className="text-[10px] font-bold text-[#7A847C]">
+                      서비스 지역 밖
+                    </Text>
+                  )}
                 </Pressable>
               ))}
             </ScrollView>
