@@ -5,6 +5,7 @@ import com.back.place.kakao.dto.PlaceSearchItem;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,7 +28,9 @@ public class KakaoPlaceController {
             description = "검색한 결과 리스트를 제공합니다."
     )
     public ApiResponse<List<PlaceSearchItem>> search(
-            @RequestParam @NotBlank String query
+            @RequestParam
+            @NotBlank
+            @Size(max = 100) String query
     ) {
         return ApiResponse.ok(
                 "장소 검색 성공",

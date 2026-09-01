@@ -1,9 +1,15 @@
 package com.back.place.kakao;
 
+import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.SecurityConfig;
+import com.back.global.config.WebConfig;
+import com.back.global.exception.BusinessException;
+import com.back.global.exception.ErrorCode;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
 import com.back.place.kakao.dto.PlaceSearchItem;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimitInterceptor;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -14,13 +20,21 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(KakaoPlaceController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class})
+@Import({
+        SecurityConfig.class,
+        WebConfig.class,
+        CurrentUserIdResolver.class,
+        GlobalExceptionHandler.class,
+        PlaceSearchRateLimitInterceptor.class
+})
 class KakaoPlaceControllerTest {
 
     @Autowired
@@ -31,6 +45,9 @@ class KakaoPlaceControllerTest {
 
     @MockitoBean
     private JwtProvider jwtProvider;
+
+    @MockitoBean
+    private PlaceSearchRateLimiter rateLimiter;
 
     @Test
     void allowsAnonymousSearchAndReturnsSupportedRegionFlag() throws Exception {
@@ -60,6 +77,19 @@ class KakaoPlaceControllerTest {
                         .param("query", "   "))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON_400"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void returnsTooManyRequestsWithoutCallingServiceWhenRateLimitIsExceeded() throws Exception {
+        willThrow(new BusinessException(ErrorCode.PLACE_SEARCH_RATE_LIMIT_EXCEEDED))
+                .given(rateLimiter).check(anyString());
+
+        mvc.perform(get("/api/v1/places/search")
+                        .param("query", "서울식물원"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("PLACE_429_1"));
 
         verifyNoInteractions(service);
     }

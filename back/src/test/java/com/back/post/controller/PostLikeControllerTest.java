@@ -7,6 +7,7 @@ import com.back.global.config.WebConfig;
 import com.back.global.error.ApiException;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import com.back.post.service.PostLikeService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,9 @@ class PostLikeControllerTest {
 
     @MockitoBean
     private JwtProvider jwtProvider;
+
+    @MockitoBean
+    private PlaceSearchRateLimiter placeSearchRateLimiter;
 
     @Test
     @DisplayName("t1: PUT /api/v1/posts/{postId}/likes 요청 시 200과 좋아요 결과를 반환한다")

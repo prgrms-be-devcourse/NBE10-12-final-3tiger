@@ -8,6 +8,7 @@ import com.back.global.exception.GlobalExceptionHandler;
 import com.back.post.service.PostService;
 import com.back.post.storage.PhotoStorage;
 import com.back.global.jwt.JwtProvider;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,7 @@ class PostControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean PostService postService;
     @MockitoBean JwtProvider jwtProvider;
+    @MockitoBean PlaceSearchRateLimiter placeSearchRateLimiter;
 
     @Test
     @DisplayName("피드는 인증 없이 내용·좋아요·댓글 정보를 조회할 수 있다")
