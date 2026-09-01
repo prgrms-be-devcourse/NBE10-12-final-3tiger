@@ -58,6 +58,10 @@ const PERSONA_OPTIONS: Array<{ key: string | null; label: string }> = [
 ];
 
 const CANDIDATE_COLORS = ["#087A3F", "#F97316", "#A855F7"];
+type PlaceSearchResult = {
+  location: Location.LocationGeocodedLocation;
+  address?: Location.LocationGeocodedAddress;
+};
 
 const toPolyline = (candidate: GenerateCandidate) =>
   (candidate.path.coordinates ?? []).map(([lng, lat]) => ({
@@ -77,14 +81,11 @@ export default function CourseGenerateScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
-  const [coordinateEditorOpen, setCoordinateEditorOpen] = useState(false);
-  const [latitudeInput, setLatitudeInput] = useState(
-    String(DEFAULT_COORDS.latitude),
-  );
-  const [longitudeInput, setLongitudeInput] = useState(
-    String(DEFAULT_COORDS.longitude),
-  );
-  const [coordinateError, setCoordinateError] = useState<string | null>(null);
+  const [placeSearchOpen, setPlaceSearchOpen] = useState(false);
+  const [placeQuery, setPlaceQuery] = useState("");
+  const [placeResults, setPlaceResults] = useState<PlaceSearchResult[]>([]);
+  const [placeSearching, setPlaceSearching] = useState(false);
+  const [placeSearchError, setPlaceSearchError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [distanceM, setDistanceM] = useState(3000);
   const [persona, setPersona] = useState<string | null>(null);
@@ -92,10 +93,8 @@ export default function CourseGenerateScreen() {
   const [candidates, setCandidates] = useState<GenerateCandidate[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-<<<<<<< HEAD
   const [addressQuery, setAddressQuery] = useState("");
   const [geocoding, setGeocoding] = useState(false);
-=======
   const profileQuery = useQuery({
     queryKey: ["my-profile"],
     queryFn: getMyProfile,
@@ -106,7 +105,6 @@ export default function CourseGenerateScreen() {
     const preferredPersona = profileQuery.data?.primaryPersona;
     if (!personaSelected && preferredPersona) setPersona(preferredPersona);
   }, [personaSelected, profileQuery.data?.primaryPersona]);
->>>>>>> db314ba (feat: 코스 생성 페이지 페르소나가 처음에 user의 페르소나로 설정되도록 함 #74)
 
   useEffect(() => {
     const loadLastLocation = async () => {
@@ -207,33 +205,63 @@ export default function CourseGenerateScreen() {
     }
   };
 
-  const openCoordinateEditor = () => {
-    setLatitudeInput(String(coords.latitude));
-    setLongitudeInput(String(coords.longitude));
-    setCoordinateError(null);
-    setCoordinateEditorOpen(true);
+  const openPlaceSearch = () => {
+    setPlaceQuery("");
+    setPlaceResults([]);
+    setPlaceSearchError(null);
+    setPlaceSearchOpen(true);
   };
 
-  const saveCoordinates = () => {
-    const latitude = Number(latitudeInput.trim());
-    const longitude = Number(longitudeInput.trim());
-    if (
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude) ||
-      latitude < -90 ||
-      latitude > 90 ||
-      longitude < -180 ||
-      longitude > 180
-    ) {
-      setCoordinateError("위도는 -90~90, 경도는 -180~180 사이로 입력해 주세요.");
-      return;
+  const searchPlaces = async () => {
+    const keyword = placeQuery.trim();
+    if (!keyword || placeSearching) return;
+    setPlaceSearching(true);
+    setPlaceSearchError(null);
+    try {
+      const results = await Location.geocodeAsync(keyword);
+      const enrichedResults = await Promise.all(
+        results.map(async (location) => {
+          try {
+            const [address] = await Location.reverseGeocodeAsync(location);
+            return { location, address };
+          } catch {
+            return { location };
+          }
+        }),
+      );
+      setPlaceResults(enrichedResults);
+      if (enrichedResults.length === 0)
+        setPlaceSearchError("검색 결과가 없어요. 장소명을 다시 입력해 주세요.");
+    } catch {
+      setPlaceResults([]);
+      setPlaceSearchError("장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.");
+    } finally {
+      setPlaceSearching(false);
     }
-    setCoords({ latitude, longitude });
+  };
+
+  const selectPlace = (place: PlaceSearchResult) => {
+    setCoords({
+      latitude: place.location.latitude,
+      longitude: place.location.longitude,
+    });
     setCandidates([]);
     setSelectedIndex(null);
     setErrorMessage(null);
-    setCoordinateEditorOpen(false);
+    setPlaceSearchOpen(false);
   };
+
+  const formatPlace = (place: PlaceSearchResult) =>
+    [
+      place.address?.name,
+      place.address?.street,
+      place.address?.district,
+      place.address?.city,
+      place.address?.region,
+    ]
+      .filter(Boolean)
+      .filter((value, index, values) => values.indexOf(value) === index)
+      .join(" ") || "검색된 위치";
 
   const generateMutation = useMutation({
     mutationFn: generateCourseCandidates,
@@ -420,10 +448,10 @@ export default function CourseGenerateScreen() {
               <Button
                 variant="ghost"
                 size="sm"
-                onPress={openCoordinateEditor}
+                onPress={openPlaceSearch}
               >
-                <Ionicons name="create-outline" size={16} color="#087A3F" />
-                <Text className="text-xs font-bold text-[#087A3F]">편집</Text>
+                <Ionicons name="search" size={16} color="#087A3F" />
+                <Text className="text-xs font-bold text-[#087A3F]">검색</Text>
               </Button>
               <Button
                 variant="ghost"
@@ -652,66 +680,76 @@ export default function CourseGenerateScreen() {
       </ScrollView>
 
       <Modal
-        visible={coordinateEditorOpen}
+        visible={placeSearchOpen}
         transparent
-        animationType="fade"
-        onRequestClose={() => setCoordinateEditorOpen(false)}
+        animationType="slide"
+        onRequestClose={() => setPlaceSearchOpen(false)}
       >
-        <KeyboardAvoidingView
-          behavior="padding"
-          className="flex-1 items-center justify-center bg-black/40 px-6"
-        >
-          <View className="w-full rounded-2xl bg-white p-5 dark:bg-[#1B211D]">
-            <Text className="text-lg font-extrabold text-[#18271D] dark:text-[#F1F5F2]">
-              출발 위치 직접 설정
-            </Text>
-            <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
-              위도와 경도를 입력하면 해당 위치를 출발점으로 사용합니다.
-            </Text>
-            <Text className="mt-4 text-xs font-bold text-[#526056] dark:text-[#AAB5AD]">
-              위도 (Latitude)
-            </Text>
-            <TextInput
-              value={latitudeInput}
-              onChangeText={setLatitudeInput}
-              keyboardType="numbers-and-punctuation"
-              placeholder="예: 37.5462"
-              placeholderTextColor={isDark ? "#758078" : "#94A09A"}
-              className="mt-1 h-12 rounded-xl border border-[#D7E2D8] bg-[#F8FAF8] px-3 text-[#18271D] dark:border-[#475249] dark:bg-[#242B26] dark:text-[#F1F5F2]"
-            />
-            <Text className="mt-3 text-xs font-bold text-[#526056] dark:text-[#AAB5AD]">
-              경도 (Longitude)
-            </Text>
-            <TextInput
-              value={longitudeInput}
-              onChangeText={setLongitudeInput}
-              keyboardType="numbers-and-punctuation"
-              placeholder="예: 127.0372"
-              placeholderTextColor={isDark ? "#758078" : "#94A09A"}
-              className="mt-1 h-12 rounded-xl border border-[#D7E2D8] bg-[#F8FAF8] px-3 text-[#18271D] dark:border-[#475249] dark:bg-[#242B26] dark:text-[#F1F5F2]"
-            />
-            {coordinateError && (
-              <Text className="mt-2 text-xs font-bold text-[#DC2626]">
-                {coordinateError}
+        <KeyboardAvoidingView behavior="padding" className="flex-1 justify-end">
+          <Pressable
+            className="absolute inset-0 bg-black/40"
+            onPress={() => setPlaceSearchOpen(false)}
+          />
+          <View className="h-[78%] rounded-t-[30px] bg-[#FCFDFC] px-5 pt-5 dark:bg-[#171C18]">
+            <View className="mb-4 flex-row items-center justify-between">
+              <Text className="text-[17px] font-black text-[#191C1D] dark:text-[#F1F5F2]">
+                출발 위치 검색
               </Text>
-            )}
-            <View className="mt-5 flex-row gap-2">
               <Button
-                variant="secondary"
-                className="h-12 flex-1 rounded-xl bg-[#E8EEE9] dark:bg-[#2A312C]"
-                onPress={() => setCoordinateEditorOpen(false)}
+                variant="ghost"
+                size="icon"
+                accessibilityLabel="검색 닫기"
+                onPress={() => setPlaceSearchOpen(false)}
               >
-                <Text className="font-bold text-[#526056] dark:text-[#D4DDD6]">
-                  취소
-                </Text>
-              </Button>
-              <Button
-                className="h-12 flex-1 rounded-xl bg-[#087A3F]"
-                onPress={saveCoordinates}
-              >
-                <Text className="font-bold text-white">저장</Text>
+                <Ionicons name="close" size={22} color={isDark ? "#F1F5F2" : "#334139"} />
               </Button>
             </View>
+            <View className="flex-row items-center rounded-xl border border-[#D7E2D8] bg-white px-3 dark:border-[#475249] dark:bg-[#1B211D]">
+              <Ionicons name="search" size={19} color="#7A847C" />
+              <TextInput
+                value={placeQuery}
+                onChangeText={setPlaceQuery}
+                onSubmitEditing={() => void searchPlaces()}
+                returnKeyType="search"
+                placeholder="공원이나 장소를 검색해 보세요"
+                placeholderTextColor={isDark ? "#758078" : "#94A09A"}
+                className="h-12 flex-1 px-2 text-[#18271D] dark:text-[#F1F5F2]"
+              />
+              {placeSearching ? (
+                <ActivityIndicator size="small" color="#087A3F" />
+              ) : (
+                <Pressable accessibilityLabel="장소 검색" onPress={() => void searchPlaces()}>
+                  <Ionicons name="arrow-forward-circle" size={23} color="#087A3F" />
+                </Pressable>
+              )}
+            </View>
+            {placeSearchError && (
+              <Text className="mt-3 text-xs font-bold text-[#B91C1C]">
+                {placeSearchError}
+              </Text>
+            )}
+            <ScrollView className="mt-3" contentContainerClassName="gap-2 pb-8">
+              {placeResults.map((place, index) => (
+                <Pressable
+                  key={`${place.location.latitude}-${place.location.longitude}-${index}`}
+                  className="flex-row items-center rounded-2xl border border-[#E5EBE5] bg-white p-4 dark:border-[#343D36] dark:bg-[#1B211D]"
+                  onPress={() => selectPlace(place)}
+                >
+                  <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#E9F5EC] dark:bg-[#24382B]">
+                    <Ionicons name="location" size={20} color="#087A3F" />
+                  </View>
+                  <View className="ml-3 flex-1">
+                    <Text className="text-sm font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
+                      {formatPlace(place)}
+                    </Text>
+                    <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
+                      {place.location.latitude.toFixed(5)}, {place.location.longitude.toFixed(5)}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#64748B" />
+                </Pressable>
+              ))}
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>

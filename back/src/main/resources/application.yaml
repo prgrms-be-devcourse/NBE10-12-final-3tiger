@@ -30,6 +30,9 @@ app:
     client-id: ${KAKAO_CLIENT_ID}
     client-secret: ${KAKAO_CLIENT_SECRET:}
     redirect-uri: ${KAKAO_REDIRECT_URI}
+  place:
+    kakao:
+      rest-api-key: ${KAKAO_PLACE_REST_API_KEY}
   storage:
     type: ${STORAGE_TYPE:local}
     public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080/local-uploads}
