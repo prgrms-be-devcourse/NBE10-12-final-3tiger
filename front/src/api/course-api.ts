@@ -6,6 +6,7 @@ import type {
   GenerateResponse,
   GeoJsonLineString,
   Region,
+  CourseUsageLog,
 } from "@/types/domain";
 import { apiRequest } from "./client";
 
@@ -52,6 +53,26 @@ export const unbookmarkCourse = (courseId: number) =>
 export const getMyBookmarks = (params: PageParams) =>
   apiRequest<PageResponse<BookmarkedCourse>>({
     url: "/api/v1/users/me/bookmarks",
+    params,
+  });
+export const rateBookmarkedCourse = (courseId: number, rating: number) =>
+  apiRequest<BookmarkedCourse>({
+    url: `/api/v1/courses/${courseId}/bookmarks/rating`,
+    method: "PATCH",
+    data: { rating },
+  });
+export const recordBookmarkedCourseUsage = (courseId: number) =>
+  apiRequest<CourseUsageLog>({
+    url: `/api/v1/courses/${courseId}/bookmarks/usage-logs`,
+    method: "POST",
+    data: { usedAt: new Date().toISOString() },
+  });
+export const getBookmarkedCourseUsageLogs = (
+  courseId: number,
+  params: PageParams,
+) =>
+  apiRequest<PageResponse<CourseUsageLog>>({
+    url: `/api/v1/courses/${courseId}/bookmarks/usage-logs`,
     params,
   });
 export const generateCourseCandidates = (data: GenerateCourseParams) =>

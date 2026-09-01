@@ -26,6 +26,8 @@ services:
       - ./docker/60-comment-upvote-unique-constraint.sh:/docker-entrypoint-initdb.d/60-comment-upvote-unique-constraint.sh:ro
       - ./docker/comment-reply.sql:/tmp/comment-reply.sql:ro
       - ./docker/70-comment-reply.sh:/docker-entrypoint-initdb.d/70-comment-reply.sh:ro
+      - ./docker/80-bookmark-activity.sql:/tmp/bookmark-activity.sql:ro
+      - ./docker/80-bookmark-activity.sh:/docker-entrypoint-initdb.d/80-bookmark-activity.sh:ro
       - ./docker/21_persona_weight.sql:/tmp/persona/21_persona_weight.sql:ro
       - ./docker/22_persona_course_scores.sql:/tmp/persona/22_persona_course_scores.sql:ro
       - ./docker/23_persona_edge_costs.sql:/tmp/persona/23_persona_edge_costs.sql:ro

@@ -74,12 +74,32 @@ class BackApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements").value(1))
                 .andExpect(jsonPath("$.data.content[0].isBookmarked").value(true));
+        mvc.perform(patch("/api/v1/courses/{id}/bookmarks/rating", courseId)
+                        .with(authenticatedAs(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\":5}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.rating").value(5));
+        mvc.perform(post("/api/v1/courses/{id}/bookmarks/usage-logs", courseId)
+                        .with(authenticatedAs(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"usedAt\":\"2026-08-19T08:30:00.000Z\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.courseId").value(courseId));
+        mvc.perform(get("/api/v1/courses/{id}/bookmarks/usage-logs", courseId)
+                        .with(authenticatedAs(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalElements").value(1));
+        mvc.perform(get("/api/v1/users/me/bookmarks").with(authenticatedAs(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].usageCount").value(1))
+                .andExpect(jsonPath("$.data.content[0].rating").value(5));
         mvc.perform(delete("/api/v1/courses/{id}/bookmarks", courseId).with(authenticatedAs(userId)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.isBookmarked").value(false));
     }
 
     @Test void createReadAndDeletePost() throws Exception {
-        String body = "{\"courseId\":" + courseId + ",\"content\":\"오늘 산책\",\"photoUrl\":\"https://cdn.example/walk.jpg\",\"walkedAt\":\"2026-08-19T17:30:00\"}";
+        String body = "{\"courseId\":" + courseId + ",\"content\":\"오늘 산책\",\"photoUrl\":\"https://cdn.example/walk.jpg\",\"walkedAt\":\"2026-08-19T08:30:00.000Z\"}";
         String response = mvc.perform(post("/api/v1/posts").with(authenticatedAs(userId))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.postId").isNumber())

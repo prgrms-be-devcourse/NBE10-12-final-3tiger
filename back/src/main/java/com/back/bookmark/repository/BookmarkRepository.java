@@ -10,9 +10,11 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.Set;
+import java.util.Optional;
 
 public interface BookmarkRepository extends JpaRepository<Bookmark, BookmarkId> {
     boolean existsByUserIdAndCourseId(Long userId, Long courseId);
+    Optional<Bookmark> findByUserIdAndCourseId(Long userId, Long courseId);
     long deleteByUserIdAndCourseId(Long userId, Long courseId);
     Page<Bookmark> findByUserId(Long userId, Pageable pageable);
 
