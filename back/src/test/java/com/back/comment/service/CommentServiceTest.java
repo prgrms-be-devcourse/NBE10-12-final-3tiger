@@ -127,8 +127,10 @@ class CommentServiceTest {
         Comment comment = new Comment(post, user, "좋은 코스네요");
         ReflectionTestUtils.setField(comment, "id", 10L);
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findByPost_IdOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
+        given(commentRepository.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(comment)));
+        given(commentRepository.findByParent_IdInOrderByCreatedAtAsc(List.of(10L)))
+                .willReturn(List.of());
 
         // when
         PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, null, PageRequest.of(0, 20));
@@ -142,6 +144,8 @@ class CommentServiceTest {
         assertThat(item.content()).isEqualTo("좋은 코스네요");
         assertThat(item.upvoteCount()).isEqualTo(0);
         assertThat(item.isUpvoted()).isFalse();
+        assertThat(item.isDeleted()).isFalse();
+        assertThat(item.replies()).isEmpty();
         assertThat(item.createdAt()).isEqualTo(comment.getCreatedAt());
     }
 
@@ -357,8 +361,10 @@ class CommentServiceTest {
         Comment notUpvoted = new Comment(post, author, "공감 안 한 댓글");
         ReflectionTestUtils.setField(notUpvoted, "id", 20L);
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findByPost_IdOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
+        given(commentRepository.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(upvoted, notUpvoted)));
+        given(commentRepository.findByParent_IdInOrderByCreatedAtAsc(List.of(10L, 20L)))
+                .willReturn(List.of());
         given(commentUpvoteRepository.findUpvotedCommentIds(userId, List.of(10L, 20L)))
                 .willReturn(List.of(10L));
 
@@ -385,8 +391,10 @@ class CommentServiceTest {
         Comment c2 = new Comment(post, author, "댓글2");
         ReflectionTestUtils.setField(c2, "id", 20L);
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findByPost_IdOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
+        given(commentRepository.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(c1, c2)));
+        given(commentRepository.findByParent_IdInOrderByCreatedAtAsc(List.of(10L, 20L)))
+                .willReturn(List.of());
 
         // when
         PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, null, PageRequest.of(0, 20));
@@ -394,5 +402,198 @@ class CommentServiceTest {
         // then
         assertThat(response.content()).allMatch(item -> !item.isUpvoted());
         verify(commentUpvoteRepository, never()).findUpvotedCommentIds(any(), any());
+    }
+
+    @Test
+    @DisplayName("t15: 원댓글에 답글 작성 성공 시 replyId를 반환하고 부모 댓글 작성자에게 CommentCreatedEvent를 발행한다")
+    void t15() {
+        // given
+        Long parentCommentId = 10L;
+        Long userId = 1L;
+        User parentAuthor = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        ReflectionTestUtils.setField(parentAuthor, "id", 42L);
+        Course course = new Course("서울숲 코스", "11200", 2500);
+        Post post = new Post(parentAuthor, course, "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
+        ReflectionTestUtils.setField(post, "id", 7L);
+        Comment parent = new Comment(post, parentAuthor, "원댓글");
+        ReflectionTestUtils.setField(parent, "id", parentCommentId);
+        User replier = User.createLocal("reply@test.com", "dummy-hash", "답글러");
+        ReflectionTestUtils.setField(replier, "id", userId);
+        Comment savedReply = new Comment(post, replier, "답글입니다", parent);
+        ReflectionTestUtils.setField(savedReply, "id", 200L);
+        given(commentRepository.findById(parentCommentId)).willReturn(Optional.of(parent));
+        given(userRepository.findById(userId)).willReturn(Optional.of(replier));
+        given(commentRepository.save(any(Comment.class))).willReturn(savedReply);
+
+        // when
+        Long replyId = commentService.createReply(parentCommentId, userId, "답글입니다");
+
+        // then
+        assertThat(replyId).isEqualTo(200L);
+
+        ArgumentCaptor<Comment> savedCaptor = ArgumentCaptor.forClass(Comment.class);
+        verify(commentRepository).save(savedCaptor.capture());
+        assertThat(savedCaptor.getValue().isReply()).isTrue();
+        assertThat(savedCaptor.getValue().getParent()).isSameAs(parent);
+
+        ArgumentCaptor<CommentCreatedEvent> eventCaptor = ArgumentCaptor.forClass(CommentCreatedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        CommentCreatedEvent event = eventCaptor.getValue();
+        assertThat(event.receiverId()).isEqualTo(42L);
+        assertThat(event.actorId()).isEqualTo(userId);
+        assertThat(event.actorNickname()).isEqualTo("답글러");
+        assertThat(event.postId()).isEqualTo(7L);
+        assertThat(event.commentId()).isEqualTo(200L);
+    }
+
+    @Test
+    @DisplayName("t16: 답글에 답글 작성 시 400 ApiException이 발생하고 저장/이벤트 발행을 하지 않는다")
+    void t16() {
+        // given
+        Long parentReplyId = 20L;
+        Long userId = 1L;
+        Post post = newPost();
+        User author = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        Comment original = new Comment(post, author, "원댓글");
+        Comment parentReply = new Comment(post, author, "답글", original);
+        ReflectionTestUtils.setField(parentReply, "id", parentReplyId);
+        given(commentRepository.findById(parentReplyId)).willReturn(Optional.of(parentReply));
+
+        // when
+        ApiException exception = catchThrowableOfType(
+                () -> commentService.createReply(parentReplyId, userId, "답답글"), ApiException.class);
+
+        // then
+        assertThat(exception.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(exception.getMessage()).isEqualTo("답글에는 답글을 달 수 없습니다.");
+        verify(commentRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("t17: 존재하지 않는 부모 댓글에 답글 작성 시 404 ApiException이 발생한다")
+    void t17() {
+        // given
+        Long parentCommentId = 999L;
+        given(commentRepository.findById(parentCommentId)).willReturn(Optional.empty());
+
+        // when
+        ApiException exception = catchThrowableOfType(
+                () -> commentService.createReply(parentCommentId, 1L, "답글"), ApiException.class);
+
+        // then
+        assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(exception.getMessage()).isEqualTo("존재하지 않는 댓글입니다.");
+    }
+
+    @Test
+    @DisplayName("t18: 하위 답글이 있는 원댓글 삭제 시 소프트 삭제된다 (content 변경, deleted=true, 하드 삭제 안 함)")
+    void t18() {
+        // given
+        Long commentId = 10L;
+        Long userId = 1L;
+        Post post = newPost();
+        User author = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        ReflectionTestUtils.setField(author, "id", userId);
+        Comment comment = new Comment(post, author, "원댓글 내용");
+        ReflectionTestUtils.setField(comment, "id", commentId);
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+        given(commentRepository.existsByParent_Id(commentId)).willReturn(true);
+
+        // when
+        commentService.deleteComment(commentId, userId);
+
+        // then
+        assertThat(comment.isDeleted()).isTrue();
+        assertThat(comment.getContent()).isEqualTo("삭제된 댓글입니다.");
+        verify(commentRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("t19: 하위 답글이 없는 원댓글 삭제 시 하드 삭제된다")
+    void t19() {
+        // given
+        Long commentId = 10L;
+        Long userId = 1L;
+        Post post = newPost();
+        User author = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        ReflectionTestUtils.setField(author, "id", userId);
+        Comment comment = new Comment(post, author, "원댓글 내용");
+        ReflectionTestUtils.setField(comment, "id", commentId);
+        given(commentRepository.findById(commentId)).willReturn(Optional.of(comment));
+        given(commentRepository.existsByParent_Id(commentId)).willReturn(false);
+
+        // when
+        commentService.deleteComment(commentId, userId);
+
+        // then
+        assertThat(comment.isDeleted()).isFalse();
+        assertThat(comment.getContent()).isEqualTo("원댓글 내용");
+        verify(commentRepository).delete(comment);
+    }
+
+    @Test
+    @DisplayName("t20: 답글 삭제는 하위 답글 존재 여부와 무관하게 항상 하드 삭제된다")
+    void t20() {
+        // given
+        Long replyId = 20L;
+        Long userId = 1L;
+        Post post = newPost();
+        User author = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        ReflectionTestUtils.setField(author, "id", userId);
+        Comment original = new Comment(post, author, "원댓글");
+        Comment reply = new Comment(post, author, "답글 내용", original);
+        ReflectionTestUtils.setField(reply, "id", replyId);
+        given(commentRepository.findById(replyId)).willReturn(Optional.of(reply));
+
+        // when
+        commentService.deleteComment(replyId, userId);
+
+        // then
+        assertThat(reply.isDeleted()).isFalse();
+        verify(commentRepository).delete(reply);
+        verify(commentRepository, never()).existsByParent_Id(any());
+    }
+
+    @Test
+    @DisplayName("t21: 목록 조회 시 원댓글에 답글이 함께 매핑되고, isUpvoted는 답글에도 적용되며 소프트 삭제된 원댓글도 답글은 노출된다")
+    void t21() {
+        // given
+        Long postId = 1L;
+        Long userId = 7L;
+        User parentAuthor = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        ReflectionTestUtils.setField(parentAuthor, "id", 42L);
+        Course course = new Course("서울숲 코스", "11200", 2500);
+        Post post = new Post(parentAuthor, course, "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
+        Comment parent = new Comment(post, parentAuthor, "원댓글 내용");
+        ReflectionTestUtils.setField(parent, "id", 10L);
+        parent.softDelete();
+        User replier = User.createLocal("reply@test.com", "dummy-hash", "답글러");
+        ReflectionTestUtils.setField(replier, "id", 8L);
+        Comment reply = new Comment(post, replier, "답글 내용", parent);
+        ReflectionTestUtils.setField(reply, "id", 11L);
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(commentRepository.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(parent)));
+        given(commentRepository.findByParent_IdInOrderByCreatedAtAsc(List.of(10L)))
+                .willReturn(List.of(reply));
+        given(commentUpvoteRepository.findUpvotedCommentIds(userId, List.of(10L, 11L)))
+                .willReturn(List.of(11L));
+
+        // when
+        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, userId, PageRequest.of(0, 20));
+
+        // then
+        assertThat(response.content()).hasSize(1);
+        CommentService.CommentResponse parentItem = response.content().get(0);
+        assertThat(parentItem.commentId()).isEqualTo(10L);
+        assertThat(parentItem.isDeleted()).isTrue();
+        assertThat(parentItem.content()).isEqualTo("삭제된 댓글입니다.");
+        assertThat(parentItem.isUpvoted()).isFalse();
+        assertThat(parentItem.replies()).hasSize(1);
+        CommentService.CommentResponse replyItem = parentItem.replies().get(0);
+        assertThat(replyItem.commentId()).isEqualTo(11L);
+        assertThat(replyItem.content()).isEqualTo("답글 내용");
+        assertThat(replyItem.isUpvoted()).isTrue();
     }
 }

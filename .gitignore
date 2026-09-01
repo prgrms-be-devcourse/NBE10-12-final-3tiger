@@ -14,6 +14,13 @@ back/build/local-uploads/
 .DS_Store
 **/.DS_Store
 
+# env / secrets (커밋 금지)
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+
 drafts/
 final-2026-08-gs-yc-v1/
 final-2026-08-gs-yc-v1.zip

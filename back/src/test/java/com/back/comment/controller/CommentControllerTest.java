@@ -55,7 +55,7 @@ class CommentControllerTest {
     void t1() throws Exception {
         // given
         CommentService.CommentResponse commentResponse =
-                new CommentService.CommentResponse(1L, 1L, "산책러", "좋은 코스네요", 0, false, LocalDateTime.now());
+                new CommentService.CommentResponse(1L, 1L, "산책러", "좋은 코스네요", 0, false, false, LocalDateTime.now(), List.of());
         given(commentService.getComments(eq(1L), isNull(), any(Pageable.class)))
                 .willReturn(PageResponse.from(new PageImpl<>(List.of(commentResponse))));
 
@@ -74,15 +74,19 @@ class CommentControllerTest {
     @DisplayName("t1b: 로그인 GET /api/v1/posts/{postId}/comments 요청 시 현재 사용자 id로 조회되고 isUpvoted가 응답에 반영된다")
     void t1b() throws Exception {
         // given
+        CommentService.CommentResponse replyResponse =
+                new CommentService.CommentResponse(2L, 3L, "답글러", "답글", 0, false, false, LocalDateTime.now(), List.of());
         CommentService.CommentResponse commentResponse =
-                new CommentService.CommentResponse(1L, 2L, "산책러", "좋은 코스네요", 3, true, LocalDateTime.now());
+                new CommentService.CommentResponse(1L, 2L, "산책러", "좋은 코스네요", 3, true, false, LocalDateTime.now(), List.of(replyResponse));
         given(commentService.getComments(eq(1L), eq(1L), any(Pageable.class)))
                 .willReturn(PageResponse.from(new PageImpl<>(List.of(commentResponse))));
 
         // when & then
         mockMvc.perform(get("/api/v1/posts/{postId}/comments", 1L).with(authenticatedAs(1L)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.content[0].isUpvoted").value(true));
+                .andExpect(jsonPath("$.data.content[0].isUpvoted").value(true))
+                .andExpect(jsonPath("$.data.content[0].replies[0].commentId").value(2))
+                .andExpect(jsonPath("$.data.content[0].replies[0].nickname").value("답글러"));
 
         verify(commentService).getComments(eq(1L), eq(1L), any(Pageable.class));
     }
@@ -171,5 +175,60 @@ class CommentControllerTest {
         // when & then
         mockMvc.perform(delete("/api/v1/comments/{commentId}", 1L).with(authenticatedAs(2L)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("t9: POST /api/v1/comments/{commentId}/replies 요청 시 200과 replyId를 반환한다")
+    void t9() throws Exception {
+        // given
+        given(commentService.createReply(1L, 1L, "답글입니다")).willReturn(50L);
+
+        // when & then
+        mockMvc.perform(post("/api/v1/comments/{commentId}/replies", 1L)
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"답글입니다\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(50));
+    }
+
+    @Test
+    @DisplayName("t10: 미인증 상태로 답글 작성 시 401을 반환한다")
+    void t10() throws Exception {
+        // when & then
+        mockMvc.perform(post("/api/v1/comments/{commentId}/replies", 1L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"답글입니다\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verify(commentService, never()).createReply(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("t11: 답글에 답글 작성 시(depth 위반) 400을 반환한다")
+    void t11() throws Exception {
+        // given
+        given(commentService.createReply(2L, 1L, "답답글"))
+                .willThrow(new ApiException(HttpStatus.BAD_REQUEST, "답글에는 답글을 달 수 없습니다."));
+
+        // when & then
+        mockMvc.perform(post("/api/v1/comments/{commentId}/replies", 2L)
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"답답글\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("t12: 빈 content로 답글 작성 시 검증 실패로 400을 반환한다")
+    void t12() throws Exception {
+        // when & then
+        mockMvc.perform(post("/api/v1/comments/{commentId}/replies", 1L)
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(commentService, never()).createReply(any(), any(), any());
     }
 }
