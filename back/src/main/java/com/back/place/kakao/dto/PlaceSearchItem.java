@@ -7,5 +7,6 @@ public record PlaceSearchItem(
         double latitude,
         double longitude,
         String category,
-        String placeUrl
+        String placeUrl,
+        boolean supportedRegion
 ) {}
