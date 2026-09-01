@@ -6,8 +6,10 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class KakaoPlaceServiceTest {
 
@@ -38,6 +40,48 @@ class KakaoPlaceServiceTest {
 
         assertThat(result).singleElement()
                 .satisfies(item -> assertThat(item.supportedRegion()).isFalse());
+    }
+
+    @Test
+    void trimsQueryAndMapsKakaoCoordinates() {
+        given(client.search("서울식물원", 15)).willReturn(response(
+                document("서울식물원", "서울 강서구 마곡동", "서울 강서구 마곡동로 161")
+        ));
+
+        var result = service.search("  서울식물원  ");
+
+        verify(client).search("서울식물원", 15);
+        assertThat(result).singleElement().satisfies(item -> {
+            assertThat(item.latitude()).isEqualTo(37.5509);
+            assertThat(item.longitude()).isEqualTo(126.8495);
+        });
+    }
+
+    @Test
+    void returnsEmptyListWhenKakaoDocumentsAreNull() {
+        given(client.search("없는 장소", 15)).willReturn(
+                new KakaoPlaceSearchResponse(null, new KakaoPlaceSearchResponse.Meta(0))
+        );
+
+        assertThat(service.search("없는 장소")).isEmpty();
+    }
+
+    @Test
+    void rejectsInvalidCoordinateFromKakao() {
+        var invalidDocument = new KakaoPlaceSearchResponse.Document(
+                "잘못된 장소",
+                "서울 강서구 마곡동",
+                "",
+                "not-a-number",
+                "37.5509",
+                "여행 > 공원",
+                "https://place.map.kakao.com/1"
+        );
+        given(client.search("잘못된 장소", 15)).willReturn(response(invalidDocument));
+
+        assertThatThrownBy(() -> service.search("잘못된 장소"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("카카오 좌표 응답이 올바르지 않습니다.");
     }
 
     private KakaoPlaceSearchResponse response(KakaoPlaceSearchResponse.Document... documents) {

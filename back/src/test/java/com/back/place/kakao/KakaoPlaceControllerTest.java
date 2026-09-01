@@ -13,8 +13,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static com.back.TestAuthentication.authenticatedAs;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,7 +33,7 @@ class KakaoPlaceControllerTest {
     private JwtProvider jwtProvider;
 
     @Test
-    void returnsSupportedRegionFlagForClient() throws Exception {
+    void allowsAnonymousSearchAndReturnsSupportedRegionFlag() throws Exception {
         given(service.search("서울식물원")).willReturn(List.of(
                 new PlaceSearchItem(
                         "서울식물원",
@@ -48,10 +48,19 @@ class KakaoPlaceControllerTest {
         ));
 
         mvc.perform(get("/api/v1/places/search")
-                        .param("query", "서울식물원")
-                        .with(authenticatedAs(1L)))
+                        .param("query", "서울식물원"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].name").value("서울식물원"))
                 .andExpect(jsonPath("$.data[0].supportedRegion").value(true));
+    }
+
+    @Test
+    void rejectsBlankQuery() throws Exception {
+        mvc.perform(get("/api/v1/places/search")
+                        .param("query", "   "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COMMON_400"));
+
+        verifyNoInteractions(service);
     }
 }
