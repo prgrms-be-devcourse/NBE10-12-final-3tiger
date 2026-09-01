@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -28,6 +28,7 @@ import {
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
+import { getMyProfile } from "@/api/user-api";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { GenerateCandidate } from "@/types/domain";
@@ -87,11 +88,25 @@ export default function CourseGenerateScreen() {
   const [locating, setLocating] = useState(false);
   const [distanceM, setDistanceM] = useState(3000);
   const [persona, setPersona] = useState<string | null>(null);
+  const [personaSelected, setPersonaSelected] = useState(false);
   const [candidates, setCandidates] = useState<GenerateCandidate[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+<<<<<<< HEAD
   const [addressQuery, setAddressQuery] = useState("");
   const [geocoding, setGeocoding] = useState(false);
+=======
+  const profileQuery = useQuery({
+    queryKey: ["my-profile"],
+    queryFn: getMyProfile,
+    enabled: isAuthenticated,
+  });
+
+  useEffect(() => {
+    const preferredPersona = profileQuery.data?.primaryPersona;
+    if (!personaSelected && preferredPersona) setPersona(preferredPersona);
+  }, [personaSelected, profileQuery.data?.primaryPersona]);
+>>>>>>> db314ba (feat: 코스 생성 페이지 페르소나가 처음에 user의 페르소나로 설정되도록 함 #74)
 
   useEffect(() => {
     const loadLastLocation = async () => {
@@ -529,7 +544,10 @@ export default function CourseGenerateScreen() {
                 <Pressable
                   key={option.label}
                   className={`h-10 rounded-full border px-4 ${active ? "border-[#087A3F] bg-[#E9FBEF] dark:bg-[#24382B]" : "border-slate-200 bg-[#F8FAF8] dark:border-[#343D36] dark:bg-[#242B26]"}`}
-                  onPress={() => setPersona(option.key)}
+                  onPress={() => {
+                    setPersonaSelected(true);
+                    setPersona(option.key);
+                  }}
                 >
                   <View className="h-full items-center justify-center">
                     <Text
