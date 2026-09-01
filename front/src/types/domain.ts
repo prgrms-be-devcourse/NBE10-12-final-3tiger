@@ -58,6 +58,15 @@ export type CourseDetail = Course & {
 
 export type BookmarkedCourse = Course & {
   isBookmarked: boolean;
+  rating?: number | null;
+  usageCount?: number;
+  lastUsedAt?: string | null;
+};
+
+export type CourseUsageLog = {
+  usageLogId: number;
+  courseId: number;
+  usedAt: string;
 };
 
 export type Post = {

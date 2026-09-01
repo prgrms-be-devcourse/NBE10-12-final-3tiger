@@ -23,7 +23,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   getCourseDetail,
+  getBookmarkedCourseUsageLogs,
   getMyBookmarks,
+  rateBookmarkedCourse,
+  recordBookmarkedCourseUsage,
   unbookmarkCourse,
 } from "@/api/course-api";
 import { Button } from "@/components/ui/button";
@@ -71,6 +74,11 @@ export default function ProfileBookmarkScreen() {
     queryKey: ["course", selectedId],
     queryFn: () => getCourseDetail(selectedId!),
     enabled: selectedId !== null,
+  });
+  const usageLogsQuery = useQuery({
+    queryKey: ["bookmark-usage-logs", selectedId],
+    queryFn: () => getBookmarkedCourseUsageLogs(selectedId!, { page: 0, size: 10 }),
+    enabled: selectedId !== null && isAuthenticated,
   });
   const courses =
     bookmarksQuery.data?.pages.flatMap((page) => page.content) ?? [];
@@ -123,7 +131,23 @@ export default function ProfileBookmarkScreen() {
       });
     },
   });
+  const ratingMutation = useMutation({
+    mutationFn: ({ courseId, rating }: { courseId: number; rating: number }) =>
+      rateBookmarkedCourse(courseId, rating),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
+  });
+  const usageMutation = useMutation({
+    mutationFn: (courseId: number) => recordBookmarkedCourseUsage(courseId),
+    onSuccess: (_result, courseId) => {
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["bookmark-usage-logs", courseId],
+      });
+    },
+  });
   const selected = detailQuery.data;
+  const selectedBookmark = courses.find((course) => course.courseId === selectedId);
+  const activityError = usageMutation.error ?? ratingMutation.error;
   useEffect(() => {
     if (selectedId === null) return;
     sheetTranslateY.setValue(windowHeight);
@@ -197,6 +221,13 @@ export default function ProfileBookmarkScreen() {
               bookmarkPending={
                 removeBookmarkMutation.isPending &&
                 removeBookmarkMutation.variables === item.courseId
+              }
+              onRate={(rating) =>
+                ratingMutation.mutate({ courseId: item.courseId, rating })
+              }
+              ratingPending={
+                ratingMutation.isPending &&
+                ratingMutation.variables?.courseId === item.courseId
               }
             />
           )}
@@ -282,6 +313,64 @@ export default function ProfileBookmarkScreen() {
                     selected.personaBadges?.join(" · ") ??
                     "코스 상세 정보를 확인해 보세요."}
                 </Text>
+                <View className="mt-5 rounded-2xl bg-[#F3F8F3] p-4 dark:bg-[#242B26]">
+                  <Text className="text-sm font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
+                    나의 코스 기록
+                  </Text>
+                  <View className="mt-3 flex-row items-center justify-between">
+                    <StarRating
+                      rating={selectedBookmark?.rating ?? null}
+                      onRate={(rating) =>
+                        ratingMutation.mutate({
+                          courseId: selected.courseId,
+                          rating,
+                        })
+                      }
+                      disabled={ratingMutation.isPending}
+                    />
+                    <Text className="text-xs font-bold text-[#526056] dark:text-[#AAB5AD]">
+                      {selectedBookmark?.rating
+                        ? `${selectedBookmark.rating}점`
+                        : "별점 없음"}
+                    </Text>
+                  </View>
+                  <View className="mt-4 flex-row items-center justify-between">
+                    <Text className="text-xs text-[#526056] dark:text-[#AAB5AD]">
+                      다녀온 횟수 {selectedBookmark?.usageCount ?? 0}회
+                    </Text>
+                    <Button
+                      size="sm"
+                      className="h-10 rounded-xl bg-[#087A3F] px-4"
+                      disabled={usageMutation.isPending}
+                      onPress={() => usageMutation.mutate(selected.courseId)}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={16} color="white" />
+                      <Text className="text-xs font-extrabold text-white">
+                        다녀왔어요
+                      </Text>
+                    </Button>
+                  </View>
+                  {activityError ? (
+                    <Text className="mt-3 text-xs text-red-600">
+                      {activityError.message}
+                    </Text>
+                  ) : null}
+                  {usageLogsQuery.data?.content.length ? (
+                    <View className="mt-4 border-t border-[#DCE8DD] pt-3 dark:border-[#3A473D]">
+                      <Text className="text-xs font-bold text-[#526056] dark:text-[#AAB5AD]">
+                        최근 사용 기록
+                      </Text>
+                      {usageLogsQuery.data.content.slice(0, 3).map((log) => (
+                        <Text
+                          key={log.usageLogId}
+                          className="mt-1 text-xs text-[#526056] dark:text-[#AAB5AD]"
+                        >
+                          {new Date(log.usedAt).toLocaleDateString("ko-KR")}에 다녀왔어요
+                        </Text>
+                      ))}
+                    </View>
+                  ) : null}
+                </View>
                 <View className="mt-4">
                   <Button
                     className="h-14 w-full rounded-xl"
@@ -306,11 +395,15 @@ function CourseCard({
   onPress,
   onToggleBookmark,
   bookmarkPending,
+  onRate,
+  ratingPending,
 }: {
   item: BookmarkedCourse;
   onPress: () => void;
   onToggleBookmark: () => void;
   bookmarkPending: boolean;
+  onRate: (rating: number) => void;
+  ratingPending: boolean;
 }) {
   return (
     <Pressable className="w-full" onPress={onPress}>
@@ -358,6 +451,55 @@ function CourseCard({
           분
         </Text>
       </View>
+      <View className="mt-3 flex-row items-center justify-between px-1">
+        <StarRating
+          rating={item.rating ?? null}
+          onRate={onRate}
+          disabled={ratingPending}
+          compact
+        />
+        <Text className="text-xs text-slate-500 dark:text-[#AAB5AD]">
+          {item.usageCount ? `${item.usageCount}회 다녀옴` : "아직 안 다녀왔어요"}
+        </Text>
+      </View>
     </Pressable>
+  );
+}
+
+function StarRating({
+  rating,
+  onRate,
+  disabled,
+  compact = false,
+}: {
+  rating: number | null;
+  onRate: (rating: number) => void;
+  disabled: boolean;
+  compact?: boolean;
+}) {
+  const size = compact ? 18 : 23;
+  return (
+    <View className="flex-row items-center" accessibilityLabel="코스 별점">
+      {[1, 2, 3, 4, 5].map((value) => (
+        <Button
+          key={value}
+          variant="ghost"
+          size="icon"
+          className={compact ? "h-7 w-6" : "h-9 w-8"}
+          accessibilityLabel={`${value}점으로 평가`}
+          disabled={disabled}
+          onPress={(event) => {
+            event.stopPropagation();
+            onRate(value);
+          }}
+        >
+          <Ionicons
+            name={rating !== null && value <= rating ? "star" : "star-outline"}
+            size={size}
+            color="#F59E0B"
+          />
+        </Button>
+      ))}
+    </View>
   );
 }
