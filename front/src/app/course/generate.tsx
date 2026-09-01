@@ -5,6 +5,8 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -74,6 +76,14 @@ export default function CourseGenerateScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [coordinateEditorOpen, setCoordinateEditorOpen] = useState(false);
+  const [latitudeInput, setLatitudeInput] = useState(
+    String(DEFAULT_COORDS.latitude),
+  );
+  const [longitudeInput, setLongitudeInput] = useState(
+    String(DEFAULT_COORDS.longitude),
+  );
+  const [coordinateError, setCoordinateError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [distanceM, setDistanceM] = useState(3000);
   const [persona, setPersona] = useState<string | null>(null);
@@ -180,6 +190,34 @@ export default function CourseGenerateScreen() {
     } finally {
       setGeocoding(false);
     }
+  };
+
+  const openCoordinateEditor = () => {
+    setLatitudeInput(String(coords.latitude));
+    setLongitudeInput(String(coords.longitude));
+    setCoordinateError(null);
+    setCoordinateEditorOpen(true);
+  };
+
+  const saveCoordinates = () => {
+    const latitude = Number(latitudeInput.trim());
+    const longitude = Number(longitudeInput.trim());
+    if (
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
+      latitude < -90 ||
+      latitude > 90 ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      setCoordinateError("위도는 -90~90, 경도는 -180~180 사이로 입력해 주세요.");
+      return;
+    }
+    setCoords({ latitude, longitude });
+    setCandidates([]);
+    setSelectedIndex(null);
+    setErrorMessage(null);
+    setCoordinateEditorOpen(false);
   };
 
   const generateMutation = useMutation({
@@ -363,21 +401,31 @@ export default function CourseGenerateScreen() {
             <Text className="text-sm font-extrabold text-[#18271D] dark:text-[#F1F5F2]">
               출발 위치
             </Text>
-            <Button
-              variant="ghost"
-              size="sm"
-              onPress={() => void useMyLocation()}
-              disabled={locating}
-            >
-              {locating ? (
-                <ActivityIndicator size="small" color="#087A3F" />
-              ) : (
-                <Ionicons name="locate" size={16} color="#087A3F" />
-              )}
-              <Text className="text-xs font-bold text-[#087A3F]">
-                내 위치로
-              </Text>
-            </Button>
+            <View className="flex-row items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onPress={openCoordinateEditor}
+              >
+                <Ionicons name="create-outline" size={16} color="#087A3F" />
+                <Text className="text-xs font-bold text-[#087A3F]">편집</Text>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onPress={() => void useMyLocation()}
+                disabled={locating}
+              >
+                {locating ? (
+                  <ActivityIndicator size="small" color="#087A3F" />
+                ) : (
+                  <Ionicons name="locate" size={16} color="#087A3F" />
+                )}
+                <Text className="text-xs font-bold text-[#087A3F]">
+                  내 위치로
+                </Text>
+              </Button>
+            </View>
           </View>
           <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
             {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
@@ -584,6 +632,71 @@ export default function CourseGenerateScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={coordinateEditorOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCoordinateEditorOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior="padding"
+          className="flex-1 items-center justify-center bg-black/40 px-6"
+        >
+          <View className="w-full rounded-2xl bg-white p-5 dark:bg-[#1B211D]">
+            <Text className="text-lg font-extrabold text-[#18271D] dark:text-[#F1F5F2]">
+              출발 위치 직접 설정
+            </Text>
+            <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
+              위도와 경도를 입력하면 해당 위치를 출발점으로 사용합니다.
+            </Text>
+            <Text className="mt-4 text-xs font-bold text-[#526056] dark:text-[#AAB5AD]">
+              위도 (Latitude)
+            </Text>
+            <TextInput
+              value={latitudeInput}
+              onChangeText={setLatitudeInput}
+              keyboardType="numbers-and-punctuation"
+              placeholder="예: 37.5462"
+              placeholderTextColor={isDark ? "#758078" : "#94A09A"}
+              className="mt-1 h-12 rounded-xl border border-[#D7E2D8] bg-[#F8FAF8] px-3 text-[#18271D] dark:border-[#475249] dark:bg-[#242B26] dark:text-[#F1F5F2]"
+            />
+            <Text className="mt-3 text-xs font-bold text-[#526056] dark:text-[#AAB5AD]">
+              경도 (Longitude)
+            </Text>
+            <TextInput
+              value={longitudeInput}
+              onChangeText={setLongitudeInput}
+              keyboardType="numbers-and-punctuation"
+              placeholder="예: 127.0372"
+              placeholderTextColor={isDark ? "#758078" : "#94A09A"}
+              className="mt-1 h-12 rounded-xl border border-[#D7E2D8] bg-[#F8FAF8] px-3 text-[#18271D] dark:border-[#475249] dark:bg-[#242B26] dark:text-[#F1F5F2]"
+            />
+            {coordinateError && (
+              <Text className="mt-2 text-xs font-bold text-[#DC2626]">
+                {coordinateError}
+              </Text>
+            )}
+            <View className="mt-5 flex-row gap-2">
+              <Button
+                variant="secondary"
+                className="h-12 flex-1 rounded-xl bg-[#E8EEE9] dark:bg-[#2A312C]"
+                onPress={() => setCoordinateEditorOpen(false)}
+              >
+                <Text className="font-bold text-[#526056] dark:text-[#D4DDD6]">
+                  취소
+                </Text>
+              </Button>
+              <Button
+                className="h-12 flex-1 rounded-xl bg-[#087A3F]"
+                onPress={saveCoordinates}
+              >
+                <Text className="font-bold text-white">저장</Text>
+              </Button>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       <LoginRequiredModal
         visible={loginRequiredOpen}
