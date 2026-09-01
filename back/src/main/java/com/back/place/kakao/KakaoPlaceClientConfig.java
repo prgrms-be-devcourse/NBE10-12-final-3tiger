@@ -11,15 +11,18 @@ public class KakaoPlaceClientConfig {
 
     @Bean
     RestClient kakaoPlaceRestClient(
-            RestClient.Builder builder,
             KakaoPlaceProperties properties
     ) {
         var requestFactory = new SimpleClientHttpRequestFactory();
 
-        requestFactory.setConnectTimeout(properties.getConnectTimeout());
-        requestFactory.setReadTimeout(properties.getReadTimeout());
+        requestFactory.setConnectTimeout(
+                properties.getConnectTimeout()
+        );
+        requestFactory.setReadTimeout(
+                properties.getReadTimeout()
+        );
 
-        return builder
+        return RestClient.builder()
                 .baseUrl("https://dapi.kakao.com")
                 .defaultHeader(
                         HttpHeaders.AUTHORIZATION,
