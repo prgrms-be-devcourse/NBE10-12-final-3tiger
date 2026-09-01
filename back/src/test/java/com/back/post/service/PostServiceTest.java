@@ -138,7 +138,9 @@ class PostServiceTest {
     @Test
     @DisplayName("피드에서 내용·좋아요 수·댓글 수·현재 사용자 좋아요 여부를 매핑한다")
     void feed() {
-        Post post = post(10L, user(2L), course(1L));
+        User author = user(2L);
+        author.changeProfileImage("https://cdn.example.com/profile.jpg");
+        Post post = post(10L, author, course(1L));
         post.increaseLikeCount();
         var commentCount = commentCount(10L, 3L);
         given(posts.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of(post)));
@@ -149,6 +151,7 @@ class PostServiceTest {
         PageResponse<PostService.FeedItem> result = postService.feed(1L, "latest", 0, 20);
 
         PostService.FeedItem item = result.content().getFirst();
+        assertThat(item.profileImageUrl()).isEqualTo("https://cdn.example.com/profile.jpg");
         assertThat(item.content()).isEqualTo("좋은 산책이었습니다.");
         assertThat(item.likeCount()).isEqualTo(1);
         assertThat(item.commentCount()).isEqualTo(3);

@@ -87,7 +87,7 @@ public class PostService {
     }
     private FeedItem toFeedItem(Post p, Long currentUserId, Map<Long, Long> commentCounts, Set<Long> likedPostIds,
                                 Set<Long> bookmarkedCourseIds) {
-        return new FeedItem(p.getId(), p.getCourse().getId(), p.getUser().getNickname(), p.getContent(),
+        return new FeedItem(p.getId(), p.getCourse().getId(), p.getUser().getNickname(), p.getUser().getProfileImageUrl(), p.getContent(),
                 p.getPhotoUrl(), p.getLikeCount(), commentCounts.getOrDefault(p.getId(), 0L),
                 likedPostIds.contains(p.getId()), bookmarkedCourseIds.contains(p.getCourse().getId()),
                 currentUserId != null && p.getUser().getId().equals(currentUserId), p.getWalkedAt());
@@ -112,7 +112,7 @@ public class PostService {
     }
     public record CreateCommand(Long courseId, String content, String photoUrl, LocalDateTime walkedAt) {}
     public record CreatedPost(Long postId) {}
-    public record FeedItem(Long postId, Long courseId, String nickname, String content, String photoUrl,
+    public record FeedItem(Long postId, Long courseId, String nickname, String profileImageUrl, String content, String photoUrl,
                            int likeCount, long commentCount, boolean isLiked, boolean isBookmarked,
                            boolean isMine, LocalDateTime walkedAt) {}
     public record MyPostItem(Long postId, Long courseId, String content, String photoUrl,

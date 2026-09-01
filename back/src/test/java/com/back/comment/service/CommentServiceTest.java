@@ -124,6 +124,7 @@ class CommentServiceTest {
         Post post = newPost();
         User user = User.createLocal("test@test.com", "dummy-hash", "산책러");
         ReflectionTestUtils.setField(user, "id", 5L);
+        user.changeProfileImage("https://cdn.example.com/profile.jpg");
         Comment comment = new Comment(post, user, "좋은 코스네요");
         ReflectionTestUtils.setField(comment, "id", 10L);
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
@@ -141,6 +142,7 @@ class CommentServiceTest {
         assertThat(item.commentId()).isEqualTo(10L);
         assertThat(item.userId()).isEqualTo(5L);
         assertThat(item.nickname()).isEqualTo("산책러");
+        assertThat(item.profileImageUrl()).isEqualTo("https://cdn.example.com/profile.jpg");
         assertThat(item.content()).isEqualTo("좋은 코스네요");
         assertThat(item.upvoteCount()).isEqualTo(0);
         assertThat(item.isUpvoted()).isFalse();

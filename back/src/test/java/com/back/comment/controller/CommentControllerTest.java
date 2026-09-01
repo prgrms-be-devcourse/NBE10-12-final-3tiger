@@ -59,7 +59,8 @@ class CommentControllerTest {
     void t1() throws Exception {
         // given
         CommentService.CommentResponse commentResponse =
-                new CommentService.CommentResponse(1L, 1L, "산책러", "좋은 코스네요", 0, false, false, LocalDateTime.now(), List.of());
+                new CommentService.CommentResponse(1L, 1L, "산책러", "https://cdn.example.com/profile.jpg",
+                        "좋은 코스네요", 0, false, false, LocalDateTime.now(), List.of());
         given(commentService.getComments(eq(1L), isNull(), any(Pageable.class)))
                 .willReturn(PageResponse.from(new PageImpl<>(List.of(commentResponse))));
 
@@ -68,6 +69,8 @@ class CommentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].commentId").value(1))
                 .andExpect(jsonPath("$.data.content[0].nickname").value("산책러"))
+                .andExpect(jsonPath("$.data.content[0].profileImageUrl")
+                        .value("https://cdn.example.com/profile.jpg"))
                 .andExpect(jsonPath("$.data.content[0].isUpvoted").value(false))
                 .andExpect(jsonPath("$.data.totalElements").value(1));
 
@@ -79,9 +82,11 @@ class CommentControllerTest {
     void t1b() throws Exception {
         // given
         CommentService.CommentResponse replyResponse =
-                new CommentService.CommentResponse(2L, 3L, "답글러", "답글", 0, false, false, LocalDateTime.now(), List.of());
+                new CommentService.CommentResponse(2L, 3L, "답글러", "https://cdn.example.com/reply.jpg",
+                        "답글", 0, false, false, LocalDateTime.now(), List.of());
         CommentService.CommentResponse commentResponse =
-                new CommentService.CommentResponse(1L, 2L, "산책러", "좋은 코스네요", 3, true, false, LocalDateTime.now(), List.of(replyResponse));
+                new CommentService.CommentResponse(1L, 2L, "산책러", "https://cdn.example.com/profile.jpg",
+                        "좋은 코스네요", 3, true, false, LocalDateTime.now(), List.of(replyResponse));
         given(commentService.getComments(eq(1L), eq(1L), any(Pageable.class)))
                 .willReturn(PageResponse.from(new PageImpl<>(List.of(commentResponse))));
 
@@ -90,7 +95,9 @@ class CommentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].isUpvoted").value(true))
                 .andExpect(jsonPath("$.data.content[0].replies[0].commentId").value(2))
-                .andExpect(jsonPath("$.data.content[0].replies[0].nickname").value("답글러"));
+                .andExpect(jsonPath("$.data.content[0].replies[0].nickname").value("답글러"))
+                .andExpect(jsonPath("$.data.content[0].replies[0].profileImageUrl")
+                        .value("https://cdn.example.com/reply.jpg"));
 
         verify(commentService).getComments(eq(1L), eq(1L), any(Pageable.class));
     }

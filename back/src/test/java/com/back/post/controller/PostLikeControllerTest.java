@@ -78,7 +78,8 @@ class PostLikeControllerTest {
     @DisplayName("t3: GET /api/v1/users/me/likes 요청 시 200과 내 좋아요 목록을 반환한다")
     void t3() throws Exception {
         // given
-        var item = new PostLikeService.LikedPostItem(10L, 1L, "산책러", "좋은 산책이었습니다.",
+        var item = new PostLikeService.LikedPostItem(10L, 1L, "산책러",
+                "https://cdn.example.com/profile.jpg", "좋은 산책이었습니다.",
                 "https://example.com/walk.jpg", 5, 2L, true, false, LocalDateTime.of(2026, 8, 26, 9, 0));
         given(postLikeService.myLikes(1L, 0, 20))
                 .willReturn(new PageResponse<>(List.of(item), 0, 20, 1));
@@ -87,6 +88,8 @@ class PostLikeControllerTest {
         mockMvc.perform(get("/api/v1/users/me/likes").with(authenticatedAs(1L)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].postId").value(10))
+                .andExpect(jsonPath("$.data.content[0].profileImageUrl")
+                        .value("https://cdn.example.com/profile.jpg"))
                 .andExpect(jsonPath("$.data.content[0].likeCount").value(5))
                 .andExpect(jsonPath("$.data.content[0].isBookmarked").value(true))
                 .andExpect(jsonPath("$.data.totalElements").value(1));
