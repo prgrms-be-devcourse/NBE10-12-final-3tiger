@@ -1,5 +1,5 @@
-import { apiRequest } from "./client";
-import type { PageParams, PageResponse } from "@/types/api";
+import { apiRequest, resolveApiHostUrl } from "./client";
+import { ApiError, type PageParams, type PageResponse } from "@/types/api";
 import type {
   LikedPostItem,
   Post,
@@ -50,6 +50,12 @@ export const unlikePost = (postId: number) =>
   });
 export const deletePost = (postId: number) =>
   apiRequest<null>({ url: `/api/v1/posts/${postId}`, method: "DELETE" });
+const deletePostPhoto = (photoUrl: string) =>
+  apiRequest<null>({
+    url: "/api/v1/posts/photo-upload",
+    method: "DELETE",
+    params: { photoUrl },
+  });
 type PhotoUploadTarget = {
   uploadUrl: string;
   photoUrl: string;
@@ -96,7 +102,8 @@ export const uploadPostPhoto = async (file: PostPhotoFile) => {
 
   const fileName = file.fileName ?? `walk-${Date.now()}.jpg`;
   const target = await getPhotoUploadUrl(fileName, contentType);
-  const uploadResponse = await fetch(target.uploadUrl, {
+  const photoUrl = resolveApiHostUrl(target.photoUrl);
+  const uploadResponse = await fetch(resolveApiHostUrl(target.uploadUrl), {
     method: "PUT",
     headers: { "Content-Type": contentType },
     body,
@@ -105,7 +112,7 @@ export const uploadPostPhoto = async (file: PostPhotoFile) => {
     throw new Error("사진 업로드에 실패했습니다. 다시 시도해 주세요.");
   }
 
-  return target.photoUrl;
+  return photoUrl;
 };
 export const createPost = (data: {
   courseId: number;
@@ -118,3 +125,21 @@ export const createPost = (data: {
     method: "POST",
     data,
   });
+
+export const createPostWithPhotoCleanup = async (data: {
+  courseId: number;
+  content: string;
+  photoUrl: string;
+  walkedAt: string;
+}) => {
+  try {
+    return await createPost(data);
+  } catch (error) {
+    // 네트워크 단절은 서버 저장 성공 여부를 알 수 없으므로 정리하지 않는다.
+    // 확인 가능한 4xx 거부 응답에서만 방금 업로드한 사진을 정리한다.
+    if (error instanceof ApiError && error.status && error.status < 500) {
+      void deletePostPhoto(data.photoUrl).catch(() => undefined);
+    }
+    throw error;
+  }
+};

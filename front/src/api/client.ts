@@ -16,6 +16,26 @@ if (!API_BASE_URL) {
   );
 }
 
+/**
+ * 로컬 저장소가 localhost URL을 반환하는 경우, 실제 앱이 접속 중인 API 호스트로 보정한다.
+ * 물리 기기에서 localhost는 개발 PC가 아니라 기기 자신을 가리킨다.
+ */
+export function resolveApiHostUrl(url: string) {
+  if (!API_BASE_URL) return url;
+
+  try {
+    const target = new URL(url);
+    const api = new URL(API_BASE_URL);
+    if (target.hostname === "localhost" || target.hostname === "127.0.0.1") {
+      target.protocol = api.protocol;
+      target.host = api.host;
+    }
+    return target.toString();
+  } catch {
+    return url;
+  }
+}
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15_000,
