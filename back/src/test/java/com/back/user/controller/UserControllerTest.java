@@ -6,6 +6,7 @@ import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import com.back.course.domain.Persona;
 import com.back.user.dto.MyPageUpdateRequest;
 import com.back.user.dto.MyPageResponse;
@@ -53,6 +54,9 @@ class UserControllerTest {
 
     @MockitoBean
     private JwtProvider jwtProvider;
+
+    @MockitoBean
+    private PlaceSearchRateLimiter placeSearchRateLimiter;
 
     @Test
     void signupReturnsCreatedUserWithoutPassword() throws Exception {
