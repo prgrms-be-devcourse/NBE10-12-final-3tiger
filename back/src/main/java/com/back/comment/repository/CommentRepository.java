@@ -13,8 +13,15 @@ import java.util.Collection;
 import java.util.List;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
+    // 원댓글(parent == null)만 페이징. 답글은 findByParent_IdInOrderByCreatedAtAsc 로 별도 일괄 조회 (N+1 방지)
     @EntityGraph(attributePaths = {"user"})
-    Page<Comment> findByPost_IdOrderByCreatedAtDesc(Long postId, Pageable pageable);
+    Page<Comment> findByPost_IdAndParentIsNullOrderByCreatedAtDesc(Long postId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"user"})
+    List<Comment> findByParent_IdInOrderByCreatedAtAsc(Collection<Long> parentIds);
+
+    boolean existsByParent_Id(Long parentId);
+
     long countByPost_Id(Long postId);
 
     @Query("""

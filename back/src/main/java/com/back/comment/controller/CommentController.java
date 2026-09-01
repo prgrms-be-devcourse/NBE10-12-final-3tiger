@@ -25,6 +25,10 @@ public class CommentController {
     ApiResponse<Long> create(@CurrentUserId Long userId, @PathVariable Long postId, @Valid @RequestBody CreateRequest request) {
         return ApiResponse.ok("댓글이 등록되었습니다.", service.createComment(postId, userId, request.content()));
     }
+    @PostMapping("/comments/{commentId}/replies")
+    ApiResponse<Long> reply(@CurrentUserId Long userId, @PathVariable Long commentId, @Valid @RequestBody CreateRequest request) {
+        return ApiResponse.ok("답글이 등록되었습니다.", service.createReply(commentId, userId, request.content()));
+    }
     @PostMapping("/comments/{commentId}/upvote")
     ApiResponse<CommentService.UpvoteResult> upvote(@CurrentUserId Long userId, @PathVariable Long commentId) {
         return ApiResponse.ok("댓글 공감이 처리되었습니다.", service.toggleUpvote(commentId, userId));

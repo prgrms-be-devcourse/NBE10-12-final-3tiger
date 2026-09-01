@@ -21,7 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @Transactional(readOnly = true)
@@ -40,12 +43,22 @@ public class CommentService {
 
     public PageResponse<CommentResponse> getComments(Long postId, Long userId, Pageable pageable) {
         getPostByIdOrThrow(postId);
-        Page<Comment> found = comments.findByPost_IdOrderByCreatedAtDesc(postId, pageable);
-        List<Long> commentIds = found.getContent().stream().map(Comment::getId).toList();
-        Set<Long> upvotedCommentIds = userId == null || commentIds.isEmpty()
+        Page<Comment> parents = comments.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(postId, pageable);
+        List<Long> parentIds = parents.getContent().stream().map(Comment::getId).toList();
+        List<Comment> replies = parentIds.isEmpty()
+                ? List.of()
+                : comments.findByParent_IdInOrderByCreatedAtAsc(parentIds);
+
+        List<Long> allCommentIds = Stream.concat(parentIds.stream(), replies.stream().map(Comment::getId)).toList();
+        Set<Long> upvotedCommentIds = userId == null || allCommentIds.isEmpty()
                 ? Set.of()
-                : Set.copyOf(commentUpvotes.findUpvotedCommentIds(userId, commentIds));
-        return PageResponse.from(found.map(comment -> toCommentResponse(comment, upvotedCommentIds)));
+                : Set.copyOf(commentUpvotes.findUpvotedCommentIds(userId, allCommentIds));
+
+        Map<Long, List<Comment>> repliesByParent = replies.stream()
+                .collect(Collectors.groupingBy(reply -> reply.getParent().getId()));
+
+        return PageResponse.from(parents.map(parent ->
+                toCommentResponse(parent, repliesByParent.getOrDefault(parent.getId(), List.of()), upvotedCommentIds)));
     }
 
     @Transactional
@@ -56,6 +69,20 @@ public class CommentService {
         eventPublisher.publishEvent(new CommentCreatedEvent(post.getUser().getId(), userId, user.getNickname(),
                 user.getProfileImageUrl(), postId, comment.getId()));
         return comment.getId();
+    }
+
+    @Transactional
+    public Long createReply(Long parentCommentId, Long userId, String content) {
+        Comment parent = getCommentByIdOrThrow(parentCommentId);
+        if (parent.isReply()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "답글에는 답글을 달 수 없습니다.");
+        }
+        User user = getUserByIdOrThrow(userId);
+        Comment reply = comments.save(new Comment(parent.getPost(), user, content, parent));
+        // 답글 알림은 부모 댓글 작성자에게 (본인 댓글에 답글 시 리스너가 자기알림을 걸러냄)
+        eventPublisher.publishEvent(new CommentCreatedEvent(parent.getUser().getId(), userId, user.getNickname(),
+                user.getProfileImageUrl(), parent.getPost().getId(), reply.getId()));
+        return reply.getId();
     }
 
     @Transactional
@@ -100,6 +127,11 @@ public class CommentService {
             throw new ApiException(HttpStatus.FORBIDDEN, "본인 댓글만 삭제할 수 있습니다.");
         }
 
+        // 답글은 항상 하드 삭제 / 원댓글은 하위 답글이 있으면 소프트 삭제, 없으면 하드 삭제
+        if (!comment.isReply() && comments.existsByParent_Id(commentId)) {
+            comment.softDelete();
+            return;
+        }
         comments.delete(comment);
     }
 
@@ -115,13 +147,18 @@ public class CommentService {
         return comments.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 댓글입니다."));
     }
 
-    private CommentResponse toCommentResponse(Comment comment, Set<Long> upvotedCommentIds) {
+    private CommentResponse toCommentResponse(Comment comment, List<Comment> replies, Set<Long> upvotedCommentIds) {
+        List<CommentResponse> replyResponses = replies.stream()
+                .map(reply -> toCommentResponse(reply, List.of(), upvotedCommentIds))
+                .toList();
         return new CommentResponse(comment.getId(), comment.getUser().getId(), comment.getUser().getNickname(),
                 comment.getContent(), comment.getUpvoteCount(),
-                upvotedCommentIds.contains(comment.getId()), comment.getCreatedAt());
+                upvotedCommentIds.contains(comment.getId()), comment.isDeleted(),
+                comment.getCreatedAt(), replyResponses);
     }
 
     public record CommentResponse(Long commentId, Long userId, String nickname, String content, int upvoteCount,
-                                  boolean isUpvoted, LocalDateTime createdAt) {}
+                                  boolean isUpvoted, boolean isDeleted, LocalDateTime createdAt,
+                                  List<CommentResponse> replies) {}
     public record UpvoteResult(boolean upvoted, int upvoteCount) {}
 }
