@@ -140,7 +140,7 @@ export type GenerateCandidate = {
   path: GeoJsonLineString;
   totalM: number;
   avgScore: number;
-  errorPct: number;
+  errorPct: number | null;
   regionCode: string;
 };
 

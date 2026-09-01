@@ -32,6 +32,7 @@ services:
       - ./docker/22_persona_course_scores.sql:/tmp/persona/22_persona_course_scores.sql:ro
       - ./docker/23_persona_edge_costs.sql:/tmp/persona/23_persona_edge_costs.sql:ro
       - ./docker/24_generate_functions_persona.sql:/tmp/persona/24_generate_functions_persona.sql:ro
+      - ./docker/25_oneway_routing.sql:/tmp/persona/25_oneway_routing.sql:ro
       - ./docker/50-persona-migration.sh:/docker-entrypoint-initdb.d/50-persona-migration.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U walking -d walking_mvp"]
