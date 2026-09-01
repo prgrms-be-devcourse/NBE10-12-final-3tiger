@@ -295,6 +295,7 @@ export default function CourseGenerateScreen() {
     mutationFn: saveGeneratedCourse,
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["courses"] });
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
       router.replace(`/course/${result.courseId}` as never);
     },
     onError: (error: Error) => setErrorMessage(error.message),
@@ -334,6 +335,7 @@ export default function CourseGenerateScreen() {
     if (!picked) return;
     if (mode === "oneway" && endCoords) {
       saveMutation.mutate({
+        name: startPlaceName,
         path: picked.path,
         regionCode: picked.regionCode,
         isLoop: false,
@@ -342,7 +344,11 @@ export default function CourseGenerateScreen() {
       });
       return;
     }
-    saveMutation.mutate({ path: picked.path, regionCode: picked.regionCode });
+    saveMutation.mutate({
+      name: startPlaceName,
+      path: picked.path,
+      regionCode: picked.regionCode,
+    });
   };
 
   const mapRegion: Region = useMemo(

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -81,7 +82,7 @@ public class CourseGenerationRepository {
 
     /** 사용자가 선택한 순환 코스 저장 → 새 courseId (하위호환용 오버로드) */
     public Long saveFromPath(GeoJsonLineString path, String regionCode) {
-        return saveFromPath(path, regionCode, true, null, null);
+        return saveFromPath(path, regionCode, true, null, null, null);
     }
 
     /**
@@ -91,6 +92,13 @@ public class CourseGenerationRepository {
     public Long saveFromPath(
             GeoJsonLineString path, String regionCode,
             boolean isLoop, Double endLng, Double endLat
+    ) {
+        return saveFromPath(path, regionCode, isLoop, endLng, endLat, null);
+    }
+
+    public Long saveFromPath(
+            GeoJsonLineString path, String regionCode,
+            boolean isLoop, Double endLng, Double endLat, String name
     ) {
         String pathJson;
         try {
@@ -103,14 +111,20 @@ public class CourseGenerationRepository {
                 ? "SELECT routing.save_from_geom(?::text, ?, ?, ?, ?, ST_SetSRID(ST_MakePoint(?, ?), 4326))"
                 : "SELECT routing.save_from_geom(?::text, ?, ?, ?, ?, NULL)";
 
+        Long courseId;
         if (hasEndPoint) {
-            return jdbc.queryForObject(sql, Long.class,
+            courseId = jdbc.queryForObject(sql, Long.class,
                     pathJson, regionCode, LocalDateTime.now(), "2026-08-gs-yc-v1.2",
                     isLoop, endLng, endLat);
+        } else {
+            courseId = jdbc.queryForObject(sql, Long.class,
+                    pathJson, regionCode, LocalDateTime.now(), "2026-08-gs-yc-v1.2",
+                    isLoop);
         }
-        return jdbc.queryForObject(sql, Long.class,
-                pathJson, regionCode, LocalDateTime.now(), "2026-08-gs-yc-v1.2",
-                isLoop);
+        if (StringUtils.hasText(name)) {
+            jdbc.update("UPDATE public.course SET name = ? WHERE course_id = ?", name.trim(), courseId);
+        }
+        return courseId;
     }
 
     public record GenerateRow(GeoJsonLineString path, Integer totalM, BigDecimal avgScore,

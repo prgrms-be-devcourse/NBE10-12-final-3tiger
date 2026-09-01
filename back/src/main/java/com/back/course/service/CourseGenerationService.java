@@ -1,11 +1,13 @@
 package com.back.course.service;
 
+import com.back.bookmark.service.BookmarkService;
 import com.back.course.dto.GenerateCandidate;
 import com.back.course.dto.GenerateRequest;
 import com.back.course.dto.GenerateResponse;
 import com.back.course.dto.SaveCourseRequest;
 import com.back.course.repository.CourseGenerationRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -20,9 +22,11 @@ public class CourseGenerationService {
     private static final int ONEWAY_CANDIDATE_COUNT = 1;
 
     private final CourseGenerationRepository repo;
+    private final BookmarkService bookmarkService;
 
-    public CourseGenerationService(CourseGenerationRepository repo) {
+    public CourseGenerationService(CourseGenerationRepository repo, BookmarkService bookmarkService) {
         this.repo = repo;
+        this.bookmarkService = bookmarkService;
     }
 
     /**
@@ -76,8 +80,13 @@ public class CourseGenerationService {
     }
 
     /** 사용자가 선택한 코스 저장 → courseId */
-    public Long save(SaveCourseRequest req) {
+    @Transactional
+    public Long save(Long userId, SaveCourseRequest req) {
         boolean isLoop = req.isLoopOrDefault();
-        return repo.saveFromPath(req.path(), req.regionCode(), isLoop, req.endLng(), req.endLat());
+        Long courseId = repo.saveFromPath(
+                req.path(), req.regionCode(), isLoop, req.endLng(), req.endLat(), req.name()
+        );
+        bookmarkService.add(userId, courseId);
+        return courseId;
     }
 }
