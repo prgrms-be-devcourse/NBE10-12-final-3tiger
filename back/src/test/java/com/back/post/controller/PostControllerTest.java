@@ -71,7 +71,7 @@ class PostControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"courseId":1,"content":"좋은 산책이었습니다.",
-                                 "photoUrl":"https://example.com/walk.jpg","walkedAt":"2026-08-26T09:00:00"}
+                                 "photoUrl":"https://example.com/walk.jpg","walkedAt":"2026-08-26T00:00:00.000Z"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.postId").value(10));
@@ -85,7 +85,7 @@ class PostControllerTest {
         mvc.perform(post("/api/v1/posts")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"courseId":1,"content":"내용","walkedAt":"2026-08-26T09:00:00"}
+                                {"courseId":1,"content":"내용","walkedAt":"2026-08-26T00:00:00.000Z"}
                                 """))
                 .andExpect(status().isUnauthorized());
 
@@ -99,7 +99,7 @@ class PostControllerTest {
                         .with(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"courseId":1,"content":"","walkedAt":"2026-08-26T09:00:00"}
+                                {"courseId":1,"content":"","walkedAt":"2026-08-26T00:00:00.000Z"}
                                 """))
                 .andExpect(status().isBadRequest());
 
@@ -155,5 +155,16 @@ class PostControllerTest {
                 .andExpect(status().isOk());
 
         verify(postService).delete(1L, 10L);
+    }
+
+    @Test
+    @DisplayName("게시글 저장에 실패한 뒤 업로드한 사진은 정리할 수 있다")
+    void deleteUploadedPhoto() throws Exception {
+        mvc.perform(delete("/api/v1/posts/photo-upload")
+                        .with(authenticatedAs(1L))
+                        .param("photoUrl", "http://localhost:8080/local-uploads/posts/1-photo.jpg"))
+                .andExpect(status().isOk());
+
+        verify(postService).deleteUploadedPhoto(1L, "http://localhost:8080/local-uploads/posts/1-photo.jpg");
     }
 }

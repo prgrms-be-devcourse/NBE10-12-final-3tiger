@@ -67,6 +67,9 @@ public class PostService {
     public PhotoStorage.UploadTarget uploadUrl(Long userId, String fileName, String contentType) {
         return storage.createUploadTarget(userId, fileName, contentType);
     }
+    public void deleteUploadedPhoto(Long userId, String photoUrl) {
+        storage.delete(userId, photoUrl);
+    }
     @Transactional public CreatedPost create(Long userId, CreateCommand command) {
         User user = getUserByIdOrThrow(userId);
         Course course = getCourseByIdOrThrow(command.courseId());
@@ -80,6 +83,7 @@ public class PostService {
         comments.deleteAllByPostId(postId);
         postLikes.deleteAllByPostId(postId);
         posts.delete(post);
+        storage.delete(userId, post.getPhotoUrl());
     }
     private FeedItem toFeedItem(Post p, Long currentUserId, Map<Long, Long> commentCounts, Set<Long> likedPostIds,
                                 Set<Long> bookmarkedCourseIds) {

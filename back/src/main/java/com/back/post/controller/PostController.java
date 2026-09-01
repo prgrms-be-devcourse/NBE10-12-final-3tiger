@@ -8,7 +8,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.web.bind.annotation.*;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 
 @RestController
 @RequestMapping("/api/v1/posts")
@@ -33,8 +34,15 @@ public class PostController {
     }
     @PostMapping
     ApiResponse<PostService.CreatedPost> create(@CurrentUserId Long userId, @Valid @RequestBody CreateRequest request) {
-        var command = new PostService.CreateCommand(request.courseId(), request.content(), request.photoUrl(), request.walkedAt());
+        var command = new PostService.CreateCommand(request.courseId(), request.content(), request.photoUrl(),
+                request.walkedAt().atZoneSameInstant(ZoneId.of("Asia/Seoul")).toLocalDateTime());
         return ApiResponse.ok("게시물이 등록되었습니다.", service.create(userId, command));
+    }
+    @DeleteMapping("/photo-upload")
+    ApiResponse<Void> deleteUploadedPhoto(@CurrentUserId Long userId,
+                                          @RequestParam @NotBlank @Size(max = 2048) String photoUrl) {
+        service.deleteUploadedPhoto(userId, photoUrl);
+        return ApiResponse.ok("업로드된 사진이 정리되었습니다.", null);
     }
     @DeleteMapping("/{postId}")
     ApiResponse<Void> delete(@CurrentUserId Long userId, @PathVariable Long postId) {
@@ -48,5 +56,5 @@ public class PostController {
     record CreateRequest(@Schema(example = "1") @NotNull(message = "코스 ID는 필수입니다.") Long courseId,
                          @Schema(example = "날씨가 좋아서 즐겁게 걸었습니다.") @NotBlank(message = "내용은 필수입니다.") @Size(max = 1000, message = "내용은 1000자 이하여야 합니다.") String content,
                          @Schema(example = "https://example.com/walk.jpg") @Size(max = 2048, message = "사진 URL이 너무 깁니다.") String photoUrl,
-                         @Schema(example = "2026-08-26T09:50:00") @NotNull(message = "산책 시각은 필수입니다.") LocalDateTime walkedAt) {}
+                         @Schema(example = "2026-08-26T00:50:00.000Z") @NotNull(message = "산책 시각은 필수입니다.") OffsetDateTime walkedAt) {}
 }

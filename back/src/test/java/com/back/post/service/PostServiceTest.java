@@ -183,6 +183,7 @@ class PostServiceTest {
         deletionOrder.verify(comments).deleteAllByPostId(10L);
         deletionOrder.verify(postLikes).deleteAllByPostId(10L);
         deletionOrder.verify(posts).delete(post);
+        verify(storage).delete(1L, "https://example.com/walk.jpg");
     }
 
     @Test
