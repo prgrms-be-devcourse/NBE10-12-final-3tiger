@@ -45,6 +45,7 @@ import type { GenerateCandidate } from "@/types/domain";
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
 
 type CourseMode = "loop" | "oneway";
+type PlaceSearchTarget = "start" | "end";
 
 const MODE_OPTIONS: Array<{ key: CourseMode; label: string; hint: string }> = [
   { key: "loop", label: "순환", hint: "출발지로 돌아오는 코스" },
@@ -85,24 +86,27 @@ export default function CourseGenerateScreen() {
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const [mode, setMode] = useState<CourseMode>("loop");
   const [coords, setCoords] = useState(DEFAULT_COORDS);
+  const [startPlaceName, setStartPlaceName] = useState("서울숲");
   const [endCoords, setEndCoords] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [endPlaceName, setEndPlaceName] = useState<string | null>(null);
   const [placeSearchOpen, setPlaceSearchOpen] = useState(false);
+  const [placeSearchTarget, setPlaceSearchTarget] =
+    useState<PlaceSearchTarget>("start");
   const [placeQuery, setPlaceQuery] = useState("");
   const [placeResults, setPlaceResults] = useState<PlaceSearchItem[]>([]);
   const [placeSearching, setPlaceSearching] = useState(false);
   const [placeSearchError, setPlaceSearchError] = useState<string | null>(null);
-  const [locating, setLocating] = useState(false);
+  const [locatingTarget, setLocatingTarget] =
+    useState<PlaceSearchTarget | null>(null);
   const [distanceM, setDistanceM] = useState(3000);
   const [persona, setPersona] = useState<string | null>(null);
   const [personaSelected, setPersonaSelected] = useState(false);
   const [candidates, setCandidates] = useState<GenerateCandidate[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [addressQuery, setAddressQuery] = useState("");
-  const [geocoding, setGeocoding] = useState(false);
   const profileQuery = useQuery({
     queryKey: ["my-profile"],
     queryFn: getMyProfile,
@@ -126,6 +130,7 @@ export default function CourseGenerateScreen() {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           });
+          setStartPlaceName("현재 위치");
         }
       } catch {
         // Keep the default coordinates when the saved location is unavailable.
@@ -140,8 +145,8 @@ export default function CourseGenerateScreen() {
     setSelectedIndex(null);
   };
 
-  const useMyLocation = async () => {
-    setLocating(true);
+  const useMyLocation = async (target: PlaceSearchTarget) => {
+    setLocatingTarget(target);
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== Location.PermissionStatus.GRANTED) {
@@ -155,8 +160,15 @@ export default function CourseGenerateScreen() {
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
       };
-      setCoords(next);
+      if (target === "start") {
+        setCoords(next);
+        setStartPlaceName("현재 위치");
+      } else {
+        setEndCoords(next);
+        setEndPlaceName("현재 위치");
+      }
       resetCandidates();
+      setErrorMessage(null);
       mapRef.current?.animateToRegion(
         { ...next, latitudeDelta: 0.02, longitudeDelta: 0.02 },
         400,
@@ -164,7 +176,7 @@ export default function CourseGenerateScreen() {
     } catch {
       setErrorMessage("현재 위치를 가져오지 못했어요.");
     } finally {
-      setLocating(false);
+      setLocatingTarget(null);
     }
   };
 
@@ -172,8 +184,10 @@ export default function CourseGenerateScreen() {
     const { latitude, longitude } = event.nativeEvent.coordinate;
     if (mode === "loop") {
       setCoords({ latitude, longitude });
+      setStartPlaceName("지도에서 선택한 위치");
     } else {
       setEndCoords({ latitude, longitude });
+      setEndPlaceName("지도에서 선택한 위치");
     }
     resetCandidates();
     setErrorMessage(null);
@@ -184,36 +198,14 @@ export default function CourseGenerateScreen() {
     setMode(next);
     resetCandidates();
     setErrorMessage(null);
-    if (next === "loop") setEndCoords(null);
-  };
-
-  const handleGeocode = async () => {
-    const query = addressQuery.trim();
-    if (!query) return;
-    setGeocoding(true);
-    setErrorMessage(null);
-    try {
-      const results = await Location.geocodeAsync(query);
-      if (results.length === 0) {
-        setErrorMessage("주소를 찾을 수 없어요. 다른 키워드로 검색해 보세요.");
-        return;
-      }
-      const first = results[0];
-      const next = { latitude: first.latitude, longitude: first.longitude };
-      setEndCoords(next);
-      resetCandidates();
-      mapRef.current?.animateToRegion(
-        { ...next, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-        400,
-      );
-    } catch {
-      setErrorMessage("주소 검색 중 문제가 발생했어요.");
-    } finally {
-      setGeocoding(false);
+    if (next === "loop") {
+      setEndCoords(null);
+      setEndPlaceName(null);
     }
   };
 
-  const openPlaceSearch = () => {
+  const openPlaceSearch = (target: PlaceSearchTarget) => {
+    setPlaceSearchTarget(target);
     setPlaceQuery("");
     setPlaceResults([]);
     setPlaceSearchError(null);
@@ -251,7 +243,9 @@ export default function CourseGenerateScreen() {
         setPlaceSearchError("검색 결과가 없어요. 장소명을 다시 입력해 주세요.");
     } catch {
       setPlaceResults([]);
-      setPlaceSearchError("장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.");
+      setPlaceSearchError(
+        "장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.",
+      );
     } finally {
       setPlaceSearching(false);
     }
@@ -259,11 +253,21 @@ export default function CourseGenerateScreen() {
 
   const selectPlace = (place: PlaceSearchItem) => {
     if (!place.supportedRegion) return;
-    setCoords({ latitude: place.latitude, longitude: place.longitude });
-    setCandidates([]);
-    setSelectedIndex(null);
+    const next = { latitude: place.latitude, longitude: place.longitude };
+    if (placeSearchTarget === "start") {
+      setCoords(next);
+      setStartPlaceName(place.name);
+    } else {
+      setEndCoords(next);
+      setEndPlaceName(place.name);
+    }
+    resetCandidates();
     setErrorMessage(null);
     setPlaceSearchOpen(false);
+    mapRef.current?.animateToRegion(
+      { ...next, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+      400,
+    );
   };
 
   const generateMutation = useMutation({
@@ -417,12 +421,16 @@ export default function CourseGenerateScreen() {
             userInterfaceStyle={isDark ? "dark" : "light"}
             onPress={handleMapPress}
           >
-            <Marker coordinate={coords} pinColor="#087A3F" title="출발지" />
+            <Marker
+              coordinate={coords}
+              pinColor="#087A3F"
+              title={startPlaceName}
+            />
             {isOneway && endCoords && (
               <Marker
                 coordinate={endCoords}
                 pinColor="#F97316"
-                title="도착지"
+                title={endPlaceName ?? "도착지"}
               />
             )}
             {candidates.map((candidate, index) => (
@@ -436,8 +444,8 @@ export default function CourseGenerateScreen() {
           </MapView>
           <View className="px-3 py-2">
             <Text className="text-[11px] text-[#6B756D] dark:text-[#AAB5AD]">
-              지도를 탭하면{" "}
-              {isOneway ? "도착지" : "출발지"}가 그 지점으로 이동해요.
+              지도를 탭하면 {isOneway ? "도착지" : "출발지"}가 그 지점으로
+              이동해요.
             </Text>
           </View>
         </View>
@@ -449,21 +457,25 @@ export default function CourseGenerateScreen() {
                 출발 위치
               </Text>
               <Text className="mt-1 text-left text-xs text-[#6B756D] dark:text-[#AAB5AD]">
-                {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
+                {startPlaceName}
               </Text>
             </View>
             <View className="flex-row items-center gap-1">
-              <Button variant="ghost" size="sm" onPress={openPlaceSearch}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onPress={() => openPlaceSearch("start")}
+              >
                 <Ionicons name="search" size={16} color="#087A3F" />
                 <Text className="text-xs font-bold text-[#087A3F]">검색</Text>
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
-                onPress={() => void useMyLocation()}
-                disabled={locating}
+                onPress={() => void useMyLocation("start")}
+                disabled={locatingTarget !== null}
               >
-                {locating ? (
+                {locatingTarget === "start" ? (
                   <ActivityIndicator size="small" color="#087A3F" />
                 ) : (
                   <Ionicons name="locate" size={16} color="#087A3F" />
@@ -479,59 +491,39 @@ export default function CourseGenerateScreen() {
         {isOneway && (
           <View className="rounded-2xl bg-white p-4 dark:bg-[#1B211D]">
             <View className="flex-row items-center justify-between">
-              <Text className="text-sm font-extrabold text-[#18271D] dark:text-[#F1F5F2]">
-                도착 위치
-              </Text>
-              {endCoords && (
+              <View className="flex-1 pr-2">
+                <Text className="text-left text-sm font-extrabold text-[#18271D] dark:text-[#F1F5F2]">
+                  도착 위치
+                </Text>
+                <Text className="mt-1 text-left text-xs text-[#6B756D] dark:text-[#AAB5AD]">
+                  {endPlaceName ?? "장소를 선택해 주세요"}
+                </Text>
+              </View>
+              <View className="flex-row items-center gap-1">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onPress={() => {
-                    setEndCoords(null);
-                    resetCandidates();
-                  }}
+                  onPress={() => openPlaceSearch("end")}
                 >
-                  <Ionicons name="close-circle" size={16} color="#B91C1C" />
-                  <Text className="text-xs font-bold text-[#B91C1C]">
-                    선택 취소
+                  <Ionicons name="search" size={16} color="#087A3F" />
+                  <Text className="text-xs font-bold text-[#087A3F]">검색</Text>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => void useMyLocation("end")}
+                  disabled={locatingTarget !== null}
+                >
+                  {locatingTarget === "end" ? (
+                    <ActivityIndicator size="small" color="#087A3F" />
+                  ) : (
+                    <Ionicons name="locate" size={16} color="#087A3F" />
+                  )}
+                  <Text className="text-xs font-bold text-[#087A3F]">
+                    내 위치로
                   </Text>
                 </Button>
-              )}
-            </View>
-            <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
-              {endCoords
-                ? `${endCoords.latitude.toFixed(5)}, ${endCoords.longitude.toFixed(5)}`
-                : "지도를 탭하거나 아래에서 주소를 검색하세요."}
-            </Text>
-
-            <View className="mt-3 flex-row items-center gap-2">
-              <View className="h-11 flex-1 flex-row items-center rounded-xl border border-slate-200 bg-[#F8FAF8] px-3 dark:border-[#343D36] dark:bg-[#242B26]">
-                <Ionicons name="search" size={16} color="#6B756D" />
-                <TextInput
-                  className="ml-2 flex-1 text-sm text-[#18271D] dark:text-[#F1F5F2]"
-                  placeholder="주소 또는 장소 이름"
-                  placeholderTextColor={isDark ? "#6B756D" : "#94A09A"}
-                  value={addressQuery}
-                  onChangeText={setAddressQuery}
-                  onSubmitEditing={() => void handleGeocode()}
-                  returnKeyType="search"
-                  editable={!geocoding}
-                />
               </View>
-              <Button
-                variant="ghost"
-                size="sm"
-                onPress={() => void handleGeocode()}
-                disabled={geocoding || addressQuery.trim().length === 0}
-              >
-                {geocoding ? (
-                  <ActivityIndicator size="small" color="#087A3F" />
-                ) : (
-                  <Text className="text-xs font-bold text-[#087A3F]">
-                    검색
-                  </Text>
-                )}
-              </Button>
             </View>
           </View>
         )}
@@ -707,7 +699,9 @@ export default function CourseGenerateScreen() {
               />
               <View className="px-5 pb-4">
                 <Text className="text-[17px] font-black text-[#191C1D] dark:text-[#F1F5F2]">
-                  출발 위치 검색
+                  {placeSearchTarget === "start"
+                    ? "출발 위치 검색"
+                    : "도착 위치 검색"}
                 </Text>
               </View>
               <View className="flex-1 px-5">
@@ -754,11 +748,7 @@ export default function CourseGenerateScreen() {
                       onPress={() => selectPlace(place)}
                     >
                       <View className="h-10 w-10 items-center justify-center rounded-xl bg-[#E9F5EC] dark:bg-[#24382B]">
-                        <Ionicons
-                          name="location"
-                          size={20}
-                          color="#087A3F"
-                        />
+                        <Ionicons name="location" size={20} color="#087A3F" />
                       </View>
                       <View className="ml-3 flex-1">
                         <Text className="text-sm font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
