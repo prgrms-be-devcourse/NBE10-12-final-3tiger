@@ -131,6 +131,32 @@ class BackApplicationTests {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test void personalUserMemoIsVisibleOnlyToItsOwner() throws Exception {
+        Long targetUserId = users.save(User.createLocal(
+                "memo-target-" + UUID.randomUUID() + "@example.com", "dummy-password-hash", "메모 대상"
+        )).getId();
+        String request = "{\"tags\":[\"함께 걷고 싶은 사람\",\"반려견 동반\"],\"memo\":\"서울숲 코스를 추천해 준 사용자\"}";
+
+        mvc.perform(put("/api/v1/users/{id}/personal-memo", targetUserId)
+                        .with(authenticatedAs(userId))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.targetUserId").value(targetUserId))
+                .andExpect(jsonPath("$.data.tags[0]").value("함께 걷고 싶은 사람"));
+        mvc.perform(get("/api/v1/users/{id}/personal-memo", targetUserId).with(authenticatedAs(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memo").value("서울숲 코스를 추천해 준 사용자"));
+
+        Long anotherUserId = users.save(User.createLocal(
+                "memo-other-" + UUID.randomUUID() + "@example.com", "dummy-password-hash", "다른 사용자"
+        )).getId();
+        mvc.perform(get("/api/v1/users/{id}/personal-memo", targetUserId).with(authenticatedAs(anotherUserId)))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/v1/users/{id}/personal-memo", targetUserId).with(authenticatedAs(userId)))
+                .andExpect(status().isOk());
+    }
+
     @Test
     void concurrentLikesKeepAccurateCount() throws Exception {
         Long secondUserId = users.save(User.createLocal(
