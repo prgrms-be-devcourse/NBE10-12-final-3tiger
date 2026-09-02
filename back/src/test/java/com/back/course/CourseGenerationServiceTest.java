@@ -1,5 +1,6 @@
 package com.back.course;
 
+import com.back.bookmark.service.BookmarkService;
 import com.back.course.domain.Persona;
 import com.back.course.dto.GenerateRequest;
 import com.back.course.dto.GeoJsonLineString;
@@ -28,7 +29,8 @@ import static org.mockito.Mockito.verify;
 class CourseGenerationServiceTest {
 
     private final CourseGenerationRepository repo = mock(CourseGenerationRepository.class);
-    private final CourseGenerationService service = new CourseGenerationService(repo);
+    private final BookmarkService bookmarkService = mock(BookmarkService.class);
+    private final CourseGenerationService service = new CourseGenerationService(repo, bookmarkService);
 
     @Test void generate_forwardsPersonaAsStringToRepository() {
         var at = LocalDateTime.of(2026, 8, 27, 14, 0);
@@ -92,22 +94,24 @@ class CourseGenerationServiceTest {
     @Test void save_defaultIsLoopWhenNotProvided() {
         var path = new GeoJsonLineString("LineString",
                 List.of(List.of(126.844, 37.55), List.of(126.845, 37.551)));
-        var req = new SaveCourseRequest(path, "11500", null, null, null);
-        given(repo.saveFromPath(eq(path), eq("11500"), anyBoolean(), any(), any())).willReturn(42L);
+        var req = new SaveCourseRequest("서울숲", path, "11500", null, null, null);
+        given(repo.saveFromPath(eq(path), eq("11500"), anyBoolean(), any(), any(), eq("서울숲"))).willReturn(42L);
 
-        service.save(req);
+        service.save(1L, req);
 
-        verify(repo).saveFromPath(eq(path), eq("11500"), eq(true), eq(null), eq(null));
+        verify(repo).saveFromPath(eq(path), eq("11500"), eq(true), eq(null), eq(null), eq("서울숲"));
+        verify(bookmarkService).add(1L, 42L);
     }
 
     @Test void save_forwardsOnewayEndPointToRepository() {
         var path = new GeoJsonLineString("LineString",
                 List.of(List.of(126.844, 37.55), List.of(126.852, 37.556)));
-        var req = new SaveCourseRequest(path, "11500", false, 37.556, 126.852);
-        given(repo.saveFromPath(eq(path), eq("11500"), eq(false), eq(126.852), eq(37.556))).willReturn(7L);
+        var req = new SaveCourseRequest("서울숲", path, "11500", false, 37.556, 126.852);
+        given(repo.saveFromPath(eq(path), eq("11500"), eq(false), eq(126.852), eq(37.556), eq("서울숲"))).willReturn(7L);
 
-        service.save(req);
+        service.save(1L, req);
 
-        verify(repo).saveFromPath(eq(path), eq("11500"), eq(false), eq(126.852), eq(37.556));
+        verify(repo).saveFromPath(eq(path), eq("11500"), eq(false), eq(126.852), eq(37.556), eq("서울숲"));
+        verify(bookmarkService).add(1L, 7L);
     }
 }

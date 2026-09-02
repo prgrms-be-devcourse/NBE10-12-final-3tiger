@@ -11,6 +11,7 @@ import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -45,6 +46,7 @@ class AuthControllerTest {
     @MockitoBean AuthService authService;
     @MockitoBean JwtProvider jwtProvider;
     @MockitoBean PasswordEncoder passwordEncoder;
+    @MockitoBean PlaceSearchRateLimiter placeSearchRateLimiter;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 

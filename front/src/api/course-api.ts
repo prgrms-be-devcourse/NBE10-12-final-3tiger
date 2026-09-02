@@ -20,6 +20,7 @@ export type GenerateCourseParams = {
 };
 
 export type SaveCourseParams = {
+  name: string;
   path: GeoJsonLineString;
   regionCode: string;
   isLoop?: boolean;

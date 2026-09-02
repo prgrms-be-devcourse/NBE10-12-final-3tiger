@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getCourseDetail } from "@/api/course-api";
 import { getMyPosts } from "@/api/post-api";
+import { getMyProfile } from "@/api/user-api";
 import { Button } from "@/components/ui/button";
 import {
   BottomSheetHandle,
@@ -155,6 +156,11 @@ export default function MyPostScreen() {
   useEffect(() => {
     if (!isAuthenticated) router.replace("/(auth)/login" as never);
   }, [isAuthenticated]);
+  const profileQuery = useQuery({
+    queryKey: ["my-profile"],
+    queryFn: getMyProfile,
+    enabled: isAuthenticated,
+  });
   const postsQuery = useInfiniteQuery({
     queryKey: ["my-posts"],
     queryFn: ({ pageParam }) => getMyPosts({ page: pageParam, size: 30 }),
@@ -193,7 +199,11 @@ export default function MyPostScreen() {
       </View>
       <View className="h-[100px] flex-row items-center gap-[15px] px-5">
         <Image
-          source={DEFAULT_PROFILE_IMAGE}
+          source={
+            profileQuery.data?.profileImageUrl
+              ? { uri: profileQuery.data.profileImageUrl }
+              : DEFAULT_PROFILE_IMAGE
+          }
           className="h-16 w-16 rounded-full border-2 border-[#22C55E]"
         />
         <View>
