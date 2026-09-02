@@ -123,6 +123,23 @@ public class User extends BaseEntity {
         );
     }
 
+    public static User createGoogle(
+            String providerUid,
+            String email,
+            String nickname
+    ) {
+        Objects.requireNonNull(providerUid, "구글 회원의 providerUid는 필수입니다.");
+        Objects.requireNonNull(nickname, "닉네임은 필수입니다.");
+
+        return new User(
+                email,
+                null,
+                nickname,
+                Provider.GOOGLE,
+                providerUid
+        );
+    }
+
     public void updateProfile(
             String nickname,
             Persona primaryPersona,
