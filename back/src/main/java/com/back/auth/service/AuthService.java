@@ -1,6 +1,9 @@
 package com.back.auth.service;
 
 import com.back.auth.dto.AuthResponse;
+import com.back.auth.google.GoogleClient;
+import com.back.auth.google.dto.GoogleTokenResponse;
+import com.back.auth.google.dto.GoogleUserInfoResponse;
 import com.back.auth.kakao.KakaoClient;
 import com.back.auth.kakao.dto.KakaoTokenResponse;
 import com.back.auth.kakao.dto.KakaoUserInfoResponse;
@@ -34,6 +37,7 @@ public class AuthService {
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate redisTemplate;
     private final KakaoClient kakaoClient;
+    private final GoogleClient googleClient;
 
 
     @Transactional(readOnly = true)
@@ -89,6 +93,7 @@ public class AuthService {
     public AuthResponse oauthLogin(String provider, String authorizationCode) {
         return switch (provider.toLowerCase()) {
             case "kakao" -> kakaoLogin(authorizationCode);
+            case "google" -> googleLogin(authorizationCode);
             default -> throw new BusinessException(ErrorCode.INVALID_PROVIDER);
         };
     }
@@ -107,6 +112,21 @@ public class AuthService {
         Optional<User> existing = userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, providerUid);
         boolean isNewUser = existing.isEmpty();
         User user = existing.orElseGet(() -> userRepository.save(User.createKakao(providerUid, email, nickname)));
+
+        return issueTokens(user.getId(), isNewUser);
+    }
+
+    private AuthResponse googleLogin(String code) {
+        GoogleTokenResponse tokenResponse = googleClient.exchangeToken(code);
+        GoogleUserInfoResponse userInfo = googleClient.getUserInfo(tokenResponse.accessToken());
+
+        String providerUid = userInfo.id();
+        String email = userInfo.email();
+        String nickname = userInfo.name() != null ? userInfo.name() : "구글 사용자";
+
+        Optional<User> existing = userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.GOOGLE, providerUid);
+        boolean isNewUser = existing.isEmpty();
+        User user = existing.orElseGet(() -> userRepository.save(User.createGoogle(providerUid, email, nickname)));
 
         return issueTokens(user.getId(), isNewUser);
     }

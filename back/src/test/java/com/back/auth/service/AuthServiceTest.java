@@ -1,6 +1,9 @@
 package com.back.auth.service;
 
 import com.back.auth.dto.AuthResponse;
+import com.back.auth.google.GoogleClient;
+import com.back.auth.google.dto.GoogleTokenResponse;
+import com.back.auth.google.dto.GoogleUserInfoResponse;
 import com.back.auth.kakao.KakaoClient;
 import com.back.auth.kakao.dto.KakaoTokenResponse;
 import com.back.auth.kakao.dto.KakaoUserInfoResponse;
@@ -50,6 +53,7 @@ class AuthServiceTest {
     @Mock ValueOperations<String, String> valueOps;
     @Mock Cursor<String> cursor;
     @Mock KakaoClient kakaoClient;
+    @Mock GoogleClient googleClient;
 
     @InjectMocks AuthService authService;
 
@@ -286,10 +290,78 @@ class AuthServiceTest {
 
     @Test
     void oauthLogin_지원안하는provider_INVALID_PROVIDER() {
-        assertThatThrownBy(() -> authService.oauthLogin("google", "some-code"))
+        assertThatThrownBy(() -> authService.oauthLogin("apple", "some-code"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
                 .isEqualTo(ErrorCode.INVALID_PROVIDER);
+    }
+
+    @Test
+    void oauthLogin_구글_기존유저_로그인처리() {
+        given(googleClient.exchangeToken("auth-code")).willReturn(new GoogleTokenResponse("google-at"));
+        given(googleClient.getUserInfo("google-at")).willReturn(
+                new GoogleUserInfoResponse("google-uid-123", "user@gmail.com", "홍길동"));
+        User user = mock(User.class);
+        given(user.getId()).willReturn(1L);
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.GOOGLE, "google-uid-123"))
+                .willReturn(Optional.of(user));
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(1L)).willReturn("at");
+        given(jwtProvider.generateRefreshToken(1L)).willReturn("rt");
+        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        AuthResponse result = authService.oauthLogin("google", "auth-code");
+
+        assertThat(result.accessToken()).isEqualTo("at");
+        assertThat(result.isNewUser()).isFalse();
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void oauthLogin_구글_신규유저_저장후토큰발급() {
+        given(googleClient.exchangeToken("auth-code")).willReturn(new GoogleTokenResponse("google-at"));
+        given(googleClient.getUserInfo("google-at")).willReturn(
+                new GoogleUserInfoResponse("google-uid-123", "user@gmail.com", "홍길동"));
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.GOOGLE, "google-uid-123"))
+                .willReturn(Optional.empty());
+        User saved = mock(User.class);
+        given(saved.getId()).willReturn(2L);
+        given(userRepository.save(any(User.class))).willReturn(saved);
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(2L)).willReturn("at");
+        given(jwtProvider.generateRefreshToken(2L)).willReturn("rt");
+        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        AuthResponse result = authService.oauthLogin("google", "auth-code");
+
+        assertThat(result.accessToken()).isEqualTo("at");
+        assertThat(result.isNewUser()).isTrue();
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void oauthLogin_구글_닉네임null_구글사용자폴백() {
+        given(googleClient.exchangeToken("auth-code")).willReturn(new GoogleTokenResponse("google-at"));
+        given(googleClient.getUserInfo("google-at")).willReturn(
+                new GoogleUserInfoResponse("google-uid-123", "user@gmail.com", null));
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.GOOGLE, "google-uid-123"))
+                .willReturn(Optional.empty());
+        User saved = mock(User.class);
+        given(saved.getId()).willReturn(1L);
+        given(userRepository.save(any(User.class))).willReturn(saved);
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(1L)).willReturn("at");
+        given(jwtProvider.generateRefreshToken(1L)).willReturn("rt");
+        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        authService.oauthLogin("google", "auth-code");
+
+        var userCaptor = org.mockito.ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getNickname()).isEqualTo("구글 사용자");
     }
 
     @Test

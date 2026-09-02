@@ -144,10 +144,10 @@ class AuthControllerTest {
 
     @Test
     void oauthLogin_지원안하는provider_400() throws Exception {
-        given(authService.oauthLogin("google", "some-code"))
+        given(authService.oauthLogin("apple", "some-code"))
                 .willThrow(new BusinessException(ErrorCode.INVALID_PROVIDER));
 
-        mvc.perform(post("/api/v1/auth/oauth/google/login")
+        mvc.perform(post("/api/v1/auth/oauth/apple/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new OAuthLoginRequest("some-code"))))
                 .andExpect(status().isBadRequest())
