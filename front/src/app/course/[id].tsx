@@ -107,7 +107,15 @@ export default function CourseDetailScreen() {
               ))}
             </View>
           )}
-          <Button className="mt-6 h-14 rounded-2xl bg-[#087A3F] active:bg-[#066C38]">
+          <Button
+            className="mt-6 h-14 rounded-2xl bg-[#087A3F] active:bg-[#066C38]"
+            onPress={() =>
+              router.push({
+                pathname: "/course/navigation",
+                params: { id: String(courseId) },
+              })
+            }
+          >
             <Ionicons name="navigate" size={20} color="white" />
             <Text className="font-black text-white">안내 시작</Text>
           </Button>

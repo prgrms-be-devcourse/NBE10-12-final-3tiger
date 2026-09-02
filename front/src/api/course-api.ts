@@ -3,6 +3,7 @@ import type {
   BookmarkedCourse,
   Course,
   CourseDetail,
+  CourseNavigation,
   GenerateResponse,
   GeoJsonLineString,
   Region,
@@ -46,6 +47,10 @@ export const getCourses = (params: CourseSearchParams) =>
   apiRequest<PageResponse<Course>>({ url: "/api/v1/courses", params });
 export const getCourseDetail = (courseId: number) =>
   apiRequest<CourseDetail>({ url: `/api/v1/courses/${courseId}` });
+export const getCourseNavigation = (courseId: number) =>
+  apiRequest<CourseNavigation>({
+    url: `/api/v1/courses/${courseId}/navigation`,
+  });
 export const bookmarkCourse = (courseId: number) =>
   apiRequest<{ isBookmarked: boolean }>({
     url: `/api/v1/courses/${courseId}/bookmarks`,

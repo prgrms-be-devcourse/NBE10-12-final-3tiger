@@ -56,6 +56,17 @@ export type CourseDetail = Course & {
   surfaceType?: string | null;
 };
 
+export type CourseNavigation = {
+  courseId: number;
+  name: string;
+  distanceM: number;
+  estimatedMinutes: number;
+  isLoop: boolean;
+  startPoint: { lat: number; lng: number };
+  endPoint: { lat: number; lng: number };
+  path: GeoJsonLineString;
+};
+
 export type BookmarkedCourse = Course & {
   isBookmarked: boolean;
   rating?: number | null;
