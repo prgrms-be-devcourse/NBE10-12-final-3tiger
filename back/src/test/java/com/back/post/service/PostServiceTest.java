@@ -18,9 +18,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -93,7 +95,9 @@ class PostServiceTest {
         PostService.CreatedPost result = postService.create(1L, command);
 
         assertThat(result.postId()).isEqualTo(10L);
-        verify(posts).save(any(Post.class));
+        ArgumentCaptor<Post> postCaptor = ArgumentCaptor.forClass(Post.class);
+        verify(posts).save(postCaptor.capture());
+        assertThat(postCaptor.getValue().getTitle()).isEqualTo("POST 테스트 코스");
     }
 
     @Test
@@ -148,9 +152,10 @@ class PostServiceTest {
         given(bookmarks.findBookmarkedCourseIds(1L, List.of(1L))).willReturn(Set.of(1L));
         given(comments.countByPostIds(any())).willReturn(List.of(commentCount));
 
-        PageResponse<PostService.FeedItem> result = postService.feed(1L, "latest", 0, 20);
+        PageResponse<PostService.FeedItem> result = postService.feed(1L, "latest", 0, 20, null);
 
         PostService.FeedItem item = result.content().getFirst();
+        assertThat(item.title()).isEqualTo("POST 테스트 코스");
         assertThat(item.profileImageUrl()).isEqualTo("https://cdn.example.com/profile.jpg");
         assertThat(item.content()).isEqualTo("좋은 산책이었습니다.");
         assertThat(item.likeCount()).isEqualTo(1);
@@ -165,12 +170,62 @@ class PostServiceTest {
         Post post = post(10L, user(2L), course(1L));
         given(posts.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of(post)));
 
-        PostService.FeedItem item = postService.feed(null, "latest", 0, 20).content().getFirst();
+        PostService.FeedItem item = postService.feed(null, "latest", 0, 20, null).content().getFirst();
 
         assertThat(item.isLiked()).isFalse();
         assertThat(item.isBookmarked()).isFalse();
         verify(postLikes, never()).findLikedPostIds(any(), any());
         verify(bookmarks, never()).findBookmarkedCourseIds(any(), any());
+    }
+
+    @Test
+    @DisplayName("검색어가 있으면 제목 부분 검색에 최신순 정렬과 페이징을 적용한다")
+    void searchesTitleWithLatestSortAndPaging() {
+        Post post = post(10L, user(2L), course(1L));
+        given(posts.findByTitleContainingIgnoreCase(eq("테스트"), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(post)));
+
+        postService.feed(null, "latest", 2, 10, "테스트");
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(posts).findByTitleContainingIgnoreCase(eq("테스트"), pageableCaptor.capture());
+        Pageable pageable = pageableCaptor.getValue();
+        assertThat(pageable.getPageNumber()).isEqualTo(2);
+        assertThat(pageable.getPageSize()).isEqualTo(10);
+        assertThat(pageable.getSort().getOrderFor("createdAt").getDirection()).isEqualTo(Sort.Direction.DESC);
+        assertThat(pageable.getSort().getOrderFor("id").getDirection()).isEqualTo(Sort.Direction.DESC);
+    }
+
+    @Test
+    @DisplayName("검색어가 있으면 제목 부분 검색에 좋아요순 정렬과 페이징을 적용한다")
+    void searchesTitleWithPopularitySortAndPaging() {
+        Post post = post(10L, user(2L), course(1L));
+        given(posts.findByTitleContainingIgnoreCase(eq("테스트"), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(post)));
+
+        postService.feed(null, "popularity", 1, 5, "테스트");
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(posts).findByTitleContainingIgnoreCase(eq("테스트"), pageableCaptor.capture());
+        Pageable pageable = pageableCaptor.getValue();
+        assertThat(pageable.getPageNumber()).isEqualTo(1);
+        assertThat(pageable.getPageSize()).isEqualTo(5);
+        assertThat(pageable.getSort().getOrderFor("likeCount").getDirection()).isEqualTo(Sort.Direction.DESC);
+        assertThat(pageable.getSort().getOrderFor("createdAt").getDirection()).isEqualTo(Sort.Direction.DESC);
+        assertThat(pageable.getSort().getOrderFor("id").getDirection()).isEqualTo(Sort.Direction.DESC);
+    }
+
+    @Test
+    @DisplayName("검색어가 null이거나 공백이면 기존 전체 피드를 조회한다")
+    void blankKeywordUsesExistingFeedQuery() {
+        given(posts.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of()));
+
+        postService.feed(null, "latest", 0, 20, null);
+        postService.feed(null, "latest", 0, 20, "");
+        postService.feed(null, "latest", 0, 20, "   ");
+
+        verify(posts, org.mockito.Mockito.times(3)).findAll(any(Pageable.class));
+        verify(posts, never()).findByTitleContainingIgnoreCase(any(), any(Pageable.class));
     }
 
     @Test

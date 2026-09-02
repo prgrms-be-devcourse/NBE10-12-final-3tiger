@@ -8,7 +8,10 @@ import type {
 } from "@/types/domain";
 
 export const getPosts = (
-  params: PageParams & { sort?: "latest" | "popularity" },
+  params: PageParams & {
+    sort?: "latest" | "popularity";
+    keyword?: string;
+  },
 ) => apiRequest<PageResponse<PostFeedItem>>({ url: "/api/v1/posts", params });
 export const getMyPosts = (params: PageParams) =>
   apiRequest<PageResponse<Post>>({ url: "/api/v1/posts/me", params });
