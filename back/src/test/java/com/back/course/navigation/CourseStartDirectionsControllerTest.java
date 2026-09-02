@@ -62,10 +62,21 @@ class CourseStartDirectionsControllerTest {
                         new CourseStartDirectionsResponse.Destination(
                                 "서울식물원 코스 출발점", 37.569, 126.835
                         ),
-                        1200,
-                        900,
-                        "https://map.kakao.com/link/by/walk/test",
-                        List.of()
+                        List.of(new CourseStartDirectionsResponse.DirectionRoute(
+                                0, "WALK", 1200, 900, 0, null,
+                                List.of(new CourseStartDirectionsResponse.RouteSegment(
+                                        0, "WALK", "출발점까지 이동", 1200, 900,
+                                        List.of(), List.of(),
+                                        new CourseStartDirectionsResponse.LineString(
+                                                "LineString",
+                                                List.of(
+                                                        List.of(126.80, 37.50),
+                                                        List.of(126.835, 37.569)
+                                                )
+                                        )
+                                ))
+                        )),
+                        "https://map.kakao.com/link/by/walk/test"
                 ));
 
         mvc.perform(get("/api/v1/courses/15/directions-to-start")
@@ -81,7 +92,14 @@ class CourseStartDirectionsControllerTest {
                 .andExpect(jsonPath("$.data.mode").value("WALK"))
                 .andExpect(jsonPath("$.data.status").value("ROUTE_AVAILABLE"))
                 .andExpect(jsonPath("$.data.destination.name")
-                        .value("서울식물원 코스 출발점"));
+                        .value("서울식물원 코스 출발점"))
+                .andExpect(jsonPath("$.data.routes[0].type").value("WALK"))
+                .andExpect(jsonPath("$.data.routes[0].segments[0].path.type")
+                        .value("LineString"))
+                .andExpect(jsonPath("$.data.routes[0].segments[0].path.coordinates[0][0]")
+                        .value(126.80))
+                .andExpect(jsonPath("$.data.transitRoutes").doesNotExist())
+                .andExpect(jsonPath("$.data.distanceMeters").doesNotExist());
 
         verify(directionsRateLimiter).check("IP:203.0.113.10");
     }

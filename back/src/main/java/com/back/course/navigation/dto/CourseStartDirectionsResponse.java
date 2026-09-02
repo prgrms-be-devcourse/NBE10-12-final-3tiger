@@ -9,10 +9,8 @@ public record CourseStartDirectionsResponse(
         boolean startable,
         int startableRadiusMeters,
         Destination destination,
-        Integer distanceMeters,
-        Integer estimatedSeconds,
-        String landingUrl,
-        List<TransitRoute> transitRoutes
+        List<DirectionRoute> routes,
+        String landingUrl
 ) {
     public record Destination(
             String name,
@@ -21,12 +19,38 @@ public record CourseStartDirectionsResponse(
     ) {
     }
 
-    public record TransitRoute(
+    public record DirectionRoute(
+            int routeIndex,
             String type,
             int distanceMeters,
             int estimatedSeconds,
             int transfers,
-            Integer fareWon
+            Integer fareWon,
+            List<RouteSegment> segments
+    ) {
+    }
+
+    public record RouteSegment(
+            int segmentIndex,
+            String mode,
+            String guidance,
+            int distanceMeters,
+            int estimatedSeconds,
+            List<String> vehicleNames,
+            List<Stop> stops,
+            LineString path
+    ) {
+    }
+
+    public record Stop(
+            String name,
+            String role
+    ) {
+    }
+
+    public record LineString(
+            String type,
+            List<List<Double>> coordinates
     ) {
     }
 }

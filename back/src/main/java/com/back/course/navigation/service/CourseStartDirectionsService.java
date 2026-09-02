@@ -9,10 +9,12 @@ import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.map.kakao.KakaoDirectionsClient;
 import com.back.map.kakao.dto.KakaoRouteDirectionsResponse;
+import com.back.map.kakao.dto.KakaoTransitDirectionsResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -61,7 +63,7 @@ public class CourseStartDirectionsService {
             return createResponse(
                     startPoint, destinationName, mode,
                     DirectionsStatus.ALREADY_NEAR_START,
-                    true, 0, 0, null, List.of()
+                    true, List.of(), null
             );
         }
 
@@ -99,7 +101,7 @@ public class CourseStartDirectionsService {
             return createResponse(
                     startPoint, destinationName, mode,
                     DirectionsStatus.ALREADY_NEAR_START,
-                    true, 0, 0, null, List.of()
+                    true, List.of(), null
             );
         }
         if (!result.isSuccess()) {
@@ -107,14 +109,24 @@ public class CourseStartDirectionsService {
         }
 
         var properties = result.route().properties();
+        List<CourseStartDirectionsResponse.RouteSegment> segments =
+                routeSegments(result.route().legs(), mode);
+        var route = new CourseStartDirectionsResponse.DirectionRoute(
+                0,
+                mode.name(),
+                properties.totalDistance(),
+                properties.totalTime(),
+                0,
+                null,
+                segments
+        );
+
         return createResponse(
                 startPoint, destinationName, mode,
                 DirectionsStatus.ROUTE_AVAILABLE,
                 false,
-                properties.totalDistance(),
-                properties.totalTime(),
-                validateLandingUrl(properties.landingUrl()),
-                List.of()
+                List.of(route),
+                validateLandingUrl(properties.landingUrl())
         );
     }
 
@@ -134,46 +146,224 @@ public class CourseStartDirectionsService {
             return createResponse(
                     startPoint, destinationName, DirectionsMode.PUBLIC_TRANSIT,
                     DirectionsStatus.ALREADY_NEAR_START,
-                    true, 0, 0, null, List.of()
+                    true, List.of(), null
             );
         }
         if (!result.isSuccess()) {
             throw new BusinessException(ErrorCode.KAKAO_TRANSIT_ROUTE_NOT_FOUND);
         }
 
-        List<CourseStartDirectionsResponse.TransitRoute> routes = result.routes().stream()
-                .filter(route -> route != null && route.properties() != null)
-                .map(route -> {
-                    var properties = route.properties();
-                    if (properties.totalDistance() == null
-                            || properties.totalTime() == null
-                            || properties.transfers() == null) {
-                        throw new BusinessException(ErrorCode.KAKAO_DIRECTIONS_FAILED);
-                    }
-                    return new CourseStartDirectionsResponse.TransitRoute(
-                            properties.type(),
-                            properties.totalDistance(),
-                            properties.totalTime(),
-                            properties.transfers(),
-                            properties.fare() == null ? null : properties.fare().value()
-                    );
-                })
-                .toList();
+        List<CourseStartDirectionsResponse.DirectionRoute> routes = new ArrayList<>();
+        for (int routeIndex = 0; routeIndex < result.routes().size(); routeIndex++) {
+            var kakaoRoute = result.routes().get(routeIndex);
+            if (kakaoRoute == null || kakaoRoute.properties() == null) {
+                throw directionsFailed();
+            }
+
+            var properties = kakaoRoute.properties();
+            if (properties.type() == null
+                    || properties.totalDistance() == null
+                    || properties.totalTime() == null
+                    || properties.transfers() == null) {
+                throw directionsFailed();
+            }
+
+            routes.add(new CourseStartDirectionsResponse.DirectionRoute(
+                    routeIndex,
+                    properties.type(),
+                    properties.totalDistance(),
+                    properties.totalTime(),
+                    properties.transfers(),
+                    properties.fare() == null ? null : properties.fare().value(),
+                    transitSegments(kakaoRoute.steps())
+            ));
+        }
 
         if (routes.isEmpty()) {
             throw new BusinessException(ErrorCode.KAKAO_TRANSIT_ROUTE_NOT_FOUND);
         }
-        var representative = routes.getFirst();
 
         return createResponse(
                 startPoint, destinationName, DirectionsMode.PUBLIC_TRANSIT,
                 DirectionsStatus.ROUTE_AVAILABLE,
                 false,
-                representative.distanceMeters(),
-                representative.estimatedSeconds(),
-                validateLandingUrl(result.properties().landingUrl()),
-                routes
+                routes,
+                validateLandingUrl(result.properties().landingUrl())
         );
+    }
+
+    private List<CourseStartDirectionsResponse.RouteSegment> routeSegments(
+            List<KakaoRouteDirectionsResponse.Leg> legs,
+            DirectionsMode mode
+    ) {
+        if (legs == null || legs.isEmpty()) {
+            throw directionsFailed();
+        }
+
+        List<CourseStartDirectionsResponse.RouteSegment> segments = new ArrayList<>();
+        for (var leg : legs) {
+            if (leg == null || leg.steps() == null) {
+                throw directionsFailed();
+            }
+            for (var step : leg.steps()) {
+                var properties = requireRouteStep(step);
+                segments.add(new CourseStartDirectionsResponse.RouteSegment(
+                        segments.size(),
+                        mode.name(),
+                        properties.guidance(),
+                        properties.distance(),
+                        properties.time(),
+                        List.of(),
+                        List.of(),
+                        lineString(step.path().points())
+                ));
+            }
+        }
+
+        if (segments.isEmpty()) {
+            throw directionsFailed();
+        }
+        return List.copyOf(segments);
+    }
+
+    private KakaoRouteDirectionsResponse.StepProperties requireRouteStep(
+            KakaoRouteDirectionsResponse.Step step
+    ) {
+        if (step == null
+                || step.properties() == null
+                || step.properties().distance() == null
+                || step.properties().time() == null
+                || step.properties().guidance() == null
+                || step.path() == null) {
+            throw directionsFailed();
+        }
+        return step.properties();
+    }
+
+    private List<CourseStartDirectionsResponse.RouteSegment> transitSegments(
+            List<KakaoTransitDirectionsResponse.Step> steps
+    ) {
+        if (steps == null || steps.isEmpty()) {
+            throw directionsFailed();
+        }
+
+        List<CourseStartDirectionsResponse.RouteSegment> segments = new ArrayList<>();
+        for (var step : steps) {
+            if (step == null
+                    || step.properties() == null
+                    || step.properties().distance() == null
+                    || step.properties().time() == null
+                    || step.properties().guidance() == null
+                    || step.path() == null) {
+                throw directionsFailed();
+            }
+
+            var properties = step.properties();
+            String segmentMode = transitMode(properties);
+            segments.add(new CourseStartDirectionsResponse.RouteSegment(
+                    segments.size(),
+                    segmentMode,
+                    properties.guidance(),
+                    properties.distance(),
+                    properties.time(),
+                    vehicleNames(properties.vehicles()),
+                    stops(properties.stops()),
+                    lineString(step.path().points())
+            ));
+        }
+        return List.copyOf(segments);
+    }
+
+    private String transitMode(
+            KakaoTransitDirectionsResponse.StepProperties properties
+    ) {
+        if ("WALK".equals(properties.type())
+                || "BUS".equals(properties.type())
+                || "SUBWAY".equals(properties.type())) {
+            return properties.type();
+        }
+
+        if (properties.vehicles() != null) {
+            for (var vehicle : properties.vehicles()) {
+                if (vehicle != null
+                        && ("BUS".equals(vehicle.type()) || "SUBWAY".equals(vehicle.type()))) {
+                    return vehicle.type();
+                }
+            }
+            if (!properties.vehicles().isEmpty()) {
+                throw directionsFailed();
+            }
+        }
+        return "WALK";
+    }
+
+    private List<String> vehicleNames(
+            List<KakaoTransitDirectionsResponse.Vehicle> vehicles
+    ) {
+        if (vehicles == null || vehicles.isEmpty()) {
+            return List.of();
+        }
+        List<String> names = new ArrayList<>();
+        for (var vehicle : vehicles) {
+            if (vehicle == null || vehicle.name() == null || vehicle.name().isBlank()) {
+                throw directionsFailed();
+            }
+            names.add(vehicle.name());
+        }
+        return List.copyOf(names);
+    }
+
+    private List<CourseStartDirectionsResponse.Stop> stops(
+            List<KakaoTransitDirectionsResponse.Stop> kakaoStops
+    ) {
+        if (kakaoStops == null || kakaoStops.isEmpty()) {
+            return List.of();
+        }
+
+        List<CourseStartDirectionsResponse.Stop> stops = new ArrayList<>();
+        for (int index = 0; index < kakaoStops.size(); index++) {
+            var stop = kakaoStops.get(index);
+            if (stop == null || stop.name() == null || stop.name().isBlank()) {
+                throw directionsFailed();
+            }
+            String role = index == 0
+                    ? "BOARDING"
+                    : index == kakaoStops.size() - 1 ? "ALIGHTING" : "PASSING";
+            stops.add(new CourseStartDirectionsResponse.Stop(stop.name(), role));
+        }
+        return List.copyOf(stops);
+    }
+
+    private CourseStartDirectionsResponse.LineString lineString(
+            List<List<Double>> points
+    ) {
+        if (points == null || points.isEmpty()) {
+            throw directionsFailed();
+        }
+
+        List<List<Double>> coordinates = new ArrayList<>();
+        for (List<Double> point : points) {
+            if (point == null || point.size() < 2) {
+                throw directionsFailed();
+            }
+            Double longitude = point.get(0);
+            Double latitude = point.get(1);
+            if (longitude == null || latitude == null
+                    || !Double.isFinite(longitude) || !Double.isFinite(latitude)
+                    || longitude < -180 || longitude > 180
+                    || latitude < -90 || latitude > 90) {
+                throw directionsFailed();
+            }
+            coordinates.add(List.of(longitude, latitude));
+        }
+        return new CourseStartDirectionsResponse.LineString(
+                "LineString",
+                List.copyOf(coordinates)
+        );
+    }
+
+    private BusinessException directionsFailed() {
+        return new BusinessException(ErrorCode.KAKAO_DIRECTIONS_FAILED);
     }
 
     private void validateCoordinates(double latitude, double longitude) {
@@ -233,10 +423,8 @@ public class CourseStartDirectionsService {
             DirectionsMode mode,
             DirectionsStatus status,
             boolean startable,
-            Integer distanceMeters,
-            Integer estimatedSeconds,
-            String landingUrl,
-            List<CourseStartDirectionsResponse.TransitRoute> transitRoutes
+            List<CourseStartDirectionsResponse.DirectionRoute> routes,
+            String landingUrl
     ) {
         return new CourseStartDirectionsResponse(
                 startPoint.getCourseId(),
@@ -249,10 +437,8 @@ public class CourseStartDirectionsService {
                         startPoint.getStartLat(),
                         startPoint.getStartLng()
                 ),
-                distanceMeters,
-                estimatedSeconds,
-                landingUrl,
-                transitRoutes
+                routes,
+                landingUrl
         );
     }
 

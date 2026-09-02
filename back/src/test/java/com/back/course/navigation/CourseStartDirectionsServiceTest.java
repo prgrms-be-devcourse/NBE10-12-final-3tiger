@@ -53,9 +53,16 @@ class CourseStartDirectionsServiceTest {
         assertThat(result.mode()).isEqualTo(DirectionsMode.WALK);
         assertThat(result.status()).isEqualTo(DirectionsStatus.ROUTE_AVAILABLE);
         assertThat(result.startable()).isFalse();
-        assertThat(result.distanceMeters()).isEqualTo(1200);
-        assertThat(result.estimatedSeconds()).isEqualTo(900);
-        assertThat(result.transitRoutes()).isEmpty();
+        assertThat(result.routes()).hasSize(1);
+        assertThat(result.routes().getFirst().type()).isEqualTo("WALK");
+        assertThat(result.routes().getFirst().distanceMeters()).isEqualTo(1200);
+        assertThat(result.routes().getFirst().estimatedSeconds()).isEqualTo(900);
+        assertThat(result.routes().getFirst().segments()).hasSize(1);
+        assertThat(result.routes().getFirst().segments().getFirst().path().coordinates())
+                .containsExactly(
+                        List.of(126.80, 37.50),
+                        List.of(126.835, 37.569)
+                );
         verify(directionsClient).getWalk(
                 37.50, 126.80, 37.5690, 126.8350,
                 "서울식물원 코스 출발점"
@@ -70,7 +77,10 @@ class CourseStartDirectionsServiceTest {
         var result = service.getDirectionsToStart(15L, 37.50, 126.80, DirectionsMode.BICYCLE);
 
         assertThat(result.mode()).isEqualTo(DirectionsMode.BICYCLE);
-        assertThat(result.distanceMeters()).isEqualTo(1400);
+        assertThat(result.routes().getFirst().type()).isEqualTo("BICYCLE");
+        assertThat(result.routes().getFirst().distanceMeters()).isEqualTo(1400);
+        assertThat(result.routes().getFirst().segments().getFirst().mode())
+                .isEqualTo("BICYCLE");
         verify(directionsClient).getBicycle(
                 37.50, 126.80, 37.5690, 126.8350,
                 "서울식물원 코스 출발점"
@@ -83,13 +93,23 @@ class CourseStartDirectionsServiceTest {
                 new KakaoTransitDirectionsResponse.RouteProperties(
                         "BUS", 5000, 2100, 0,
                         new KakaoTransitDirectionsResponse.Fare(1450, null, null)
-                )
+                ),
+                List.of(transitStep(
+                        "BUS", "6645번 버스 승차", 4100, 1500,
+                        List.of("강서구청", "화곡역", "서울식물원"),
+                        List.of(new KakaoTransitDirectionsResponse.Vehicle("마을", "6645"))
+                ))
         );
         var second = new KakaoTransitDirectionsResponse.Route(
                 new KakaoTransitDirectionsResponse.RouteProperties(
                         "BUS_AND_SUBWAY", 5500, 1800, 1,
                         new KakaoTransitDirectionsResponse.Fare(1550, null, null)
-                )
+                ),
+                List.of(transitStep(
+                        "SUBWAY", "5호선 승차", 4200, 1200,
+                        List.of("까치산역", "화곡역", "마곡역"),
+                        List.of(new KakaoTransitDirectionsResponse.Vehicle("SUBWAY", "5호선"))
+                ))
         );
         given(directionsClient.getPublicTransit(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString()))
                 .willReturn(new KakaoTransitDirectionsResponse(
@@ -105,11 +125,25 @@ class CourseStartDirectionsServiceTest {
                 15L, 37.50, 126.80, DirectionsMode.PUBLIC_TRANSIT
         );
 
-        assertThat(result.distanceMeters()).isEqualTo(5000);
-        assertThat(result.estimatedSeconds()).isEqualTo(2100);
-        assertThat(result.transitRoutes()).hasSize(2);
-        assertThat(result.transitRoutes().get(1).transfers()).isEqualTo(1);
-        assertThat(result.transitRoutes().get(1).fareWon()).isEqualTo(1550);
+        assertThat(result.routes()).hasSize(2);
+        assertThat(result.routes().get(0).routeIndex()).isZero();
+        assertThat(result.routes().get(0).distanceMeters()).isEqualTo(5000);
+        assertThat(result.routes().get(1).routeIndex()).isEqualTo(1);
+        assertThat(result.routes().get(1).transfers()).isEqualTo(1);
+        assertThat(result.routes().get(1).fareWon()).isEqualTo(1550);
+
+        var busSegment = result.routes().getFirst().segments().getFirst();
+        assertThat(busSegment.segmentIndex()).isZero();
+        assertThat(busSegment.mode()).isEqualTo("BUS");
+        assertThat(busSegment.vehicleNames()).containsExactly("6645");
+        assertThat(busSegment.stops())
+                .extracting(stop -> stop.role())
+                .containsExactly("BOARDING", "PASSING", "ALIGHTING");
+        assertThat(busSegment.path().coordinates())
+                .containsExactly(
+                        List.of(126.8495, 37.5509),
+                        List.of(126.827658, 37.5667106)
+                );
     }
 
     @Test
@@ -120,7 +154,7 @@ class CourseStartDirectionsServiceTest {
 
         assertThat(result.status()).isEqualTo(DirectionsStatus.ALREADY_NEAR_START);
         assertThat(result.startable()).isTrue();
-        assertThat(result.distanceMeters()).isZero();
+        assertThat(result.routes()).isEmpty();
         assertThat(result.landingUrl()).isNull();
         verifyNoInteractions(directionsClient);
     }
@@ -176,6 +210,35 @@ class CourseStartDirectionsServiceTest {
         );
     }
 
+    @Test
+    void missingSegmentPathIsRejectedInsteadOfReturningEmptyCoordinates() {
+        var step = new KakaoRouteDirectionsResponse.Step(
+                new KakaoRouteDirectionsResponse.StepProperties(
+                        100, "직진", 80, 126.80, 37.50
+                ),
+                new KakaoRouteDirectionsResponse.Path(List.of())
+        );
+        var response = new KakaoRouteDirectionsResponse(
+                "OK",
+                new KakaoRouteDirectionsResponse.Route(
+                        new KakaoRouteDirectionsResponse.RouteProperties(
+                                100, 80, "https://map.kakao.com/link/by/walk/test"
+                        ),
+                        List.of(new KakaoRouteDirectionsResponse.Leg(
+                                new KakaoRouteDirectionsResponse.LegProperties(100, 80),
+                                List.of(step)
+                        ))
+                )
+        );
+        given(directionsClient.getWalk(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyString()))
+                .willReturn(response);
+
+        assertError(
+                () -> service.getDirectionsToStart(15L, 37.50, 126.80, DirectionsMode.WALK),
+                ErrorCode.KAKAO_DIRECTIONS_FAILED
+        );
+    }
+
     private KakaoRouteDirectionsResponse route(
             String status, int distance, int seconds, String landingUrl
     ) {
@@ -184,8 +247,47 @@ class CourseStartDirectionsServiceTest {
                 new KakaoRouteDirectionsResponse.Route(
                         new KakaoRouteDirectionsResponse.RouteProperties(
                                 distance, seconds, landingUrl
-                        )
+                        ),
+                        List.of(new KakaoRouteDirectionsResponse.Leg(
+                                new KakaoRouteDirectionsResponse.LegProperties(distance, seconds),
+                                List.of(new KakaoRouteDirectionsResponse.Step(
+                                        new KakaoRouteDirectionsResponse.StepProperties(
+                                                distance, "출발점까지 이동", seconds,
+                                                126.80, 37.50
+                                        ),
+                                        new KakaoRouteDirectionsResponse.Path(List.of(
+                                                List.of(126.80, 37.50),
+                                                List.of(126.835, 37.569)
+                                        ))
+                                ))
+                        ))
                 )
+        );
+    }
+
+    private KakaoTransitDirectionsResponse.Step transitStep(
+            String type,
+            String guidance,
+            int distance,
+            int seconds,
+            List<String> stopNames,
+            List<KakaoTransitDirectionsResponse.Vehicle> vehicles
+    ) {
+        return new KakaoTransitDirectionsResponse.Step(
+                new KakaoTransitDirectionsResponse.StepProperties(
+                        guidance,
+                        type,
+                        distance,
+                        seconds,
+                        stopNames.stream()
+                                .map(KakaoTransitDirectionsResponse.Stop::new)
+                                .toList(),
+                        vehicles
+                ),
+                new KakaoTransitDirectionsResponse.Path(List.of(
+                        List.of(126.8495, 37.5509),
+                        List.of(126.827658, 37.5667106)
+                ))
         );
     }
 
