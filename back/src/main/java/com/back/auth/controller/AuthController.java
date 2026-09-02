@@ -3,15 +3,13 @@ package com.back.auth.controller;
 import com.back.auth.dto.AuthResponse;
 import com.back.auth.dto.LoginRequest;
 import com.back.auth.dto.LogoutRequest;
+import com.back.auth.dto.OAuthLoginRequest;
 import com.back.auth.dto.RefreshRequest;
 import com.back.auth.service.AuthService;
 import com.back.global.api.ApiResponse;
-import com.back.global.exception.BusinessException;
-import com.back.global.exception.ErrorCode;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -40,12 +38,12 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok("로그아웃이 완료되었습니다.", null));
     }
 
-    @GetMapping("/kakao")
-    public ResponseEntity<ApiResponse<AuthResponse>> kakaoLogin(@RequestParam String code) {
-        if (!StringUtils.hasText(code)) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
-        }
-        AuthResponse response = authService.kakaoLogin(code);
-        return ResponseEntity.ok(ApiResponse.ok("카카오 로그인이 완료되었습니다.", response));
+    @PostMapping("/oauth/{provider}/login")
+    public ResponseEntity<ApiResponse<AuthResponse>> oauthLogin(
+            @PathVariable String provider,
+            @Valid @RequestBody OAuthLoginRequest request
+    ) {
+        AuthResponse response = authService.oauthLogin(provider, request.authorizationCode());
+        return ResponseEntity.ok(ApiResponse.ok("소셜 로그인이 완료되었습니다.", response));
     }
 }

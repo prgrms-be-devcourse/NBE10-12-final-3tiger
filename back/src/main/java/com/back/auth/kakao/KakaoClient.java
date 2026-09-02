@@ -11,6 +11,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 @Component
 public class KakaoClient {
@@ -41,11 +42,13 @@ public class KakaoClient {
                     .retrieve()
                     .body(KakaoTokenResponse.class);
             if (response == null) {
-                throw new BusinessException(ErrorCode.KAKAO_AUTH_FAILED);
+                throw new BusinessException(ErrorCode.SOCIAL_SERVER_ERROR);
             }
             return response;
+        } catch (RestClientResponseException e) {
+            throw new BusinessException(ErrorCode.INVALID_AUTHORIZATION_CODE);
         } catch (RestClientException e) {
-            throw new BusinessException(ErrorCode.KAKAO_AUTH_FAILED);
+            throw new BusinessException(ErrorCode.SOCIAL_SERVER_ERROR);
         }
     }
 
@@ -57,11 +60,11 @@ public class KakaoClient {
                     .retrieve()
                     .body(KakaoUserInfoResponse.class);
             if (response == null) {
-                throw new BusinessException(ErrorCode.KAKAO_AUTH_FAILED);
+                throw new BusinessException(ErrorCode.SOCIAL_SERVER_ERROR);
             }
             return response;
         } catch (RestClientException e) {
-            throw new BusinessException(ErrorCode.KAKAO_AUTH_FAILED);
+            throw new BusinessException(ErrorCode.SOCIAL_SERVER_ERROR);
         }
     }
 }

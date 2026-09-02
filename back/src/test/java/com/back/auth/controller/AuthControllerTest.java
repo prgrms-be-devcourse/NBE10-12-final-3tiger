@@ -3,6 +3,7 @@ package com.back.auth.controller;
 import com.back.auth.dto.AuthResponse;
 import com.back.auth.dto.LoginRequest;
 import com.back.auth.dto.LogoutRequest;
+import com.back.auth.dto.OAuthLoginRequest;
 import com.back.auth.service.AuthService;
 import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.PasswordEncoderConfig;
@@ -25,7 +26,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -52,7 +52,7 @@ class AuthControllerTest {
     @Test
     void login_성공_200() throws Exception {
         given(authService.login(anyString(), anyString()))
-                .willReturn(new AuthResponse("at", "rt"));
+                .willReturn(new AuthResponse("at", "rt", false));
 
         mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,26 +110,47 @@ class AuthControllerTest {
     }
 
     @Test
-    void kakaoLogin_성공_200() throws Exception {
-        given(authService.kakaoLogin("valid-code")).willReturn(new AuthResponse("at", "rt"));
+    void oauthLogin_카카오_성공_200() throws Exception {
+        given(authService.oauthLogin("kakao", "valid-code"))
+                .willReturn(new AuthResponse("at", "rt", false));
 
-        mvc.perform(get("/api/v1/auth/kakao")
-                        .param("code", "valid-code"))
+        mvc.perform(post("/api/v1/auth/oauth/kakao/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new OAuthLoginRequest("valid-code"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").value("at"))
-                .andExpect(jsonPath("$.message").value("카카오 로그인이 완료되었습니다."));
+                .andExpect(jsonPath("$.message").value("소셜 로그인이 완료되었습니다."));
     }
 
     @Test
-    void kakaoLogin_code없음_400() throws Exception {
-        mvc.perform(get("/api/v1/auth/kakao"))
+    void oauthLogin_카카오_신규유저_isNewUser_true() throws Exception {
+        given(authService.oauthLogin("kakao", "new-user-code"))
+                .willReturn(new AuthResponse("at", "rt", true));
+
+        mvc.perform(post("/api/v1/auth/oauth/kakao/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new OAuthLoginRequest("new-user-code"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.isNewUser").value(true));
+    }
+
+    @Test
+    void oauthLogin_authorizationCode_없음_400() throws Exception {
+        mvc.perform(post("/api/v1/auth/oauth/kakao/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void kakaoLogin_빈code_400() throws Exception {
-        mvc.perform(get("/api/v1/auth/kakao")
-                        .param("code", ""))
-                .andExpect(status().isBadRequest());
+    void oauthLogin_지원안하는provider_400() throws Exception {
+        given(authService.oauthLogin("google", "some-code"))
+                .willThrow(new BusinessException(ErrorCode.INVALID_PROVIDER));
+
+        mvc.perform(post("/api/v1/auth/oauth/google/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new OAuthLoginRequest("some-code"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_400_1"));
     }
 }
