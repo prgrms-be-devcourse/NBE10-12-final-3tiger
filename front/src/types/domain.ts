@@ -69,12 +69,30 @@ export type CourseNavigation = {
 
 export type DirectionsMode = "WALK" | "PUBLIC_TRANSIT" | "BICYCLE";
 
-export type TransitRoute = {
+export type DirectionStop = {
+  name: string;
+  role: "BOARDING" | "PASSING" | "ALIGHTING" | string;
+};
+
+export type DirectionRouteSegment = {
+  segmentIndex: number;
+  mode: "WALK" | "BUS" | "SUBWAY" | "BICYCLE" | string;
+  guidance: string;
+  distanceMeters: number;
+  estimatedSeconds: number;
+  vehicleNames: string[];
+  stops: DirectionStop[];
+  path: GeoJsonLineString;
+};
+
+export type DirectionRoute = {
+  routeIndex: number;
   type: string;
   distanceMeters: number;
   estimatedSeconds: number;
   transfers: number;
   fareWon: number | null;
+  segments: DirectionRouteSegment[];
 };
 
 export type CourseStartDirections = {
@@ -88,10 +106,8 @@ export type CourseStartDirections = {
     latitude: number;
     longitude: number;
   };
-  distanceMeters: number | null;
-  estimatedSeconds: number | null;
+  routes: DirectionRoute[];
   landingUrl: string | null;
-  transitRoutes: TransitRoute[];
 };
 
 export type BookmarkedCourse = Course & {

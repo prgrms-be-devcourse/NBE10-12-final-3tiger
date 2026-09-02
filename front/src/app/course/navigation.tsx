@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -40,8 +40,9 @@ import {
 import { useThemeStore } from "@/stores/theme-store";
 import type {
   CourseStartDirections,
+  DirectionRoute,
+  DirectionRouteSegment,
   DirectionsMode,
-  TransitRoute,
 } from "@/types/domain";
 
 const START_PROXIMITY_M = 50;
@@ -86,17 +87,224 @@ const transitTypeLabel = (type: string) => {
 const transitTypeIcon = (type: string): keyof typeof Ionicons.glyphMap =>
   type === "SUBWAY" ? "train-outline" : "bus-outline";
 
-function TransitRouteCard({
+const TRANSIT_COLORS = [
+  "#2563EB",
+  "#7C3AED",
+  "#DC2626",
+  "#0891B2",
+  "#EA580C",
+  "#16A34A",
+  "#C026D3",
+];
+
+const SUBWAY_LINE_COLORS: Record<string, string> = {
+  "1": "#0052A4",
+  "2": "#00A84D",
+  "3": "#EF7C1C",
+  "4": "#00A5DE",
+  "5": "#996CAC",
+  "6": "#CD7C2F",
+  "7": "#747F00",
+  "8": "#E6186C",
+  "9": "#BDB092",
+};
+
+const stringHash = (value: string) =>
+  [...value].reduce((hash, character) => hash + character.charCodeAt(0), 0);
+
+const segmentLabel = (segment: DirectionRouteSegment) => {
+  if (segment.vehicleNames.length > 0) return segment.vehicleNames.join(" · ");
+  if (segment.mode === "WALK") return "도보";
+  if (segment.mode === "BICYCLE") return "자전거";
+  if (segment.mode === "SUBWAY") return "지하철";
+  if (segment.mode === "BUS") return "버스";
+  return segment.mode;
+};
+
+const segmentIcon = (
+  segment: DirectionRouteSegment,
+): keyof typeof Ionicons.glyphMap => {
+  if (segment.mode === "WALK") return "walk-outline";
+  if (segment.mode === "BICYCLE") return "bicycle-outline";
+  if (segment.mode === "SUBWAY") return "train-outline";
+  return "bus-outline";
+};
+
+const segmentColor = (segment: DirectionRouteSegment) => {
+  if (segment.mode === "WALK") return "#64748B";
+  if (segment.mode === "BICYCLE") return "#0D9488";
+  const vehicle = segment.vehicleNames[0] ?? segment.mode;
+  if (segment.mode === "SUBWAY") {
+    const line = vehicle.match(/[1-9]/)?.[0];
+    if (line) return SUBWAY_LINE_COLORS[line];
+  }
+  return TRANSIT_COLORS[
+    stringHash(`${segment.mode}-${vehicle}`) % TRANSIT_COLORS.length
+  ];
+};
+
+const lightenColor = (hex: string, amount = 0.58) => {
+  const value = hex.replace("#", "");
+  const channel = (offset: number) => {
+    const original = Number.parseInt(value.slice(offset, offset + 2), 16);
+    return Math.round(original + (255 - original) * amount)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${channel(0)}${channel(2)}${channel(4)}`;
+};
+
+const segmentIdentity = (segment: DirectionRouteSegment) =>
+  `${segment.mode}:${segment.vehicleNames.join("|")}`;
+
+const getVisualRouteSegments = (route: DirectionRoute) =>
+  route.segments
+    .filter(
+      (segment) => segment.distanceMeters > 0 || segment.estimatedSeconds > 0,
+    )
+    .reduce<DirectionRouteSegment[]>((groups, segment) => {
+      const previous = groups.at(-1);
+      if (previous && segmentIdentity(previous) === segmentIdentity(segment)) {
+        groups[groups.length - 1] = {
+          ...previous,
+          distanceMeters: previous.distanceMeters + segment.distanceMeters,
+          estimatedSeconds:
+            previous.estimatedSeconds + segment.estimatedSeconds,
+        };
+      } else {
+        groups.push(segment);
+      }
+      return groups;
+    }, []);
+
+const bearingDegrees = (from: LatLng, to: LatLng) => {
+  const fromLatitude = (from.latitude * Math.PI) / 180;
+  const toLatitude = (to.latitude * Math.PI) / 180;
+  const longitudeDelta = ((to.longitude - from.longitude) * Math.PI) / 180;
+  const y = Math.sin(longitudeDelta) * Math.cos(toLatitude);
+  const x =
+    Math.cos(fromLatitude) * Math.sin(toLatitude) -
+    Math.sin(fromLatitude) * Math.cos(toLatitude) * Math.cos(longitudeDelta);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+};
+
+const getDirectionArrows = (
+  coordinates: LatLng[],
+  requestedSpacingMeters: number,
+) => {
+  if (coordinates.length < 2) return [];
+  const legLengths = coordinates
+    .slice(1)
+    .map((coordinate, index) => distanceMeters(coordinates[index], coordinate));
+  const totalLength = legLengths.reduce((sum, length) => sum + length, 0);
+  const arrowSpacingMeters = Math.max(
+    requestedSpacingMeters,
+    totalLength / 120,
+  );
+  if (totalLength < arrowSpacingMeters / 2) return [];
+  const targetDistances: number[] = [];
+  for (
+    let distance = arrowSpacingMeters / 2;
+    distance < totalLength;
+    distance += arrowSpacingMeters
+  ) {
+    targetDistances.push(distance);
+  }
+
+  return targetDistances.map((targetDistance) => {
+    let traveled = 0;
+    for (let legIndex = 0; legIndex < legLengths.length; legIndex += 1) {
+      const legLength = legLengths[legIndex];
+      if (traveled + legLength >= targetDistance) {
+        const start = coordinates[legIndex];
+        const end = coordinates[legIndex + 1];
+        const ratio =
+          legLength > 0 ? (targetDistance - traveled) / legLength : 0;
+        return {
+          coordinate: {
+            latitude: start.latitude + (end.latitude - start.latitude) * ratio,
+            longitude:
+              start.longitude + (end.longitude - start.longitude) * ratio,
+          },
+          bearing: bearingDegrees(start, end),
+        };
+      }
+      traveled += legLength;
+    }
+    const end = coordinates.at(-1)!;
+    const start = coordinates.at(-2)!;
+    return { coordinate: end, bearing: bearingDegrees(start, end) };
+  });
+};
+
+function RouteProcessBar({ route }: { route: DirectionRoute }) {
+  const segments = getVisualRouteSegments(route);
+  if (segments.length === 0) return null;
+  const totalWeight = segments.reduce(
+    (sum, segment) => sum + Math.max(segment.estimatedSeconds, 60),
+    0,
+  );
+
+  return (
+    <View className="mt-3">
+      <View className="h-4 flex-row overflow-hidden rounded-full">
+        {segments.map((segment) => (
+          <View
+            key={segment.segmentIndex}
+            className="relative min-w-8 flex-row items-center overflow-hidden"
+            style={{
+              flex: Math.max(segment.estimatedSeconds, 60) / totalWeight,
+            }}
+          >
+            <View
+              className="z-10 h-4 w-4 shrink-0 items-center justify-center rounded-full border"
+              style={{
+                backgroundColor: "white",
+                borderColor: segmentColor(segment),
+              }}
+            >
+              <Ionicons
+                name={segmentIcon(segment)}
+                size={9}
+                color={segmentColor(segment)}
+              />
+            </View>
+            <View
+              className="relative h-2.5 flex-1 justify-center"
+              style={{ backgroundColor: segmentColor(segment) }}
+            >
+              <Text
+                pointerEvents="none"
+                numberOfLines={1}
+                className="text-center text-[8px] font-black leading-[10px] text-white"
+              >
+                {formatDuration(segment.estimatedSeconds)}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function DirectionRouteCard({
   route,
   index,
   isDark,
+  onPress,
 }: {
-  route: TransitRoute;
+  route: DirectionRoute;
   index: number;
   isDark: boolean;
+  onPress: () => void;
 }) {
   return (
-    <View className="mb-2 rounded-2xl border border-[#DCE4F0] bg-white px-4 py-3 dark:border-[#334155] dark:bg-[#172033]">
+    <Pressable
+      accessibilityRole="button"
+      className="mb-3 rounded-2xl border border-[#DCE4F0] bg-white px-4 py-3 active:opacity-80 dark:border-[#334155] dark:bg-[#172033]"
+      onPress={onPress}
+    >
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center gap-2">
           <View className="h-9 w-9 items-center justify-center rounded-xl bg-[#E8F0FF] dark:bg-[#23365B]">
@@ -119,6 +327,7 @@ function TransitRouteCard({
           {formatDuration(route.estimatedSeconds)}
         </Text>
       </View>
+      <RouteProcessBar route={route} />
       <View className="mt-3 flex-row items-center gap-2">
         <Text className="text-xs font-semibold text-[#475569] dark:text-[#CBD5E1]">
           {formatDistance(route.distanceMeters)}
@@ -135,8 +344,15 @@ function TransitRouteCard({
             </Text>
           </>
         )}
+        <View className="ml-auto">
+          <Ionicons
+            name="chevron-forward"
+            size={17}
+            color={isDark ? "#94A3B8" : "#64748B"}
+          />
+        </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -154,6 +370,7 @@ function DirectionsSheet({
   onRetry,
   onOpenKakao,
   onStart,
+  onSelectRoute,
 }: {
   visible: boolean;
   mode: DirectionsMode;
@@ -168,6 +385,7 @@ function DirectionsSheet({
   onRetry: () => void;
   onOpenKakao: (data: CourseStartDirections) => void;
   onStart: (confirmedStartable: boolean) => void;
+  onSelectRoute: (route: DirectionRoute) => void;
 }) {
   const { height: windowHeight } = useWindowDimensions();
   const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
@@ -334,13 +552,13 @@ function DirectionsSheet({
                     </Text>
                     <View className="mt-2 flex-row items-end justify-between">
                       <Text className="text-3xl font-black text-white">
-                        {data.estimatedSeconds != null
-                          ? formatDuration(data.estimatedSeconds)
+                        {data.routes[0]?.estimatedSeconds != null
+                          ? formatDuration(data.routes[0].estimatedSeconds)
                           : "정보 없음"}
                       </Text>
                       <Text className="pb-1 text-base font-black text-[#DBEAFE]">
-                        {data.distanceMeters != null
-                          ? formatDistance(data.distanceMeters)
+                        {data.routes[0]?.distanceMeters != null
+                          ? formatDistance(data.routes[0].distanceMeters)
                           : "거리 정보 없음"}
                       </Text>
                     </View>
@@ -354,22 +572,22 @@ function DirectionsSheet({
                   </View>
                 )}
 
-                {data.mode === "PUBLIC_TRANSIT" &&
-                  data.transitRoutes.length > 0 && (
-                    <View className="mt-4">
-                      <Text className="mb-2 text-sm font-black text-[#334155] dark:text-[#E2E8F0]">
-                        이용 가능한 경로 {data.transitRoutes.length}개
-                      </Text>
-                      {data.transitRoutes.map((route, index) => (
-                        <TransitRouteCard
-                          key={`${route.type}-${route.estimatedSeconds}-${index}`}
-                          route={route}
-                          index={index}
-                          isDark={isDark}
-                        />
-                      ))}
-                    </View>
-                  )}
+                {data.routes.length > 0 && (
+                  <View className="mt-4">
+                    <Text className="mb-2 text-sm font-black text-[#334155] dark:text-[#E2E8F0]">
+                      이용 가능한 경로 {data.routes.length}개
+                    </Text>
+                    {data.routes.map((route, index) => (
+                      <DirectionRouteCard
+                        key={`${route.routeIndex}-${route.type}-${route.estimatedSeconds}`}
+                        route={route}
+                        index={index}
+                        isDark={isDark}
+                        onPress={() => onSelectRoute(route)}
+                      />
+                    ))}
+                  </View>
+                )}
 
                 <View className="mt-4 gap-2">
                   {!data.startable && data.landingUrl && (
@@ -426,8 +644,149 @@ function DirectionsSheet({
   );
 }
 
+function RouteDetailSheet({
+  route,
+  isDark,
+  onBack,
+}: {
+  route: DirectionRoute | null;
+  isDark: boolean;
+  onBack: () => void;
+}) {
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
+
+  useEffect(() => {
+    if (!route) return;
+    sheetTranslateY.setValue(windowHeight);
+    Animated.timing(sheetTranslateY, {
+      toValue: 0,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [route, sheetTranslateY, windowHeight]);
+
+  if (!route) return null;
+  const dismissSheet = () =>
+    dismissBottomSheet(sheetTranslateY, windowHeight, onBack);
+
+  return (
+    <View
+      pointerEvents="box-none"
+      className="absolute inset-0 z-50 justify-end"
+    >
+      <Animated.View
+        className="h-1/2 overflow-hidden rounded-t-[30px] bg-white shadow-2xl dark:bg-[#0F172A]"
+        style={{ transform: [{ translateY: sheetTranslateY }] }}
+      >
+        <SafeAreaView edges={["bottom"]} className="flex-1">
+          <BottomSheetHandle
+            onDismiss={onBack}
+            translateY={sheetTranslateY}
+            dismissDistance={windowHeight}
+          />
+          <View className="flex-row items-center px-5 pb-2 pt-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              accessibilityLabel="추천 경로 목록으로 돌아가기"
+              className="-ml-2 h-10 w-10 rounded-full"
+              onPress={dismissSheet}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={22}
+                color={isDark ? "#E2E8F0" : "#334155"}
+              />
+            </Button>
+            <View className="ml-1 flex-1">
+              <Text className="text-lg font-black text-[#0F172A] dark:text-[#F8FAFC]">
+                선택한 경로
+              </Text>
+              <Text className="mt-0.5 text-xs font-bold text-[#64748B] dark:text-[#94A3B8]">
+                {formatDuration(route.estimatedSeconds)} ·{" "}
+                {formatDistance(route.distanceMeters)}
+                {route.transfers > 0 ? ` · 환승 ${route.transfers}회` : ""}
+              </Text>
+            </View>
+          </View>
+          <View className="px-5 pb-3">
+            <RouteProcessBar route={route} />
+          </View>
+          <ScrollView
+            className="flex-1 border-t border-[#E2E8F0] dark:border-[#263449]"
+            contentContainerClassName="px-5 py-3"
+            showsVerticalScrollIndicator
+            nestedScrollEnabled
+          >
+            {route.segments.map((segment, index) => {
+              const boarding = segment.stops.find(
+                (stop) => stop.role === "BOARDING",
+              );
+              const alighting = [...segment.stops]
+                .reverse()
+                .find((stop) => stop.role === "ALIGHTING");
+              const color = segmentColor(segment);
+              return (
+                <View key={segment.segmentIndex} className="flex-row">
+                  <View className="mr-3 items-center">
+                    <View
+                      className="h-9 w-9 items-center justify-center rounded-full"
+                      style={{ backgroundColor: color }}
+                    >
+                      <Ionicons
+                        name={segmentIcon(segment)}
+                        size={18}
+                        color="white"
+                      />
+                    </View>
+                    {index < route.segments.length - 1 && (
+                      <View
+                        className="min-h-8 w-0.5 flex-1"
+                        style={{ backgroundColor: `${color}55` }}
+                      />
+                    )}
+                  </View>
+                  <View className="mb-4 flex-1 rounded-2xl bg-[#F4F7FB] px-4 py-3 dark:bg-[#172033]">
+                    <View className="flex-row items-start justify-between gap-3">
+                      <Text
+                        className="flex-1 text-sm font-black"
+                        style={{ color }}
+                      >
+                        {segmentLabel(segment)}
+                      </Text>
+                      <Text className="text-xs font-bold text-[#64748B] dark:text-[#94A3B8]">
+                        {formatDuration(segment.estimatedSeconds)} ·{" "}
+                        {formatDistance(segment.distanceMeters)}
+                      </Text>
+                    </View>
+                    {!!segment.guidance && (
+                      <Text className="mt-1.5 text-sm leading-5 text-[#334155] dark:text-[#CBD5E1]">
+                        {segment.guidance}
+                      </Text>
+                    )}
+                    {(boarding || alighting) && (
+                      <Text className="mt-2 text-xs font-semibold text-[#64748B] dark:text-[#94A3B8]">
+                        {[boarding?.name, alighting?.name]
+                          .filter(Boolean)
+                          .join(" → ")}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </SafeAreaView>
+      </Animated.View>
+    </View>
+  );
+}
+
 export default function CourseNavigationScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const { height: mapViewportHeight } = useWindowDimensions();
   const courseId = Number(id);
   const isDark = useThemeStore((state) => state.isDark);
   const mapRef = useRef<MapView>(null);
@@ -435,6 +794,8 @@ export default function CourseNavigationScreen() {
   const offRouteSamplesRef = useRef(0);
   const hasFitRouteRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
+  const [mapLatitudeDelta, setMapLatitudeDelta] = useState(0.012);
+  const [showDirectionsMarkers, setShowDirectionsMarkers] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
@@ -446,6 +807,8 @@ export default function CourseNavigationScreen() {
   const [isDirectionsOpen, setIsDirectionsOpen] = useState(false);
   const [directionsMode, setDirectionsMode] = useState<DirectionsMode>("WALK");
   const [directionsOrigin, setDirectionsOrigin] = useState<LatLng | null>(null);
+  const [selectedDirectionsRoute, setSelectedDirectionsRoute] =
+    useState<DirectionRoute | null>(null);
 
   const navigationQuery = useQuery({
     queryKey: ["course-navigation", courseId],
@@ -490,6 +853,34 @@ export default function CourseNavigationScreen() {
     () => splitRouteAtProgress(route, progress),
     [progress, route],
   );
+  const selectedMapSegments = useMemo(
+    () =>
+      (selectedDirectionsRoute?.segments ?? [])
+        .map((segment) => ({
+          segment,
+          coordinates: toMapCoordinates(segment.path?.coordinates ?? []),
+        }))
+        .filter((item) => item.coordinates.length > 1),
+    [selectedDirectionsRoute],
+  );
+  const selectedRouteCoordinates = useMemo(
+    () => selectedMapSegments.flatMap((item) => item.coordinates),
+    [selectedMapSegments],
+  );
+  const selectedDirectionArrows = useMemo(() => {
+    const metersPerScreenPoint =
+      (mapLatitudeDelta * 111_320) / Math.max(mapViewportHeight, 1);
+    const arrowSpacingMeters = Math.max(12, metersPerScreenPoint * 72);
+    return selectedMapSegments.flatMap(({ segment, coordinates }) =>
+      getDirectionArrows(coordinates, arrowSpacingMeters).map(
+        (arrow, index) => ({
+          ...arrow,
+          color: segmentColor(segment),
+          key: `${segment.segmentIndex}-${index}`,
+        }),
+      ),
+    );
+  }, [mapLatitudeDelta, mapViewportHeight, selectedMapSegments]);
   const startPoint = navigationQuery.data
     ? {
         latitude: navigationQuery.data.startPoint.lat,
@@ -645,6 +1036,14 @@ export default function CourseNavigationScreen() {
     mapReady,
   ]);
 
+  useEffect(() => {
+    if (!mapReady || selectedRouteCoordinates.length < 2) return;
+    mapRef.current?.fitToCoordinates(selectedRouteCoordinates, {
+      edgePadding: { top: 100, right: 44, bottom: 390, left: 44 },
+      animated: true,
+    });
+  }, [mapReady, selectedRouteCoordinates]);
+
   const openDirectionsToStart = () => {
     if (!userLocation) {
       Alert.alert(
@@ -658,6 +1057,7 @@ export default function CourseNavigationScreen() {
       longitude: userLocation.longitude,
     });
     setDirectionsMode("WALK");
+    setSelectedDirectionsRoute(null);
     setIsDirectionsOpen(true);
   };
 
@@ -770,6 +1170,10 @@ export default function CourseNavigationScreen() {
         userInterfaceStyle={isDark ? "dark" : "light"}
         onMapReady={() => setMapReady(true)}
         onPanDrag={() => setFollowUser(false)}
+        onRegionChangeComplete={(region) => {
+          setMapLatitudeDelta(region.latitudeDelta);
+          setShowDirectionsMarkers(region.latitudeDelta <= 0.035);
+        }}
       >
         {routeParts.completed.length > 1 && (
           <Polyline
@@ -783,12 +1187,115 @@ export default function CourseNavigationScreen() {
         {routeParts.remaining.length > 1 && (
           <Polyline
             coordinates={routeParts.remaining}
-            strokeColor={isOffRoute ? "#E66B3D" : "#087A3F"}
+            strokeColor={
+              selectedDirectionsRoute
+                ? isDark
+                  ? "#475569"
+                  : "#CBD5E1"
+                : isOffRoute
+                  ? "#E66B3D"
+                  : "#087A3F"
+            }
             strokeWidth={7}
             lineCap="round"
             lineJoin="round"
           />
         )}
+        {selectedMapSegments.map(({ segment, coordinates }) => {
+          const color = segmentColor(segment);
+          return (
+            <Fragment key={`direction-segment-${segment.segmentIndex}`}>
+              <Polyline
+                coordinates={coordinates}
+                strokeColor={`${color}38`}
+                strokeWidth={15}
+                lineCap="round"
+                lineJoin="round"
+              />
+              <Polyline
+                coordinates={coordinates}
+                strokeColor={color}
+                strokeWidth={11}
+                lineCap="round"
+                lineJoin="round"
+              />
+              <Polyline
+                coordinates={coordinates}
+                strokeColor={lightenColor(color)}
+                strokeWidth={7}
+                lineCap="round"
+                lineJoin="round"
+              />
+            </Fragment>
+          );
+        })}
+        {selectedDirectionArrows.map((arrow) => (
+          <Marker
+            key={`direction-arrow-${arrow.key}`}
+            coordinate={arrow.coordinate}
+            anchor={{ x: 0.5, y: 0.5 }}
+            tracksViewChanges={false}
+            pointerEvents="none"
+          >
+            <View
+              className="h-5 w-5 items-center justify-center"
+              style={{ transform: [{ rotate: `${arrow.bearing - 90}deg` }] }}
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color="white"
+                style={{
+                  textShadowColor: arrow.color,
+                  textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: 2,
+                }}
+              />
+            </View>
+          </Marker>
+        ))}
+        {showDirectionsMarkers &&
+          selectedMapSegments
+            .filter(
+              ({ segment }, index, segments) =>
+                index === 0 ||
+                segmentIdentity(segments[index - 1].segment) !==
+                  segmentIdentity(segment),
+            )
+            .map(({ segment, coordinates }) => {
+              const color = segmentColor(segment);
+              const showVehicleName =
+                segment.mode === "BUS" || segment.mode === "SUBWAY";
+              return (
+                <Marker
+                  key={`direction-marker-${segment.segmentIndex}`}
+                  coordinate={coordinates[0]}
+                  anchor={{ x: 0.5, y: 0.5 }}
+                  tracksViewChanges={false}
+                  accessibilityLabel={`${segmentLabel(segment)} 구간 시작`}
+                >
+                  <View
+                    className="flex-row items-center rounded-full border-2 bg-white px-2 py-1 shadow-md dark:bg-[#0F172A]"
+                    style={{ borderColor: color }}
+                  >
+                    <Ionicons
+                      name={segmentIcon(segment)}
+                      size={14}
+                      color={color}
+                    />
+                    {showVehicleName && (
+                      <Text
+                        numberOfLines={1}
+                        className="ml-1 max-w-24 text-[11px] font-black"
+                        style={{ color }}
+                      >
+                        {segmentLabel(segment)}
+                      </Text>
+                    )}
+                  </View>
+                </Marker>
+              );
+            })}
         <Marker coordinate={startPoint} title="출발점" pinColor="#087A3F" />
         {!navigationQuery.data.isLoop && (
           <Marker coordinate={endPoint} title="도착점" pinColor="#E66B3D" />
@@ -972,7 +1479,7 @@ export default function CourseNavigationScreen() {
       </SafeAreaView>
 
       <DirectionsSheet
-        visible={isDirectionsOpen}
+        visible={isDirectionsOpen && selectedDirectionsRoute == null}
         mode={directionsMode}
         data={directionsQuery.data}
         isPending={directionsQuery.isPending || directionsQuery.isFetching}
@@ -980,11 +1487,23 @@ export default function CourseNavigationScreen() {
         errorMessage={directionsQuery.error?.message}
         courseName={navigationQuery.data.name}
         isDark={isDark}
-        onClose={() => setIsDirectionsOpen(false)}
-        onModeChange={setDirectionsMode}
+        onClose={() => {
+          setSelectedDirectionsRoute(null);
+          setIsDirectionsOpen(false);
+        }}
+        onModeChange={(nextMode) => {
+          setSelectedDirectionsRoute(null);
+          setDirectionsMode(nextMode);
+        }}
         onRetry={() => void directionsQuery.refetch()}
         onOpenKakao={(directions) => void openKakaoDirections(directions)}
         onStart={startNavigation}
+        onSelectRoute={setSelectedDirectionsRoute}
+      />
+      <RouteDetailSheet
+        route={selectedDirectionsRoute}
+        isDark={isDark}
+        onBack={() => setSelectedDirectionsRoute(null)}
       />
     </View>
   );
