@@ -17,7 +17,10 @@ export const getMyLikedPosts = (params: PageParams) =>
     url: "/api/v1/users/me/likes",
     params,
   });
-export const getPostComments = (postId: number, params: PageParams) =>
+export const getPostComments = (
+  postId: number,
+  params: PageParams & { sort?: "latest" | "upvote" },
+) =>
   apiRequest<PageResponse<PostComment>>({
     url: `/api/v1/posts/${postId}/comments`,
     params,

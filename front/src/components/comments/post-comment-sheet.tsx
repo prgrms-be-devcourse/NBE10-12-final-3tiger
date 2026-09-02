@@ -15,6 +15,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   Easing,
   TextInput,
   View,
@@ -43,6 +44,11 @@ import { LIKED_COLOR } from "@/components/feed/post-actions";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { PostComment } from "@/types/domain";
+
+const COMMENT_SORTS: Array<{ key: "latest" | "upvote"; label: string }> = [
+  { key: "latest", label: "최신순" },
+  { key: "upvote", label: "공감순" },
+];
 
 function CommentRow({
   item,
@@ -369,6 +375,7 @@ export function PostCommentSheet({
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [content, setContent] = useState("");
+  const [sort, setSort] = useState<"latest" | "upvote">("latest");
   const { height: windowHeight } = useWindowDimensions();
   const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
   const dismissSheet = () =>
@@ -392,9 +399,9 @@ export function PostCommentSheet({
     staleTime: 5 * 60 * 1000,
   });
   const commentsQuery = useInfiniteQuery({
-    queryKey: ["post-comments", numericPostId],
+    queryKey: ["post-comments", numericPostId, sort],
     queryFn: ({ pageParam }) =>
-      getPostComments(numericPostId!, { page: pageParam, size: 20 }),
+      getPostComments(numericPostId!, { page: pageParam, size: 20, sort }),
     initialPageParam: 0,
     enabled: numericPostId !== null && Number.isFinite(numericPostId),
     getNextPageParam: (lastPage) => {
@@ -459,6 +466,28 @@ export function PostCommentSheet({
                 댓글
               </Text>
             </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerClassName="gap-2 px-5 pb-2 pt-1"
+            >
+              {COMMENT_SORTS.map((option) => {
+                const active = sort === option.key;
+                return (
+                  <Pressable
+                    key={option.key}
+                    className={`h-9 justify-center rounded-full px-3 ${active ? "bg-[#087A3F]" : "bg-white dark:bg-[#1B211D]"}`}
+                    onPress={() => setSort(option.key)}
+                  >
+                    <Text
+                      className={`text-xs font-extrabold ${active ? "text-white" : "text-[#536158] dark:text-[#AAB5AD]"}`}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
             {commentsQuery.isPending ? (
               <View className="flex-1 items-center justify-center">
                 <ActivityIndicator color="#087A3F" />
