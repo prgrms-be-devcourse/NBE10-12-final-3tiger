@@ -41,11 +41,25 @@ public enum ErrorCode {
             "유효하지 않거나 만료된 리프레시 토큰입니다."
     ),
 
+    KAKAO_PLACE_SEARCH_FAILED(
+            HttpStatus.BAD_GATEWAY,
+            "PLACE_502_1",
+            "장소 검색 서비스에 일시적인 오류가 발생했습니다."
+    ),
+
+    PLACE_SEARCH_RATE_LIMIT_EXCEEDED(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "PLACE_429_1",
+            "장소 검색 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
+    ),
+
     KAKAO_AUTH_FAILED(
             HttpStatus.UNAUTHORIZED,
             "AUTH_401_3",
             "카카오 인증에 실패했습니다."
     );
+
+
 
     private final HttpStatus status;
     private final String code;

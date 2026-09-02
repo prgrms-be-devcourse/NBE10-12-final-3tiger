@@ -7,6 +7,7 @@ import com.back.global.exception.GlobalExceptionHandler;
 import com.back.region.controller.RegionController;
 import com.back.region.service.RegionService;
 import com.back.global.jwt.JwtProvider;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +29,7 @@ class RegionControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean RegionService regionService;
     @MockitoBean JwtProvider jwtProvider;
+    @MockitoBean PlaceSearchRateLimiter placeSearchRateLimiter;
 
     @Test
     @DisplayName("지역 목록 조회 시 중심 좌표와 코스 개수를 반환한다")

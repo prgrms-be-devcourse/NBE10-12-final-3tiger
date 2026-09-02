@@ -7,6 +7,7 @@ import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.SecurityConfig;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,7 @@ class CourseControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean CourseService courseService;
     @MockitoBean JwtProvider jwtProvider;
+    @MockitoBean PlaceSearchRateLimiter placeSearchRateLimiter;
 
     @Test
     @DisplayName("코스 상세 조회 시 경로를 GeoJSON LineString 형식으로 반환한다")

@@ -31,6 +31,7 @@ import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
 import { PostMenuSheet } from "@/components/feed/post-menu-sheet";
+import { PersonalUserMemoSheet } from "@/components/user/personal-user-memo-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
@@ -101,6 +102,7 @@ function FeedPost({
   const [expanded, setExpanded] = useState(false);
   const [contentLineCount, setContentLineCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [memoOpen, setMemoOpen] = useState(false);
   useEffect(() => {
     setLiked(item.isLiked);
     setLikeCount(item.likeCount);
@@ -253,6 +255,23 @@ function FeedPost({
         >
           <Ionicons name="ellipsis-vertical" size={18} color="#087A3F" />
         </Button>
+        {!item.isMine ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            accessibilityLabel={`${item.nickname ?? "사용자"}님 개인 메모`}
+            className="h-8 w-8 rounded-full"
+            onPress={() => {
+              if (!isAuthenticated) {
+                onRequireLogin();
+                return;
+              }
+              setMemoOpen(true);
+            }}
+          >
+            <Ionicons name="pricetag-outline" size={17} color="#087A3F" />
+          </Button>
+        ) : null}
       </View>
       {item.photoUrl ? (
         <Image
@@ -340,6 +359,14 @@ function FeedPost({
         canDelete={canDelete}
         onClose={() => setMenuOpen(false)}
       />
+      {!item.isMine ? (
+        <PersonalUserMemoSheet
+          open={memoOpen}
+          targetUserId={item.userId}
+          nickname={item.nickname ?? "산책러"}
+          onClose={() => setMemoOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }

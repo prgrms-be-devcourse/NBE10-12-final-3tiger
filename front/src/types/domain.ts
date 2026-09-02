@@ -72,6 +72,7 @@ export type CourseUsageLog = {
 export type Post = {
   postId: number;
   courseId: number;
+  userId?: number;
   nickname?: string;
   content: string;
   photoUrl?: string;
@@ -85,9 +86,17 @@ export type Post = {
 };
 
 export type PostFeedItem = Post & {
+  userId: number;
   isLiked: boolean;
   isBookmarked: boolean;
   isMine: boolean;
+};
+
+export type PersonalUserMemo = {
+  targetUserId: number;
+  tags: string[];
+  memo?: string | null;
+  updatedAt: string;
 };
 
 export type LikedPostItem = Post & {
@@ -145,7 +154,7 @@ export type GenerateCandidate = {
   path: GeoJsonLineString;
   totalM: number;
   avgScore: number;
-  errorPct: number;
+  errorPct: number | null;
   regionCode: string;
 };
 

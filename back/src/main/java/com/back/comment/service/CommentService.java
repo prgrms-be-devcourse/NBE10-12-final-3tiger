@@ -155,12 +155,13 @@ public class CommentService {
                 .map(reply -> toCommentResponse(reply, List.of(), upvotedCommentIds))
                 .toList();
         return new CommentResponse(comment.getId(), comment.getUser().getId(), comment.getUser().getNickname(),
-                comment.getContent(), comment.getUpvoteCount(),
+                comment.getUser().getProfileImageUrl(), comment.getContent(), comment.getUpvoteCount(),
                 upvotedCommentIds.contains(comment.getId()), comment.isDeleted(),
                 comment.getCreatedAt(), replyResponses);
     }
 
-    public record CommentResponse(Long commentId, Long userId, String nickname, String content, int upvoteCount,
+    public record CommentResponse(Long commentId, Long userId, String nickname, String profileImageUrl,
+                                  String content, int upvoteCount,
                                   boolean isUpvoted, boolean isDeleted, LocalDateTime createdAt,
                                   List<CommentResponse> replies) {}
     public record UpvoteResult(boolean upvoted, int upvoteCount) {}

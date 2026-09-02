@@ -6,6 +6,7 @@ import com.back.course.dto.SaveCourseRequest;
 import com.back.course.dto.SaveCourseResponse;
 import com.back.course.service.CourseGenerationService;
 import com.back.global.api.ApiResponse;
+import com.back.global.auth.CurrentUserId;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,8 +31,9 @@ public class CourseGenerationController {
 
     /** 사용자가 선택한 코스 정식 저장 */
     @PostMapping("/save")
-    public ApiResponse<SaveCourseResponse> save(@Valid @RequestBody SaveCourseRequest req) {
-        Long courseId = service.save(req);
+    public ApiResponse<SaveCourseResponse> save(@CurrentUserId Long userId,
+                                                @Valid @RequestBody SaveCourseRequest req) {
+        Long courseId = service.save(userId, req);
         return ApiResponse.ok("코스가 저장되었습니다.", new SaveCourseResponse(courseId));
     }
 }

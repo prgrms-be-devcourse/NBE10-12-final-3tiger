@@ -8,6 +8,7 @@ import com.back.global.config.WebConfig;
 import com.back.global.error.ApiException;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,12 +52,16 @@ class CommentControllerTest {
     @MockitoBean
     private JwtProvider jwtProvider;
 
+    @MockitoBean
+    private PlaceSearchRateLimiter placeSearchRateLimiter;
+
     @Test
     @DisplayName("t1: 비로그인 GET /api/v1/posts/{postId}/comments 요청 시 200, userId=null로 조회되고 isUpvoted=false")
     void t1() throws Exception {
         // given
         CommentService.CommentResponse commentResponse =
-                new CommentService.CommentResponse(1L, 1L, "산책러", "좋은 코스네요", 0, false, false, LocalDateTime.now(), List.of());
+                new CommentService.CommentResponse(1L, 1L, "산책러", "https://cdn.example.com/profile.jpg",
+                        "좋은 코스네요", 0, false, false, LocalDateTime.now(), List.of());
         given(commentService.getComments(eq(1L), isNull(), anyString(), any(Pageable.class)))
                 .willReturn(PageResponse.from(new PageImpl<>(List.of(commentResponse))));
 
@@ -65,6 +70,8 @@ class CommentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].commentId").value(1))
                 .andExpect(jsonPath("$.data.content[0].nickname").value("산책러"))
+                .andExpect(jsonPath("$.data.content[0].profileImageUrl")
+                        .value("https://cdn.example.com/profile.jpg"))
                 .andExpect(jsonPath("$.data.content[0].isUpvoted").value(false))
                 .andExpect(jsonPath("$.data.totalElements").value(1));
 
@@ -76,9 +83,11 @@ class CommentControllerTest {
     void t1b() throws Exception {
         // given
         CommentService.CommentResponse replyResponse =
-                new CommentService.CommentResponse(2L, 3L, "답글러", "답글", 0, false, false, LocalDateTime.now(), List.of());
+                new CommentService.CommentResponse(2L, 3L, "답글러", "https://cdn.example.com/reply.jpg",
+                        "답글", 0, false, false, LocalDateTime.now(), List.of());
         CommentService.CommentResponse commentResponse =
-                new CommentService.CommentResponse(1L, 2L, "산책러", "좋은 코스네요", 3, true, false, LocalDateTime.now(), List.of(replyResponse));
+                new CommentService.CommentResponse(1L, 2L, "산책러", "https://cdn.example.com/profile.jpg",
+                        "좋은 코스네요", 3, true, false, LocalDateTime.now(), List.of(replyResponse));
         given(commentService.getComments(eq(1L), eq(1L), anyString(), any(Pageable.class)))
                 .willReturn(PageResponse.from(new PageImpl<>(List.of(commentResponse))));
 
@@ -87,7 +96,9 @@ class CommentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].isUpvoted").value(true))
                 .andExpect(jsonPath("$.data.content[0].replies[0].commentId").value(2))
-                .andExpect(jsonPath("$.data.content[0].replies[0].nickname").value("답글러"));
+                .andExpect(jsonPath("$.data.content[0].replies[0].nickname").value("답글러"))
+                .andExpect(jsonPath("$.data.content[0].replies[0].profileImageUrl")
+                        .value("https://cdn.example.com/reply.jpg"));
 
         verify(commentService).getComments(eq(1L), eq(1L), anyString(), any(Pageable.class));
     }

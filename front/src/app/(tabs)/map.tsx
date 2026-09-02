@@ -20,13 +20,14 @@ import {
 import MapView, { type Region as MapRegion } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getRegions } from "@/api/course-api";
+import { searchPlaces, type PlaceSearchItem } from "@/api/place-api";
 import { getMyProfile } from "@/api/user-api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import {
   BottomSheetHandle,
   dismissBottomSheet,
 } from "@/components/ui/bottom-sheet-handle";
+import { Button } from "@/components/ui/button";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
@@ -79,15 +80,16 @@ export default function MapScreen() {
   const isDark = useThemeStore((state) => state.isDark);
   const mapRef = useRef<MapView>(null);
   const lastViewedRegionRef = useRef<MapRegion | null>(null);
-  const [query, setQuery] = useState("");
-  const [locating, setLocating] = useState(true);
-  const [showLocationLoading, setShowLocationLoading] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [regionsOpen, setRegionsOpen] = useState(false);
   const { height: windowHeight } = useWindowDimensions();
   const regionsSheetTranslateY = useRef(
     new Animated.Value(windowHeight),
   ).current;
+  const [query, setQuery] = useState("");
+  const [locating, setLocating] = useState(true);
+  const [showLocationLoading, setShowLocationLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [placeResults, setPlaceResults] = useState<PlaceSearchItem[]>([]);
+  const [regionsOpen, setRegionsOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const profileQuery = useQuery({
     queryKey: ["my-profile"],
@@ -100,24 +102,6 @@ export default function MapScreen() {
     enabled: regionsOpen,
     staleTime: 5 * 60 * 1000,
   });
-  const dismissRegionsSheet = useCallback(
-    () =>
-      dismissBottomSheet(regionsSheetTranslateY, windowHeight, () =>
-        setRegionsOpen(false),
-      ),
-    [regionsSheetTranslateY, windowHeight],
-  );
-  useEffect(() => {
-    if (!regionsOpen) return;
-    regionsSheetTranslateY.setValue(windowHeight);
-    Animated.timing(regionsSheetTranslateY, {
-      toValue: 0,
-      duration: 280,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [regionsOpen, regionsSheetTranslateY, windowHeight]);
-
   const moveTo = useCallback((next: MapRegion) => {
     if (!isValidCoordinate(next.latitude, next.longitude)) return;
     lastViewedRegionRef.current = next;
@@ -182,24 +166,40 @@ export default function MapScreen() {
     setMessage(null);
 
     try {
-      const [result] = await Location.geocodeAsync(keyword);
-      if (!result) {
+      const results = await searchPlaces(keyword);
+      setPlaceResults(results);
+      if (results.length === 0) {
         setMessage(
           "검색 결과가 없어요. 다른 동네나 공원 이름을 입력해 주세요.",
         );
         return;
       }
-      moveTo({
-        latitude: result.latitude,
-        longitude: result.longitude,
-        ...FIVE_HUNDRED_METER_VIEW,
-      });
     } catch {
+      setPlaceResults([]);
       setMessage("장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.");
     } finally {
       setSearching(false);
     }
-  }, [moveTo, query]);
+  }, [query]);
+
+  const dismissRegionsSheet = useCallback(
+    () =>
+      dismissBottomSheet(regionsSheetTranslateY, windowHeight, () =>
+        setRegionsOpen(false),
+      ),
+    [regionsSheetTranslateY, windowHeight],
+  );
+
+  useEffect(() => {
+    if (!regionsOpen) return;
+    regionsSheetTranslateY.setValue(windowHeight);
+    Animated.timing(regionsSheetTranslateY, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [regionsOpen, regionsSheetTranslateY, windowHeight]);
 
   useFocusEffect(
     useCallback(() => {
@@ -346,6 +346,43 @@ export default function MapScreen() {
             </Text>
           </Button>
         </ScrollView>
+        {placeResults.length > 0 && (
+          <View className="mt-2 max-h-64 overflow-hidden rounded-2xl bg-white shadow-lg dark:bg-[#1B211D]">
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {placeResults.map((place, index) => (
+                <Pressable
+                  key={`${place.latitude}-${place.longitude}-${index}`}
+                  className="flex-row items-center border-b border-[#EEF1EE] px-4 py-3 dark:border-[#343D36]"
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    moveTo({
+                      latitude: place.latitude,
+                      longitude: place.longitude,
+                      ...FIVE_HUNDRED_METER_VIEW,
+                    });
+                    setPlaceResults([]);
+                  }}
+                >
+                  <View className="h-9 w-9 items-center justify-center rounded-xl bg-[#E9FBEF] dark:bg-[#24382B]">
+                    <Ionicons name="location" size={18} color="#087A3F" />
+                  </View>
+                  <View className="ml-3 flex-1">
+                    <Text className="text-sm font-extrabold text-[#24372A] dark:text-[#F1F5F2]">
+                      {place.name}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      className="mt-0.5 text-xs text-[#6D7B6D] dark:text-[#AAB5AD]"
+                    >
+                      {place.roadAddress || place.address || "주소 정보 없음"}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#94A09A" />
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </SafeAreaView>
 
       <View className="absolute bottom-7 left-[18px] right-[18px] items-end gap-3">
@@ -373,7 +410,7 @@ export default function MapScreen() {
         </Button>
         <Button
           className="h-[68px] w-full justify-start rounded-[22px] bg-[#22C55E] px-4 shadow-lg"
-          onPress={() => router.push("/(tabs)/course" as never)}
+          onPress={() => router.push("/course/generate" as never)}
         >
           <View className="h-9 w-9 items-center justify-center rounded-xl bg-[#BDF4CB]">
             <Ionicons name="sparkles" size={18} color="#087A3F" />
