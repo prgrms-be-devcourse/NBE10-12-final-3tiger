@@ -121,6 +121,11 @@ const segmentLabel = (segment: DirectionRouteSegment) => {
   return segment.mode;
 };
 
+const compactSegmentLabel = (segment: DirectionRouteSegment) => {
+  if (segment.vehicleNames.length <= 1) return segmentLabel(segment);
+  return `${segment.vehicleNames[0]} 외 ${segment.vehicleNames.length - 1}개`;
+};
+
 const segmentIcon = (
   segment: DirectionRouteSegment,
 ): keyof typeof Ionicons.glyphMap => {
@@ -170,6 +175,7 @@ const getVisualRouteSegments = (route: DirectionRoute) =>
           distanceMeters: previous.distanceMeters + segment.distanceMeters,
           estimatedSeconds:
             previous.estimatedSeconds + segment.estimatedSeconds,
+          stops: [...previous.stops, ...segment.stops],
         };
       } else {
         groups.push(segment);
@@ -188,53 +194,39 @@ const bearingDegrees = (from: LatLng, to: LatLng) => {
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 };
 
-const getDirectionArrows = (
-  coordinates: LatLng[],
-  requestedSpacingMeters: number,
-) => {
-  if (coordinates.length < 2) return [];
+const getPolylineLength = (coordinates: LatLng[]) =>
+  coordinates
+    .slice(1)
+    .reduce(
+      (total, coordinate, index) =>
+        total + distanceMeters(coordinates[index], coordinate),
+      0,
+    );
+
+const getDirectionPoint = (coordinates: LatLng[], targetDistance: number) => {
+  if (coordinates.length < 2) return null;
   const legLengths = coordinates
     .slice(1)
     .map((coordinate, index) => distanceMeters(coordinates[index], coordinate));
-  const totalLength = legLengths.reduce((sum, length) => sum + length, 0);
-  const arrowSpacingMeters = Math.max(
-    requestedSpacingMeters,
-    totalLength / 120,
-  );
-  if (totalLength < arrowSpacingMeters / 2) return [];
-  const targetDistances: number[] = [];
-  for (
-    let distance = arrowSpacingMeters / 2;
-    distance < totalLength;
-    distance += arrowSpacingMeters
-  ) {
-    targetDistances.push(distance);
-  }
-
-  return targetDistances.map((targetDistance) => {
-    let traveled = 0;
-    for (let legIndex = 0; legIndex < legLengths.length; legIndex += 1) {
-      const legLength = legLengths[legIndex];
-      if (traveled + legLength >= targetDistance) {
-        const start = coordinates[legIndex];
-        const end = coordinates[legIndex + 1];
-        const ratio =
-          legLength > 0 ? (targetDistance - traveled) / legLength : 0;
-        return {
-          coordinate: {
-            latitude: start.latitude + (end.latitude - start.latitude) * ratio,
-            longitude:
-              start.longitude + (end.longitude - start.longitude) * ratio,
-          },
-          bearing: bearingDegrees(start, end),
-        };
-      }
-      traveled += legLength;
+  let traveled = 0;
+  for (let legIndex = 0; legIndex < legLengths.length; legIndex += 1) {
+    const legLength = legLengths[legIndex];
+    if (traveled + legLength >= targetDistance) {
+      const start = coordinates[legIndex];
+      const end = coordinates[legIndex + 1];
+      const ratio = legLength > 0 ? (targetDistance - traveled) / legLength : 0;
+      return {
+        coordinate: {
+          latitude: start.latitude + (end.latitude - start.latitude) * ratio,
+          longitude:
+            start.longitude + (end.longitude - start.longitude) * ratio,
+        },
+        bearing: bearingDegrees(start, end),
+      };
     }
-    const end = coordinates.at(-1)!;
-    const start = coordinates.at(-2)!;
-    return { coordinate: end, bearing: bearingDegrees(start, end) };
-  });
+    traveled += legLength;
+  }
+  return null;
 };
 
 function RouteProcessBar({ route }: { route: DirectionRoute }) {
@@ -288,15 +280,70 @@ function RouteProcessBar({ route }: { route: DirectionRoute }) {
   );
 }
 
+function CompactRouteSummary({
+  route,
+  destinationName,
+}: {
+  route: DirectionRoute;
+  destinationName: string;
+}) {
+  const segments = getVisualRouteSegments(route);
+  if (!segments.some((segment) => ["BUS", "SUBWAY"].includes(segment.mode))) {
+    return null;
+  }
+
+  return (
+    <View className="mt-2.5">
+      {segments.map((segment, index) => {
+        const nextSegment = segments[index + 1];
+        const destination =
+          [...segment.stops].reverse().find((stop) => stop.name)?.name ??
+          nextSegment?.stops.find((stop) => stop.name)?.name ??
+          destinationName;
+        const color = segmentColor(segment);
+        return (
+          <View key={segment.segmentIndex} className="flex-row">
+            <View className="mr-2 items-center">
+              <View
+                className="h-5 w-5 items-center justify-center rounded-full border bg-white dark:bg-[#172033]"
+                style={{ borderColor: color }}
+              >
+                <Ionicons name={segmentIcon(segment)} size={11} color={color} />
+              </View>
+              {index < segments.length - 1 && (
+                <View
+                  className="h-2.5 w-px"
+                  style={{ backgroundColor: `${color}66` }}
+                />
+              )}
+            </View>
+            <Text
+              numberOfLines={1}
+              className="flex-1 pt-0.5 text-[11px] font-semibold leading-5 text-[#475569] dark:text-[#CBD5E1]"
+            >
+              <Text className="font-black" style={{ color }}>
+                {compactSegmentLabel(segment)}
+              </Text>
+              {` · ${destination}`}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 function DirectionRouteCard({
   route,
   index,
   isDark,
+  destinationName,
   onPress,
 }: {
   route: DirectionRoute;
   index: number;
   isDark: boolean;
+  destinationName: string;
   onPress: () => void;
 }) {
   return (
@@ -328,6 +375,7 @@ function DirectionRouteCard({
         </Text>
       </View>
       <RouteProcessBar route={route} />
+      <CompactRouteSummary route={route} destinationName={destinationName} />
       <View className="mt-3 flex-row items-center gap-2">
         <Text className="text-xs font-semibold text-[#475569] dark:text-[#CBD5E1]">
           {formatDistance(route.distanceMeters)}
@@ -583,6 +631,7 @@ function DirectionsSheet({
                         route={route}
                         index={index}
                         isDark={isDark}
+                        destinationName={data.destination.name}
                         onPress={() => onSelectRoute(route)}
                       />
                     ))}
@@ -786,7 +835,6 @@ function RouteDetailSheet({
 
 export default function CourseNavigationScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { height: mapViewportHeight } = useWindowDimensions();
   const courseId = Number(id);
   const isDark = useThemeStore((state) => state.isDark);
   const mapRef = useRef<MapView>(null);
@@ -794,7 +842,6 @@ export default function CourseNavigationScreen() {
   const offRouteSamplesRef = useRef(0);
   const hasFitRouteRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
-  const [mapLatitudeDelta, setMapLatitudeDelta] = useState(0.012);
   const [showDirectionsMarkers, setShowDirectionsMarkers] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
@@ -868,19 +915,38 @@ export default function CourseNavigationScreen() {
     [selectedMapSegments],
   );
   const selectedDirectionArrows = useMemo(() => {
-    const metersPerScreenPoint =
-      (mapLatitudeDelta * 111_320) / Math.max(mapViewportHeight, 1);
-    const arrowSpacingMeters = Math.max(12, metersPerScreenPoint * 72);
-    return selectedMapSegments.flatMap(({ segment, coordinates }) =>
-      getDirectionArrows(coordinates, arrowSpacingMeters).map(
-        (arrow, index) => ({
-          ...arrow,
-          color: segmentColor(segment),
-          key: `${segment.segmentIndex}-${index}`,
-        }),
-      ),
+    const arrowCount = 12;
+    const segmentsWithLength = selectedMapSegments.map((item) => ({
+      ...item,
+      length: getPolylineLength(item.coordinates),
+    }));
+    const totalLength = segmentsWithLength.reduce(
+      (sum, item) => sum + item.length,
+      0,
     );
-  }, [mapLatitudeDelta, mapViewportHeight, selectedMapSegments]);
+    if (totalLength <= 0) return [];
+
+    return Array.from({ length: arrowCount }, (_, index) => {
+      const targetDistance = (totalLength * (index + 1)) / (arrowCount + 1);
+      let traveled = 0;
+      for (const item of segmentsWithLength) {
+        if (traveled + item.length >= targetDistance) {
+          const point = getDirectionPoint(
+            item.coordinates,
+            targetDistance - traveled,
+          );
+          if (!point) break;
+          return {
+            ...point,
+            color: segmentColor(item.segment),
+            key: `${item.segment.segmentIndex}-${index}`,
+          };
+        }
+        traveled += item.length;
+      }
+      return null;
+    }).filter((arrow): arrow is NonNullable<typeof arrow> => arrow != null);
+  }, [selectedMapSegments]);
   const startPoint = navigationQuery.data
     ? {
         latitude: navigationQuery.data.startPoint.lat,
@@ -1171,7 +1237,6 @@ export default function CourseNavigationScreen() {
         onMapReady={() => setMapReady(true)}
         onPanDrag={() => setFollowUser(false)}
         onRegionChangeComplete={(region) => {
-          setMapLatitudeDelta(region.latitudeDelta);
           setShowDirectionsMarkers(region.latitudeDelta <= 0.035);
         }}
       >
@@ -1272,7 +1337,7 @@ export default function CourseNavigationScreen() {
                   coordinate={coordinates[0]}
                   anchor={{ x: 0.5, y: 0.5 }}
                   tracksViewChanges={false}
-                  accessibilityLabel={`${segmentLabel(segment)} 구간 시작`}
+                  accessibilityLabel={`${compactSegmentLabel(segment)} 구간 시작`}
                 >
                   <View
                     className="flex-row items-center rounded-full border-2 bg-white px-2 py-1 shadow-md dark:bg-[#0F172A]"
@@ -1289,7 +1354,7 @@ export default function CourseNavigationScreen() {
                         className="ml-1 max-w-24 text-[11px] font-black"
                         style={{ color }}
                       >
-                        {segmentLabel(segment)}
+                        {compactSegmentLabel(segment)}
                       </Text>
                     )}
                   </View>
