@@ -134,7 +134,7 @@ class CommentServiceTest {
                 .willReturn(List.of());
 
         // when
-        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, null, PageRequest.of(0, 20));
+        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, null, "latest", PageRequest.of(0, 20));
 
         // then
         assertThat(response.content()).hasSize(1);
@@ -159,7 +159,7 @@ class CommentServiceTest {
         given(postRepository.findById(postId)).willReturn(Optional.empty());
 
         // when
-        ApiException exception = catchThrowableOfType(() -> commentService.getComments(postId, null, PageRequest.of(0, 20)), ApiException.class);
+        ApiException exception = catchThrowableOfType(() -> commentService.getComments(postId, null, "latest", PageRequest.of(0, 20)), ApiException.class);
 
         // then
         assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -371,7 +371,7 @@ class CommentServiceTest {
                 .willReturn(List.of(10L));
 
         // when
-        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, userId, PageRequest.of(0, 20));
+        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, userId, "latest", PageRequest.of(0, 20));
 
         // then
         assertThat(response.content()).hasSize(2);
@@ -399,7 +399,7 @@ class CommentServiceTest {
                 .willReturn(List.of());
 
         // when
-        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, null, PageRequest.of(0, 20));
+        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, null, "latest", PageRequest.of(0, 20));
 
         // then
         assertThat(response.content()).allMatch(item -> !item.isUpvoted());
@@ -583,7 +583,7 @@ class CommentServiceTest {
                 .willReturn(List.of(11L));
 
         // when
-        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, userId, PageRequest.of(0, 20));
+        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, userId, "latest", PageRequest.of(0, 20));
 
         // then
         assertThat(response.content()).hasSize(1);
@@ -597,5 +597,49 @@ class CommentServiceTest {
         assertThat(replyItem.commentId()).isEqualTo(11L);
         assertThat(replyItem.content()).isEqualTo("답글 내용");
         assertThat(replyItem.isUpvoted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("t22: sort=upvote면 공감순 조회 메서드를 호출하고, 답글은 기존 createdAt ASC 조회를 그대로 사용한다")
+    void t22() {
+        // given
+        Long postId = 1L;
+        Post post = newPost();
+        User author = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        Comment top = new Comment(post, author, "공감 많은 댓글");
+        ReflectionTestUtils.setField(top, "id", 10L);
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(commentRepository.findByPost_IdAndParentIsNullOrderByUpvoteCountDescCreatedAtDesc(eq(postId), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of(top)));
+        given(commentRepository.findByParent_IdInOrderByCreatedAtAsc(List.of(10L)))
+                .willReturn(List.of());
+
+        // when
+        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, null, "upvote", PageRequest.of(0, 20));
+
+        // then
+        assertThat(response.content()).hasSize(1);
+        verify(commentRepository).findByPost_IdAndParentIsNullOrderByUpvoteCountDescCreatedAtDesc(eq(postId), any(Pageable.class));
+        verify(commentRepository, never()).findByPost_IdAndParentIsNullOrderByCreatedAtDesc(any(), any());
+        verify(commentRepository).findByParent_IdInOrderByCreatedAtAsc(List.of(10L));
+    }
+
+    @Test
+    @DisplayName("t23: 알 수 없는 sort 값이면 예외 없이 최신순(createdAt DESC) 조회로 폴백한다")
+    void t23() {
+        // given
+        Long postId = 1L;
+        Post post = newPost();
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(commentRepository.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of()));
+
+        // when
+        PageResponse<CommentService.CommentResponse> response = commentService.getComments(postId, null, "boom", PageRequest.of(0, 20));
+
+        // then
+        assertThat(response.content()).isEmpty();
+        verify(commentRepository).findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class));
+        verify(commentRepository, never()).findByPost_IdAndParentIsNullOrderByUpvoteCountDescCreatedAtDesc(any(), any());
     }
 }

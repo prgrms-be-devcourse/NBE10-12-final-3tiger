@@ -17,7 +17,10 @@ export const getMyLikedPosts = (params: PageParams) =>
     url: "/api/v1/users/me/likes",
     params,
   });
-export const getPostComments = (postId: number, params: PageParams) =>
+export const getPostComments = (
+  postId: number,
+  params: PageParams & { sort?: "latest" | "upvote" },
+) =>
   apiRequest<PageResponse<PostComment>>({
     url: `/api/v1/posts/${postId}/comments`,
     params,
@@ -25,6 +28,12 @@ export const getPostComments = (postId: number, params: PageParams) =>
 export const addPostComment = (postId: number, content: string) =>
   apiRequest<number>({
     url: `/api/v1/posts/${postId}/comments`,
+    method: "POST",
+    data: { content },
+  });
+export const addCommentReply = (commentId: number, content: string) =>
+  apiRequest<number>({
+    url: `/api/v1/comments/${commentId}/replies`,
     method: "POST",
     data: { content },
   });

@@ -41,9 +41,12 @@ public class CommentService {
         this.eventPublisher = eventPublisher;
     }
 
-    public PageResponse<CommentResponse> getComments(Long postId, Long userId, Pageable pageable) {
+    public PageResponse<CommentResponse> getComments(Long postId, Long userId, String sort, Pageable pageable) {
         getPostByIdOrThrow(postId);
-        Page<Comment> parents = comments.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(postId, pageable);
+        // 원댓글만 sort 로 분기 (잘못된 값은 latest 로 폴백). 답글은 항상 createdAt ASC 유지
+        Page<Comment> parents = "upvote".equalsIgnoreCase(sort)
+                ? comments.findByPost_IdAndParentIsNullOrderByUpvoteCountDescCreatedAtDesc(postId, pageable)
+                : comments.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(postId, pageable);
         List<Long> parentIds = parents.getContent().stream().map(Comment::getId).toList();
         List<Comment> replies = parentIds.isEmpty()
                 ? List.of()

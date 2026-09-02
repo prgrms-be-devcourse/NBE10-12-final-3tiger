@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
@@ -61,7 +62,7 @@ class CommentControllerTest {
         CommentService.CommentResponse commentResponse =
                 new CommentService.CommentResponse(1L, 1L, "산책러", "https://cdn.example.com/profile.jpg",
                         "좋은 코스네요", 0, false, false, LocalDateTime.now(), List.of());
-        given(commentService.getComments(eq(1L), isNull(), any(Pageable.class)))
+        given(commentService.getComments(eq(1L), isNull(), anyString(), any(Pageable.class)))
                 .willReturn(PageResponse.from(new PageImpl<>(List.of(commentResponse))));
 
         // when & then
@@ -74,7 +75,7 @@ class CommentControllerTest {
                 .andExpect(jsonPath("$.data.content[0].isUpvoted").value(false))
                 .andExpect(jsonPath("$.data.totalElements").value(1));
 
-        verify(commentService).getComments(eq(1L), isNull(), any(Pageable.class));
+        verify(commentService).getComments(eq(1L), isNull(), eq("latest"), any(Pageable.class));
     }
 
     @Test
@@ -87,7 +88,7 @@ class CommentControllerTest {
         CommentService.CommentResponse commentResponse =
                 new CommentService.CommentResponse(1L, 2L, "산책러", "https://cdn.example.com/profile.jpg",
                         "좋은 코스네요", 3, true, false, LocalDateTime.now(), List.of(replyResponse));
-        given(commentService.getComments(eq(1L), eq(1L), any(Pageable.class)))
+        given(commentService.getComments(eq(1L), eq(1L), anyString(), any(Pageable.class)))
                 .willReturn(PageResponse.from(new PageImpl<>(List.of(commentResponse))));
 
         // when & then
@@ -99,7 +100,21 @@ class CommentControllerTest {
                 .andExpect(jsonPath("$.data.content[0].replies[0].profileImageUrl")
                         .value("https://cdn.example.com/reply.jpg"));
 
-        verify(commentService).getComments(eq(1L), eq(1L), any(Pageable.class));
+        verify(commentService).getComments(eq(1L), eq(1L), anyString(), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("t1c: sort 쿼리 파라미터가 서비스로 그대로 전달된다")
+    void t1c() throws Exception {
+        // given
+        given(commentService.getComments(eq(1L), isNull(), anyString(), any(Pageable.class)))
+                .willReturn(PageResponse.from(new PageImpl<>(List.of())));
+
+        // when & then
+        mockMvc.perform(get("/api/v1/posts/{postId}/comments", 1L).param("sort", "upvote"))
+                .andExpect(status().isOk());
+
+        verify(commentService).getComments(eq(1L), isNull(), eq("upvote"), any(Pageable.class));
     }
 
     @Test
