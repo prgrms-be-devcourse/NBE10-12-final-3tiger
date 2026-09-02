@@ -67,6 +67,33 @@ export type CourseNavigation = {
   path: GeoJsonLineString;
 };
 
+export type DirectionsMode = "WALK" | "PUBLIC_TRANSIT" | "BICYCLE";
+
+export type TransitRoute = {
+  type: string;
+  distanceMeters: number;
+  estimatedSeconds: number;
+  transfers: number;
+  fareWon: number | null;
+};
+
+export type CourseStartDirections = {
+  courseId: number;
+  mode: DirectionsMode;
+  status: "ROUTE_AVAILABLE" | "ALREADY_NEAR_START";
+  startable: boolean;
+  startableRadiusMeters: number;
+  destination: {
+    name: string;
+    latitude: number;
+    longitude: number;
+  };
+  distanceMeters: number | null;
+  estimatedSeconds: number | null;
+  landingUrl: string | null;
+  transitRoutes: TransitRoute[];
+};
+
 export type BookmarkedCourse = Course & {
   isBookmarked: boolean;
   rating?: number | null;

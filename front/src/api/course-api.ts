@@ -4,6 +4,8 @@ import type {
   Course,
   CourseDetail,
   CourseNavigation,
+  CourseStartDirections,
+  DirectionsMode,
   GenerateResponse,
   GeoJsonLineString,
   Region,
@@ -50,6 +52,16 @@ export const getCourseDetail = (courseId: number) =>
 export const getCourseNavigation = (courseId: number) =>
   apiRequest<CourseNavigation>({
     url: `/api/v1/courses/${courseId}/navigation`,
+  });
+export const getCourseStartDirections = (
+  courseId: number,
+  latitude: number,
+  longitude: number,
+  mode: DirectionsMode,
+) =>
+  apiRequest<CourseStartDirections>({
+    url: `/api/v1/courses/${courseId}/directions-to-start`,
+    params: { latitude, longitude, mode },
   });
 export const bookmarkCourse = (courseId: number) =>
   apiRequest<{ isBookmarked: boolean }>({
