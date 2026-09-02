@@ -469,6 +469,7 @@ export function PostCommentSheet({
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
+              className="flex-none"
               contentContainerClassName="gap-2 px-5 pb-2 pt-1"
             >
               {COMMENT_SORTS.map((option) => {

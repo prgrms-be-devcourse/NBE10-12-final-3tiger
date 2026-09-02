@@ -509,6 +509,7 @@ export default function CommunityScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          className="flex-none"
           style={{ height: SORT_BAR_HEIGHT }}
           contentContainerClassName="items-center gap-2 px-3"
         >
