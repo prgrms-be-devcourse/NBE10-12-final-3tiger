@@ -24,6 +24,7 @@ import {
 import { useRef } from "react";
 
 import {
+  addCommentReply,
   addPostComment,
   deleteComment,
   getPostComments,
@@ -52,22 +53,31 @@ const COMMENT_SORTS: Array<{ key: "latest" | "upvote"; label: string }> = [
 
 function CommentRow({
   item,
-  canDelete,
   postId,
+  currentUserId,
+  isReply = false,
 }: {
   item: PostComment;
-  canDelete: boolean;
   postId: number;
+  currentUserId?: number;
+  isReply?: boolean;
 }) {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDark = useThemeStore((state) => state.isDark);
+  const canDelete = currentUserId != null && currentUserId === item.userId;
+  const replies = item.replies ?? [];
   const [upvoted, setUpvoted] = useState(item.isUpvoted);
   const [upvoteCount, setUpvoteCount] = useState(item.upvoteCount);
   const [profileImageReady, setProfileImageReady] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ left: 20, top: 0 });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyContent, setReplyContent] = useState("");
+  const [repliesExpanded, setRepliesExpanded] = useState(
+    () => (item.replies?.length ?? 0) < 3,
+  );
   const commentRef = useRef<View>(null);
   useEffect(() => {
     setUpvoted(item.isUpvoted);
@@ -90,19 +100,23 @@ function CommentRow({
         pageParams: unknown[];
       }>({ queryKey: ["post-comments"] }, (data) => {
         if (!data) return data;
+        const patchUpvote = (comment: PostComment) =>
+          comment.commentId === item.commentId
+            ? {
+                ...comment,
+                isUpvoted: result.upvoted,
+                upvoteCount: result.upvoteCount,
+              }
+            : comment;
         return {
           ...data,
           pages: data.pages.map((page) => ({
             ...page,
-            content: page.content.map((comment) =>
-              comment.commentId === item.commentId
-                ? {
-                    ...comment,
-                    isUpvoted: result.upvoted,
-                    upvoteCount: result.upvoteCount,
-                  }
-                : comment,
-            ),
+            // 원댓글과 답글(중첩) 모두 반영
+            content: page.content.map((comment) => ({
+              ...patchUpvote(comment),
+              replies: (comment.replies ?? []).map(patchUpvote),
+            })),
           })),
         };
       });
@@ -121,9 +135,15 @@ function CommentRow({
           ...data,
           pages: data.pages.map((page) => ({
             ...page,
-            content: page.content.filter(
-              (comment) => comment.commentId !== item.commentId,
-            ),
+            // 원댓글이면 목록에서 제거, 답글이면 부모의 replies 에서 제거
+            content: page.content
+              .filter((comment) => comment.commentId !== item.commentId)
+              .map((comment) => ({
+                ...comment,
+                replies: (comment.replies ?? []).filter(
+                  (reply) => reply.commentId !== item.commentId,
+                ),
+              })),
           })),
         };
       });
@@ -135,6 +155,25 @@ function CommentRow({
       ]);
     },
   });
+  const replyMutation = useMutation({
+    mutationFn: () => addCommentReply(item.commentId, replyContent.trim()),
+    onSuccess: async () => {
+      setReplyContent("");
+      setReplyOpen(false);
+      setRepliesExpanded(true);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["post-comments", postId] }),
+        queryClient.invalidateQueries({ queryKey: ["posts"] }),
+        queryClient.invalidateQueries({ queryKey: ["liked-posts"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-posts"] }),
+      ]);
+    },
+  });
+  const canSubmitReply =
+    isAuthenticated && Boolean(replyContent.trim()) && !replyMutation.isPending;
+  const submitReply = () => {
+    if (canSubmitReply) replyMutation.mutate();
+  };
   const handleUpvote = () => {
     if (!isAuthenticated || mutation.isPending) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -184,13 +223,17 @@ function CommentRow({
         ref={commentRef}
         accessibilityLabel={`${item.nickname}님의 댓글, 길게 눌러 메뉴 열기`}
         delayLongPress={450}
-        onLongPress={() => {
-          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          commentRef.current?.measureInWindow((x, y, width, height) => {
-            setMenuPosition({ left: x + 20, top: y + height + 6 });
-            setMenuOpen(true);
-          });
-        }}
+        onLongPress={
+          item.isDeleted
+            ? undefined
+            : () => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                commentRef.current?.measureInWindow((x, y, width, height) => {
+                  setMenuPosition({ left: x + 20, top: y + height + 6 });
+                  setMenuOpen(true);
+                });
+              }
+        }
         className="w-full flex-row items-start gap-3 bg-[#FCFDFC] px-5 dark:bg-[#171C18]"
       >
         <Avatar alt={`${item.nickname} 프로필`} className="h-10 w-10">
@@ -214,51 +257,137 @@ function CommentRow({
               {new Date(item.createdAt).toLocaleDateString("ko-KR")}
             </Text>
           </View>
-          <Text className="mt-0.5 text-xs leading-[18px] text-[#34443A] dark:text-[#D4DDD6]">
+          <Text
+            className={`mt-0.5 text-xs leading-[18px] ${
+              item.isDeleted
+                ? "italic text-[#9AA79F] dark:text-[#6E7A72]"
+                : "text-[#34443A] dark:text-[#D4DDD6]"
+            }`}
+          >
             {item.content}
           </Text>
         </View>
-        <Button
-          variant="ghost"
-          accessibilityLabel={upvoted ? "댓글 공감 취소" : "댓글 공감"}
-          className="-mr-2 h-12 w-10 flex-col gap-0 rounded-full px-0 py-1"
-          disabled={!isAuthenticated || mutation.isPending}
-          onPress={handleUpvote}
-        >
-          <View className="h-[22px] w-[22px] items-center justify-center">
-            <Animated.View
-              pointerEvents="none"
-              className="absolute h-[22px] w-[22px] rounded-full border border-[#22C55E]"
-              style={{
-                opacity: burst.interpolate({
-                  inputRange: [0, 0.15, 1],
-                  outputRange: [0, 0.45, 0],
-                }),
-                transform: [
-                  {
-                    scale: burst.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.5, 1.75],
-                    }),
-                  },
-                ],
-              }}
-            />
-            <Animated.View style={{ transform: [{ scale }] }}>
-              <Ionicons
-                name={upvoted ? "heart" : "heart-outline"}
-                size={21}
-                color={upvoted ? LIKED_COLOR : isDark ? "#AAB5AD" : "#64748B"}
-              />
-            </Animated.View>
-          </View>
-          <Text
-            className={`text-[11px] font-bold ${upvoted ? "text-[#22C55E]" : "text-[#64748B] dark:text-[#AAB5AD]"}`}
+        {!item.isDeleted && (
+          <Button
+            variant="ghost"
+            accessibilityLabel={upvoted ? "댓글 공감 취소" : "댓글 공감"}
+            className="-mr-2 h-12 w-10 flex-col gap-0 rounded-full px-0 py-1"
+            disabled={!isAuthenticated || mutation.isPending}
+            onPress={handleUpvote}
           >
-            {upvoteCount}
-          </Text>
-        </Button>
+            <View className="h-[22px] w-[22px] items-center justify-center">
+              <Animated.View
+                pointerEvents="none"
+                className="absolute h-[22px] w-[22px] rounded-full border border-[#22C55E]"
+                style={{
+                  opacity: burst.interpolate({
+                    inputRange: [0, 0.15, 1],
+                    outputRange: [0, 0.45, 0],
+                  }),
+                  transform: [
+                    {
+                      scale: burst.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.5, 1.75],
+                      }),
+                    },
+                  ],
+                }}
+              />
+              <Animated.View style={{ transform: [{ scale }] }}>
+                <Ionicons
+                  name={upvoted ? "heart" : "heart-outline"}
+                  size={21}
+                  color={upvoted ? LIKED_COLOR : isDark ? "#AAB5AD" : "#64748B"}
+                />
+              </Animated.View>
+            </View>
+            <Text
+              className={`text-[11px] font-bold ${upvoted ? "text-[#22C55E]" : "text-[#64748B] dark:text-[#AAB5AD]"}`}
+            >
+              {upvoteCount}
+            </Text>
+          </Button>
+        )}
       </Pressable>
+
+      {!isReply && !item.isDeleted && isAuthenticated && (
+        <Pressable
+          accessibilityLabel="답글 달기"
+          className="mt-1 self-start pl-[68px] pr-5 py-1"
+          onPress={() => setReplyOpen((prev) => !prev)}
+        >
+          <Text className="text-[11px] font-bold text-[#6B756D] dark:text-[#AAB5AD]">
+            답글 달기
+          </Text>
+        </Pressable>
+      )}
+
+      {!isReply && replyOpen && (
+        <View className="mt-1.5 flex-row items-end gap-2 pl-[68px] pr-5">
+          <View className="min-h-9 flex-1 flex-row items-end rounded-[18px] border border-[#DCE5DE] bg-[#F8FAF8] py-1 pl-3.5 pr-1 dark:border-[#343D36] dark:bg-[#242B26]">
+            <TextInput
+              value={replyContent}
+              onChangeText={setReplyContent}
+              editable={!replyMutation.isPending}
+              autoFocus
+              className="max-h-20 min-h-7 flex-1 py-1 text-[13px] text-[#191C1D] dark:text-[#F1F5F2]"
+              multiline
+              maxLength={1000}
+              placeholder={`${item.nickname}님에게 답글 남기기`}
+              placeholderTextColor="#7A857D"
+              textAlignVertical="center"
+            />
+            <Button
+              size="icon"
+              accessibilityLabel="답글 작성"
+              className="h-8 w-8 rounded-full"
+              disabled={!canSubmitReply}
+              onPress={submitReply}
+            >
+              {replyMutation.isPending ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Ionicons name="send" size={15} color="white" />
+              )}
+            </Button>
+          </View>
+        </View>
+      )}
+      {!isReply && replyMutation.isError ? (
+        <Text className="mt-1 pl-[68px] pr-5 text-[11px] text-destructive">
+          {replyMutation.error.message}
+        </Text>
+      ) : null}
+
+      {!isReply && replies.length > 0 && (
+        <View className="mt-2 gap-3">
+          {replies.length >= 3 && (
+            <Pressable
+              accessibilityLabel={repliesExpanded ? "답글 숨기기" : "답글 보기"}
+              className="self-start pl-[68px] pr-5 py-1"
+              onPress={() => setRepliesExpanded((prev) => !prev)}
+            >
+              <Text className="text-[11px] font-bold text-[#087A3F] dark:text-[#4ADE80]">
+                {repliesExpanded
+                  ? "답글 숨기기"
+                  : `답글 ${replies.length}개 보기`}
+              </Text>
+            </Pressable>
+          )}
+          {repliesExpanded &&
+            replies.map((reply) => (
+              <View key={reply.commentId} className="pl-8">
+                <CommentRow
+                  item={reply}
+                  postId={postId}
+                  currentUserId={currentUserId}
+                  isReply
+                />
+              </View>
+            ))}
+        </View>
+      )}
 
       <Modal
         visible={menuOpen}
@@ -525,7 +654,7 @@ export function PostCommentSheet({
                   <CommentRow
                     item={item}
                     postId={numericPostId!}
-                    canDelete={profileQuery.data?.userId === item.userId}
+                    currentUserId={profileQuery.data?.userId}
                   />
                 )}
                 onEndReached={() => {

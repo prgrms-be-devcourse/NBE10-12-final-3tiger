@@ -31,6 +31,12 @@ export const addPostComment = (postId: number, content: string) =>
     method: "POST",
     data: { content },
   });
+export const addCommentReply = (commentId: number, content: string) =>
+  apiRequest<number>({
+    url: `/api/v1/comments/${commentId}/replies`,
+    method: "POST",
+    data: { content },
+  });
 export const toggleCommentUpvote = (commentId: number) =>
   apiRequest<{ upvoted: boolean; upvoteCount: number }>({
     url: `/api/v1/comments/${commentId}/upvote`,
