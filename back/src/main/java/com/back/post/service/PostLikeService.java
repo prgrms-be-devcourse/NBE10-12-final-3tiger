@@ -104,7 +104,8 @@ public class PostLikeService {
     private LikedPostItem toLikedPostItem(PostLike postLike, Long currentUserId, Map<Long, Long> commentCounts,
                                           Set<Long> bookmarkedCourseIds) {
         Post post = postLike.getPost();
-        return new LikedPostItem(post.getId(), post.getCourse().getId(), post.getUser().getNickname(), post.getContent(),
+        return new LikedPostItem(post.getId(), post.getCourse().getId(), post.getUser().getNickname(),
+                post.getUser().getProfileImageUrl(), post.getContent(),
                 post.getPhotoUrl(), post.getLikeCount(),
                 commentCounts.getOrDefault(post.getId(), 0L),
                 bookmarkedCourseIds.contains(post.getCourse().getId()),
@@ -120,7 +121,8 @@ public class PostLikeService {
     }
 
     public record LikeResult(boolean isLiked, int likeCount) {}
-    public record LikedPostItem(Long postId, Long courseId, String nickname, String content, String photoUrl,
+    public record LikedPostItem(Long postId, Long courseId, String nickname, String profileImageUrl,
+                                String content, String photoUrl,
                                 int likeCount, long commentCount, boolean isBookmarked, boolean isMine,
                                 LocalDateTime likedAt) {}
 }

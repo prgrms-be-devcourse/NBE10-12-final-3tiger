@@ -13,13 +13,19 @@ import { apiRequest } from "./client";
 export type GenerateCourseParams = {
   lat: number;
   lng: number;
-  distanceM: number;
+  distanceM?: number;
+  endLat?: number;
+  endLng?: number;
   persona?: string;
 };
 
 export type SaveCourseParams = {
+  name: string;
   path: GeoJsonLineString;
   regionCode: string;
+  isLoop?: boolean;
+  endLat?: number;
+  endLng?: number;
 };
 
 export type CourseSearchParams = PageParams & {

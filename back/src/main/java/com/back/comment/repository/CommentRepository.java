@@ -17,6 +17,10 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     @EntityGraph(attributePaths = {"user"})
     Page<Comment> findByPost_IdAndParentIsNullOrderByCreatedAtDesc(Long postId, Pageable pageable);
 
+    // 공감순: upvoteCount 내림차순, 동점은 최신순(createdAt DESC)
+    @EntityGraph(attributePaths = {"user"})
+    Page<Comment> findByPost_IdAndParentIsNullOrderByUpvoteCountDescCreatedAtDesc(Long postId, Pageable pageable);
+
     @EntityGraph(attributePaths = {"user"})
     List<Comment> findByParent_IdInOrderByCreatedAtAsc(Collection<Long> parentIds);
 

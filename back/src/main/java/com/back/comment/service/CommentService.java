@@ -41,9 +41,12 @@ public class CommentService {
         this.eventPublisher = eventPublisher;
     }
 
-    public PageResponse<CommentResponse> getComments(Long postId, Long userId, Pageable pageable) {
+    public PageResponse<CommentResponse> getComments(Long postId, Long userId, String sort, Pageable pageable) {
         getPostByIdOrThrow(postId);
-        Page<Comment> parents = comments.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(postId, pageable);
+        // 원댓글만 sort 로 분기 (잘못된 값은 latest 로 폴백). 답글은 항상 createdAt ASC 유지
+        Page<Comment> parents = "upvote".equalsIgnoreCase(sort)
+                ? comments.findByPost_IdAndParentIsNullOrderByUpvoteCountDescCreatedAtDesc(postId, pageable)
+                : comments.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(postId, pageable);
         List<Long> parentIds = parents.getContent().stream().map(Comment::getId).toList();
         List<Comment> replies = parentIds.isEmpty()
                 ? List.of()
@@ -152,12 +155,13 @@ public class CommentService {
                 .map(reply -> toCommentResponse(reply, List.of(), upvotedCommentIds))
                 .toList();
         return new CommentResponse(comment.getId(), comment.getUser().getId(), comment.getUser().getNickname(),
-                comment.getContent(), comment.getUpvoteCount(),
+                comment.getUser().getProfileImageUrl(), comment.getContent(), comment.getUpvoteCount(),
                 upvotedCommentIds.contains(comment.getId()), comment.isDeleted(),
                 comment.getCreatedAt(), replyResponses);
     }
 
-    public record CommentResponse(Long commentId, Long userId, String nickname, String content, int upvoteCount,
+    public record CommentResponse(Long commentId, Long userId, String nickname, String profileImageUrl,
+                                  String content, int upvoteCount,
                                   boolean isUpvoted, boolean isDeleted, LocalDateTime createdAt,
                                   List<CommentResponse> replies) {}
     public record UpvoteResult(boolean upvoted, int upvoteCount) {}

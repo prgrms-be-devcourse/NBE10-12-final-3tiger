@@ -9,6 +9,7 @@ import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
 import com.back.notification.domain.NotificationType;
 import com.back.notification.service.NotificationService;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +46,9 @@ class NotificationControllerTest {
 
     @MockitoBean
     private JwtProvider jwtProvider;
+
+    @MockitoBean
+    private PlaceSearchRateLimiter placeSearchRateLimiter;
 
     @Test
     @DisplayName("t1: GET /api/v1/notifications 요청 시 200과 페이징 응답을 반환한다")

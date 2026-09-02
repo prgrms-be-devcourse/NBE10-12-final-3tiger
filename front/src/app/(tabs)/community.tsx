@@ -16,7 +16,9 @@ import {
   Image,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -29,6 +31,7 @@ import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
 import { PostMenuSheet } from "@/components/feed/post-menu-sheet";
+import { PersonalUserMemoSheet } from "@/components/user/personal-user-memo-sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
@@ -39,6 +42,12 @@ import { useThemeStore } from "@/stores/theme-store";
 import type { PostFeedItem } from "@/types/domain";
 
 const HEADER_BAR_HEIGHT = 56;
+const SORT_BAR_HEIGHT = 44;
+
+const POST_SORTS: Array<{ key: "latest" | "popularity"; label: string }> = [
+  { key: "latest", label: "최신순" },
+  { key: "popularity", label: "좋아요순" },
+];
 
 function formatTime(value: string) {
   const date = new Date(value);
@@ -93,6 +102,7 @@ function FeedPost({
   const [expanded, setExpanded] = useState(false);
   const [contentLineCount, setContentLineCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [memoOpen, setMemoOpen] = useState(false);
   useEffect(() => {
     setLiked(item.isLiked);
     setLikeCount(item.likeCount);
@@ -245,6 +255,23 @@ function FeedPost({
         >
           <Ionicons name="ellipsis-vertical" size={18} color="#087A3F" />
         </Button>
+        {!item.isMine ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            accessibilityLabel={`${item.nickname ?? "사용자"}님 개인 메모`}
+            className="h-8 w-8 rounded-full"
+            onPress={() => {
+              if (!isAuthenticated) {
+                onRequireLogin();
+                return;
+              }
+              setMemoOpen(true);
+            }}
+          >
+            <Ionicons name="pricetag-outline" size={17} color="#087A3F" />
+          </Button>
+        ) : null}
       </View>
       {item.photoUrl ? (
         <Image
@@ -332,6 +359,14 @@ function FeedPost({
         canDelete={canDelete}
         onClose={() => setMenuOpen(false)}
       />
+      {!item.isMine ? (
+        <PersonalUserMemoSheet
+          open={memoOpen}
+          targetUserId={item.userId}
+          nickname={item.nickname ?? "산책러"}
+          onClose={() => setMemoOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -345,7 +380,8 @@ export default function CommunityScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDark = useThemeStore((state) => state.isDark);
   const insets = useSafeAreaInsets();
-  const headerHeight = insets.top + HEADER_BAR_HEIGHT;
+  const headerBarHeight = insets.top + HEADER_BAR_HEIGHT;
+  const headerHeight = headerBarHeight + SORT_BAR_HEIGHT;
   const listRef = useRef<FlatList<PostFeedItem>>(null);
   const handledNotificationId = useRef<string | null>(null);
   const headerTranslateY = useRef(new Animated.Value(0)).current;
@@ -354,10 +390,11 @@ export default function CommunityScreen() {
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sort, setSort] = useState<"latest" | "popularity">("latest");
   const postsQuery = useInfiniteQuery({
-    queryKey: ["posts", "latest"],
+    queryKey: ["posts", sort],
     queryFn: ({ pageParam }) =>
-      getPosts({ page: pageParam, size: 20, sort: "latest" }),
+      getPosts({ page: pageParam, size: 20, sort }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) =>
       (lastPage.page + 1) * lastPage.size < lastPage.totalElements
@@ -447,7 +484,7 @@ export default function CommunityScreen() {
         />
         <View
           className="flex-row items-center justify-between px-3"
-          style={{ height: headerHeight, paddingTop: insets.top }}
+          style={{ height: headerBarHeight, paddingTop: insets.top }}
         >
           <View
             pointerEvents="none"
@@ -496,6 +533,30 @@ export default function CommunityScreen() {
             </View>
           </View>
         </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          className="flex-none"
+          style={{ height: SORT_BAR_HEIGHT }}
+          contentContainerClassName="items-center gap-2 px-3"
+        >
+          {POST_SORTS.map((option) => {
+            const active = sort === option.key;
+            return (
+              <Pressable
+                key={option.key}
+                className={`h-9 justify-center rounded-full px-3 ${active ? "bg-[#087A3F]" : "bg-white dark:bg-[#1B211D]"}`}
+                onPress={() => setSort(option.key)}
+              >
+                <Text
+                  className={`text-xs font-extrabold ${active ? "text-white" : "text-[#536158] dark:text-[#AAB5AD]"}`}
+                >
+                  {option.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </Animated.View>
       {postsQuery.isPending ? (
         <View className="flex-1 items-center justify-center gap-3 bg-white px-6 py-12 dark:bg-[#111411]">

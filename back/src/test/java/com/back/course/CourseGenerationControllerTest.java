@@ -9,6 +9,7 @@ import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.SecurityConfig;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -23,7 +24,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static com.back.TestAuthentication.authenticatedAs;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -41,6 +44,9 @@ class CourseGenerationControllerTest {
 
     @MockitoBean
     private JwtProvider jwtProvider;
+
+    @MockitoBean
+    private PlaceSearchRateLimiter placeSearchRateLimiter;
 
     @Test
     @DisplayName("코스 후보 생성 응답은 ApiResponse 규약으로 래핑되어 반환된다")
@@ -104,12 +110,14 @@ class CourseGenerationControllerTest {
     @Test
     @DisplayName("코스 저장 응답은 ApiResponse 규약으로 courseId를 래핑해 반환한다")
     void saveReturnsCourseIdInEnvelope() throws Exception {
-        given(service.save(any())).willReturn(42L);
+        given(service.save(eq(1L), any())).willReturn(42L);
 
         mvc.perform(post("/api/v1/courses/save")
+                        .with(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "name": "서울숲",
                                   "path": {
                                     "type": "LineString",
                                     "coordinates": [[126.8496, 37.5474], [126.8507, 37.5483]]
@@ -126,8 +134,9 @@ class CourseGenerationControllerTest {
     @Test
     void saveRejectsMissingPath() throws Exception {
         mvc.perform(post("/api/v1/courses/save")
+                        .with(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"regionCode\":\"11500\"}"))
+                        .content("{\"name\":\"서울숲\",\"regionCode\":\"11500\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON_400"));
     }
@@ -135,9 +144,11 @@ class CourseGenerationControllerTest {
     @Test
     void saveRejectsMissingRegionCode() throws Exception {
         mvc.perform(post("/api/v1/courses/save")
+                        .with(authenticatedAs(1L))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "name": "서울숲",
                                   "path": {
                                     "type": "LineString",
                                     "coordinates": [[126.8496, 37.5474]]

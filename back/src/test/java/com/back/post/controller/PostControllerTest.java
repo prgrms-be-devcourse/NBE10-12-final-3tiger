@@ -8,6 +8,7 @@ import com.back.global.exception.GlobalExceptionHandler;
 import com.back.post.service.PostService;
 import com.back.post.storage.PhotoStorage;
 import com.back.global.jwt.JwtProvider;
+import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,11 +40,13 @@ class PostControllerTest {
     @Autowired MockMvc mvc;
     @MockitoBean PostService postService;
     @MockitoBean JwtProvider jwtProvider;
+    @MockitoBean PlaceSearchRateLimiter placeSearchRateLimiter;
 
     @Test
     @DisplayName("피드는 인증 없이 내용·좋아요·댓글 정보를 조회할 수 있다")
     void feed() throws Exception {
-        var item = new PostService.FeedItem(10L, 1L, "산책러", "좋은 산책이었습니다.",
+        var item = new PostService.FeedItem(10L, 1L, 2L, "산책러", "https://cdn.example.com/profile.jpg",
+                "좋은 산책이었습니다.",
                 "https://example.com/walk.jpg", 3, 2, false, false, false,
                 LocalDateTime.of(2026, 8, 26, 9, 0));
         given(postService.feed(null, "latest", 0, 20))
@@ -52,6 +55,9 @@ class PostControllerTest {
         mvc.perform(get("/api/v1/posts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].postId").value(10))
+                .andExpect(jsonPath("$.data.content[0].userId").value(2))
+                .andExpect(jsonPath("$.data.content[0].profileImageUrl")
+                        .value("https://cdn.example.com/profile.jpg"))
                 .andExpect(jsonPath("$.data.content[0].content").value("좋은 산책이었습니다."))
                 .andExpect(jsonPath("$.data.content[0].likeCount").value(3))
                 .andExpect(jsonPath("$.data.content[0].commentCount").value(2))

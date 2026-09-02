@@ -53,7 +53,13 @@ export default function SettingsScreen() {
       }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["my-profile"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["my-profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["posts"] }),
+        queryClient.invalidateQueries({ queryKey: ["liked-posts"] }),
+        queryClient.invalidateQueries({ queryKey: ["post-comments"] }),
+        queryClient.invalidateQueries({ queryKey: ["my-posts"] }),
+      ]);
       router.replace("/(tabs)/profile" as never);
     },
   });

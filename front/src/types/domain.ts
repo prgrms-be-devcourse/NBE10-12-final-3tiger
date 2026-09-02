@@ -72,6 +72,7 @@ export type CourseUsageLog = {
 export type Post = {
   postId: number;
   courseId: number;
+  userId?: number;
   nickname?: string;
   content: string;
   photoUrl?: string;
@@ -85,9 +86,17 @@ export type Post = {
 };
 
 export type PostFeedItem = Post & {
+  userId: number;
   isLiked: boolean;
   isBookmarked: boolean;
   isMine: boolean;
+};
+
+export type PersonalUserMemo = {
+  targetUserId: number;
+  tags: string[];
+  memo?: string | null;
+  updatedAt: string;
 };
 
 export type LikedPostItem = Post & {
@@ -99,12 +108,17 @@ export type PostComment = {
   commentId: number;
   userId: number;
   nickname: string;
+  /** 서버 응답에는 아직 포함되지 않는 필드 (항상 undefined) */
   profileImageUrl?: string | null;
   content: string;
   upvoteCount: number;
   /** 현재 로그인한 사용자가 공감했는지 여부 */
   isUpvoted: boolean;
+  /** 소프트 삭제된 원댓글이면 true. content는 "삭제된 댓글입니다."로 마스킹되어 옴 */
+  isDeleted: boolean;
   createdAt: string;
+  /** 원댓글에만 채워짐 (createdAt ASC 고정 정렬). 답글의 replies는 항상 빈 배열 (depth 1) */
+  replies: PostComment[];
 };
 
 export type Region = {
@@ -140,7 +154,7 @@ export type GenerateCandidate = {
   path: GeoJsonLineString;
   totalM: number;
   avgScore: number;
-  errorPct: number;
+  errorPct: number | null;
   regionCode: string;
 };
 
