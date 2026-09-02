@@ -1,46 +1,43 @@
-package com.back.auth.kakao;
+package com.back.auth.google;
 
-import com.back.auth.kakao.dto.KakaoTokenResponse;
-import com.back.auth.kakao.dto.KakaoUserInfoResponse;
+import com.back.auth.google.dto.GoogleTokenResponse;
+import com.back.auth.google.dto.GoogleUserInfoResponse;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 @Component
-public class KakaoClient {
+public class GoogleClient {
 
-    private final KakaoProperties props;
+    private final GoogleProperties props;
     private final RestClient restClient;
 
-    public KakaoClient(KakaoProperties props) {
+    public GoogleClient(GoogleProperties props) {
         this.props = props;
         this.restClient = RestClient.create();
     }
 
-    public KakaoTokenResponse exchangeToken(String code) {
+    public GoogleTokenResponse exchangeToken(String code) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("grant_type", "authorization_code");
         params.add("client_id", props.getClientId());
-        if (StringUtils.hasText(props.getClientSecret())) {
-            params.add("client_secret", props.getClientSecret());
-        }
+        params.add("client_secret", props.getClientSecret());
         params.add("redirect_uri", props.getRedirectUri());
         params.add("code", code);
 
         try {
-            KakaoTokenResponse response = restClient.post()
-                    .uri("https://kauth.kakao.com/oauth/token")
+            GoogleTokenResponse response = restClient.post()
+                    .uri("https://oauth2.googleapis.com/token")
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(params)
                     .retrieve()
-                    .body(KakaoTokenResponse.class);
+                    .body(GoogleTokenResponse.class);
             if (response == null) {
                 throw new BusinessException(ErrorCode.SOCIAL_SERVER_ERROR);
             }
@@ -52,13 +49,13 @@ public class KakaoClient {
         }
     }
 
-    public KakaoUserInfoResponse getUserInfo(String accessToken) {
+    public GoogleUserInfoResponse getUserInfo(String accessToken) {
         try {
-            KakaoUserInfoResponse response = restClient.get()
-                    .uri("https://kapi.kakao.com/v2/user/me")
+            GoogleUserInfoResponse response = restClient.get()
+                    .uri("https://www.googleapis.com/oauth2/v2/userinfo")
                     .header("Authorization", "Bearer " + accessToken)
                     .retrieve()
-                    .body(KakaoUserInfoResponse.class);
+                    .body(GoogleUserInfoResponse.class);
             if (response == null) {
                 throw new BusinessException(ErrorCode.SOCIAL_SERVER_ERROR);
             }

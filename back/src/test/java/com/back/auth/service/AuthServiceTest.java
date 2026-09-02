@@ -1,6 +1,9 @@
 package com.back.auth.service;
 
 import com.back.auth.dto.AuthResponse;
+import com.back.auth.google.GoogleClient;
+import com.back.auth.google.dto.GoogleTokenResponse;
+import com.back.auth.google.dto.GoogleUserInfoResponse;
 import com.back.auth.kakao.KakaoClient;
 import com.back.auth.kakao.dto.KakaoTokenResponse;
 import com.back.auth.kakao.dto.KakaoUserInfoResponse;
@@ -50,6 +53,7 @@ class AuthServiceTest {
     @Mock ValueOperations<String, String> valueOps;
     @Mock Cursor<String> cursor;
     @Mock KakaoClient kakaoClient;
+    @Mock GoogleClient googleClient;
 
     @InjectMocks AuthService authService;
 
@@ -185,7 +189,7 @@ class AuthServiceTest {
 
         AuthResponse response = authService.refresh("old-rt");
 
-        assertThat(response).isEqualTo(new AuthResponse("new-at", "new-rt"));
+        assertThat(response).isEqualTo(new AuthResponse("new-at", "new-rt", false));
         verify(userRepository).findByIdAndDeletedAtIsNull(1L);
         verify(valueOps).set("RT:1:new-jti", "1", 1209600L, TimeUnit.SECONDS);
     }
@@ -225,7 +229,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void kakaoLogin_기존유저_로그인처리() {
+    void oauthLogin_카카오_기존유저_로그인처리() {
         given(kakaoClient.exchangeToken("auth-code")).willReturn(new KakaoTokenResponse("kakao-at"));
         given(kakaoClient.getUserInfo("kakao-at")).willReturn(
                 new KakaoUserInfoResponse(12345L,
@@ -241,14 +245,15 @@ class AuthServiceTest {
         given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
         given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
 
-        AuthResponse result = authService.kakaoLogin("auth-code");
+        AuthResponse result = authService.oauthLogin("kakao", "auth-code");
 
         assertThat(result.accessToken()).isEqualTo("at");
+        assertThat(result.isNewUser()).isFalse();
         verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
-    void kakaoLogin_신규유저_저장후토큰발급() {
+    void oauthLogin_카카오_신규유저_저장후토큰발급() {
         given(kakaoClient.exchangeToken("auth-code")).willReturn(new KakaoTokenResponse("kakao-at"));
         given(kakaoClient.getUserInfo("kakao-at")).willReturn(
                 new KakaoUserInfoResponse(12345L,
@@ -265,25 +270,102 @@ class AuthServiceTest {
         given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
         given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
 
-        AuthResponse result = authService.kakaoLogin("auth-code");
+        AuthResponse result = authService.oauthLogin("kakao", "auth-code");
 
         assertThat(result.accessToken()).isEqualTo("at");
+        assertThat(result.isNewUser()).isTrue();
         verify(userRepository).save(any(User.class));
     }
 
     @Test
-    void kakaoLogin_토큰교환실패_KAKAO_AUTH_FAILED() {
+    void oauthLogin_카카오_토큰교환실패_INVALID_AUTHORIZATION_CODE() {
         given(kakaoClient.exchangeToken(anyString()))
-                .willThrow(new BusinessException(ErrorCode.KAKAO_AUTH_FAILED));
+                .willThrow(new BusinessException(ErrorCode.INVALID_AUTHORIZATION_CODE));
 
-        assertThatThrownBy(() -> authService.kakaoLogin("bad-code"))
+        assertThatThrownBy(() -> authService.oauthLogin("kakao", "bad-code"))
                 .isInstanceOf(BusinessException.class)
                 .extracting(e -> ((BusinessException) e).getErrorCode())
-                .isEqualTo(ErrorCode.KAKAO_AUTH_FAILED);
+                .isEqualTo(ErrorCode.INVALID_AUTHORIZATION_CODE);
     }
 
     @Test
-    void kakaoLogin_이메일null_정상처리() {
+    void oauthLogin_지원안하는provider_INVALID_PROVIDER() {
+        assertThatThrownBy(() -> authService.oauthLogin("apple", "some-code"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_PROVIDER);
+    }
+
+    @Test
+    void oauthLogin_구글_기존유저_로그인처리() {
+        given(googleClient.exchangeToken("auth-code")).willReturn(new GoogleTokenResponse("google-at"));
+        given(googleClient.getUserInfo("google-at")).willReturn(
+                new GoogleUserInfoResponse("google-uid-123", "user@gmail.com", "홍길동"));
+        User user = mock(User.class);
+        given(user.getId()).willReturn(1L);
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.GOOGLE, "google-uid-123"))
+                .willReturn(Optional.of(user));
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(1L)).willReturn("at");
+        given(jwtProvider.generateRefreshToken(1L)).willReturn("rt");
+        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        AuthResponse result = authService.oauthLogin("google", "auth-code");
+
+        assertThat(result.accessToken()).isEqualTo("at");
+        assertThat(result.isNewUser()).isFalse();
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void oauthLogin_구글_신규유저_저장후토큰발급() {
+        given(googleClient.exchangeToken("auth-code")).willReturn(new GoogleTokenResponse("google-at"));
+        given(googleClient.getUserInfo("google-at")).willReturn(
+                new GoogleUserInfoResponse("google-uid-123", "user@gmail.com", "홍길동"));
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.GOOGLE, "google-uid-123"))
+                .willReturn(Optional.empty());
+        User saved = mock(User.class);
+        given(saved.getId()).willReturn(2L);
+        given(userRepository.save(any(User.class))).willReturn(saved);
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(2L)).willReturn("at");
+        given(jwtProvider.generateRefreshToken(2L)).willReturn("rt");
+        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        AuthResponse result = authService.oauthLogin("google", "auth-code");
+
+        assertThat(result.accessToken()).isEqualTo("at");
+        assertThat(result.isNewUser()).isTrue();
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void oauthLogin_구글_닉네임null_구글사용자폴백() {
+        given(googleClient.exchangeToken("auth-code")).willReturn(new GoogleTokenResponse("google-at"));
+        given(googleClient.getUserInfo("google-at")).willReturn(
+                new GoogleUserInfoResponse("google-uid-123", "user@gmail.com", null));
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.GOOGLE, "google-uid-123"))
+                .willReturn(Optional.empty());
+        User saved = mock(User.class);
+        given(saved.getId()).willReturn(1L);
+        given(userRepository.save(any(User.class))).willReturn(saved);
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(1L)).willReturn("at");
+        given(jwtProvider.generateRefreshToken(1L)).willReturn("rt");
+        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        authService.oauthLogin("google", "auth-code");
+
+        var userCaptor = org.mockito.ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        assertThat(userCaptor.getValue().getNickname()).isEqualTo("구글 사용자");
+    }
+
+    @Test
+    void oauthLogin_카카오_이메일null_정상처리() {
         given(kakaoClient.exchangeToken("auth-code")).willReturn(new KakaoTokenResponse("kakao-at"));
         given(kakaoClient.getUserInfo("kakao-at")).willReturn(
                 new KakaoUserInfoResponse(12345L,
@@ -299,11 +381,11 @@ class AuthServiceTest {
         given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
         given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
 
-        assertThatCode(() -> authService.kakaoLogin("auth-code")).doesNotThrowAnyException();
+        assertThatCode(() -> authService.oauthLogin("kakao", "auth-code")).doesNotThrowAnyException();
     }
 
     @Test
-    void kakaoLogin_닉네임null_카카오사용자폴백() {
+    void oauthLogin_카카오_닉네임null_카카오사용자폴백() {
         given(kakaoClient.exchangeToken("auth-code")).willReturn(new KakaoTokenResponse("kakao-at"));
         given(kakaoClient.getUserInfo("kakao-at")).willReturn(
                 new KakaoUserInfoResponse(12345L,
@@ -320,7 +402,7 @@ class AuthServiceTest {
         given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
         given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
 
-        authService.kakaoLogin("auth-code");
+        authService.oauthLogin("kakao", "auth-code");
 
         var userCaptor = org.mockito.ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(userCaptor.capture());

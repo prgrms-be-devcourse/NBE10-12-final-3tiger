@@ -1,6 +1,9 @@
 package com.back.auth.service;
 
 import com.back.auth.dto.AuthResponse;
+import com.back.auth.google.GoogleClient;
+import com.back.auth.google.dto.GoogleTokenResponse;
+import com.back.auth.google.dto.GoogleUserInfoResponse;
 import com.back.auth.kakao.KakaoClient;
 import com.back.auth.kakao.dto.KakaoTokenResponse;
 import com.back.auth.kakao.dto.KakaoUserInfoResponse;
@@ -22,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -33,6 +37,7 @@ public class AuthService {
     private final JwtProvider jwtProvider;
     private final StringRedisTemplate redisTemplate;
     private final KakaoClient kakaoClient;
+    private final GoogleClient googleClient;
 
 
     @Transactional(readOnly = true)
@@ -46,7 +51,7 @@ public class AuthService {
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
-        return issueTokens(user.getId());
+        return issueTokens(user.getId(), false);
     }
 
     public AuthResponse refresh(String refreshToken) {
@@ -68,7 +73,7 @@ public class AuthService {
         userRepository.findByIdAndDeletedAtIsNull(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
 
-        return issueTokens(userId);
+        return issueTokens(userId, false);
     }
 
     public void logout(String refreshToken) {
@@ -85,7 +90,15 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse kakaoLogin(String code) {
+    public AuthResponse oauthLogin(String provider, String authorizationCode) {
+        return switch (provider.toLowerCase()) {
+            case "kakao" -> kakaoLogin(authorizationCode);
+            case "google" -> googleLogin(authorizationCode);
+            default -> throw new BusinessException(ErrorCode.INVALID_PROVIDER);
+        };
+    }
+
+    private AuthResponse kakaoLogin(String code) {
         KakaoTokenResponse tokenResponse = kakaoClient.exchangeToken(code);
         KakaoUserInfoResponse userInfo = kakaoClient.getUserInfo(tokenResponse.accessToken());
 
@@ -96,10 +109,26 @@ public class AuthService {
                 ? account.profile().nickname()
                 : "카카오 사용자";
 
-        User user = userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, providerUid)
-                .orElseGet(() -> userRepository.save(User.createKakao(providerUid, email, nickname)));
+        Optional<User> existing = userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, providerUid);
+        boolean isNewUser = existing.isEmpty();
+        User user = existing.orElseGet(() -> userRepository.save(User.createKakao(providerUid, email, nickname)));
 
-        return issueTokens(user.getId());
+        return issueTokens(user.getId(), isNewUser);
+    }
+
+    private AuthResponse googleLogin(String code) {
+        GoogleTokenResponse tokenResponse = googleClient.exchangeToken(code);
+        GoogleUserInfoResponse userInfo = googleClient.getUserInfo(tokenResponse.accessToken());
+
+        String providerUid = userInfo.id();
+        String email = userInfo.email();
+        String nickname = userInfo.name() != null ? userInfo.name() : "구글 사용자";
+
+        Optional<User> existing = userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.GOOGLE, providerUid);
+        boolean isNewUser = existing.isEmpty();
+        User user = existing.orElseGet(() -> userRepository.save(User.createGoogle(providerUid, email, nickname)));
+
+        return issueTokens(user.getId(), isNewUser);
     }
 
     public void revokeAllRefreshTokens(Long userId) {
@@ -124,7 +153,7 @@ public class AuthService {
         }
     }
 
-    private AuthResponse issueTokens(Long userId) {
+    private AuthResponse issueTokens(Long userId, boolean isNewUser) {
         String accessToken = jwtProvider.generateAccessToken(userId);
         String refreshToken = jwtProvider.generateRefreshToken(userId);
         String jti = jwtProvider.getJti(refreshToken);
@@ -135,6 +164,6 @@ public class AuthService {
                 jwtProvider.getRefreshTokenExpiry(),
                 TimeUnit.SECONDS
         );
-        return new AuthResponse(accessToken, refreshToken);
+        return new AuthResponse(accessToken, refreshToken, isNewUser);
     }
 }

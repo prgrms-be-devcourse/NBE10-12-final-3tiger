@@ -41,6 +41,24 @@ public enum ErrorCode {
             "유효하지 않거나 만료된 리프레시 토큰입니다."
     ),
 
+    INVALID_PROVIDER(
+            HttpStatus.BAD_REQUEST,
+            "AUTH_400_1",
+            "지원하지 않는 소셜 로그인 제공자입니다."
+    ),
+
+    INVALID_AUTHORIZATION_CODE(
+            HttpStatus.BAD_REQUEST,
+            "AUTH_400_2",
+            "유효하지 않은 인가 코드입니다."
+    ),
+
+    SOCIAL_SERVER_ERROR(
+            HttpStatus.BAD_GATEWAY,
+            "AUTH_502_1",
+            "소셜 서버와의 통신에 실패했습니다."
+    ),
+
     KAKAO_PLACE_SEARCH_FAILED(
             HttpStatus.BAD_GATEWAY,
             "PLACE_502_1",
@@ -51,15 +69,7 @@ public enum ErrorCode {
             HttpStatus.TOO_MANY_REQUESTS,
             "PLACE_429_1",
             "장소 검색 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
-    ),
-
-    KAKAO_AUTH_FAILED(
-            HttpStatus.UNAUTHORIZED,
-            "AUTH_401_3",
-            "카카오 인증에 실패했습니다."
     );
-
-
 
     private final HttpStatus status;
     private final String code;
