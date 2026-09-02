@@ -69,6 +69,30 @@ public enum ErrorCode {
             HttpStatus.TOO_MANY_REQUESTS,
             "PLACE_429_1",
             "장소 검색 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
+    ),
+
+    COURSE_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "COURSE_404_1",
+            "코스를 찾을 수 없습니다."
+    ),
+
+    COURSE_NOT_NAVIGABLE(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "COURSE_422_1",
+            "안내할 수 없는 코스입니다."
+    ),
+
+    COURSE_PATH_DATA_INVALID(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "COURSE_500_1",
+            "코스 경로 데이터를 처리할 수 없습니다."
+    ),
+
+    KAKAO_AUTH_FAILED(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH_401_3",
+            "카카오 인증에 실패했습니다."
     );
 
     private final HttpStatus status;
