@@ -1,7 +1,12 @@
--- Hazard feature schema for a newly initialized database.
--- hazardType / severity remain strings until their allowed values are defined.
+-- Hazard feature schema replacement.
+-- The feature has not been merged yet, so legacy hazard/upvote rows are intentionally not migrated.
+-- Only Hazard-owned tables are replaced; Course/User and other domain tables are untouched.
 
-CREATE TABLE IF NOT EXISTS hazard (
+DROP TABLE IF EXISTS hazard_confirmation;
+DROP TABLE IF EXISTS hazard_report;
+DROP TABLE IF EXISTS hazard CASCADE;
+
+CREATE TABLE hazard (
     hazard_id   BIGSERIAL   PRIMARY KEY,
     course_id   BIGINT      NOT NULL REFERENCES course(course_id) ON DELETE CASCADE,
     hazard_type VARCHAR(50) NOT NULL,
@@ -11,7 +16,7 @@ CREATE TABLE IF NOT EXISTS hazard (
     activated_at TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS hazard_report (
+CREATE TABLE hazard_report (
     hazard_report_id BIGSERIAL     PRIMARY KEY,
     hazard_id        BIGINT        NOT NULL REFERENCES hazard(hazard_id) ON DELETE CASCADE,
     reporter_user_id BIGINT        NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
@@ -24,7 +29,7 @@ CREATE TABLE IF NOT EXISTS hazard_report (
         UNIQUE (hazard_id, reporter_user_id)
 );
 
-CREATE TABLE IF NOT EXISTS hazard_confirmation (
+CREATE TABLE hazard_confirmation (
     hazard_confirmation_id BIGSERIAL PRIMARY KEY,
     hazard_id BIGINT NOT NULL REFERENCES hazard(hazard_id) ON DELETE CASCADE,
     user_id   BIGINT NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
@@ -33,11 +38,11 @@ CREATE TABLE IF NOT EXISTS hazard_confirmation (
         UNIQUE (hazard_id, user_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_hazard_course_status_created_at
+CREATE INDEX idx_hazard_course_status_created_at
     ON hazard (course_id, status, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_hazard_report_reporter
+CREATE INDEX idx_hazard_report_reporter
     ON hazard_report (reporter_user_id);
 
-CREATE INDEX IF NOT EXISTS idx_hazard_confirmation_user
+CREATE INDEX idx_hazard_confirmation_user
     ON hazard_confirmation (user_id);

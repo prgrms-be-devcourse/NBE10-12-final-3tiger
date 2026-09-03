@@ -1,15 +1,15 @@
 package com.back.hazard.repository;
 
 import com.back.hazard.domain.Hazard;
+import com.back.hazard.domain.HazardStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 public interface HazardRepository extends JpaRepository<Hazard, Long> {
 
-    List<Hazard> findByCourse_IdAndExpiresAtAfterOrderByExpiresAtAsc(
+    List<Hazard> findByCourse_IdAndStatusOrderByCreatedAtDesc(
             Long courseId,
-            LocalDateTime now
+            HazardStatus status
     );
 }

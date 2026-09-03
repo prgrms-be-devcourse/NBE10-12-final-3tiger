@@ -1,9 +1,10 @@
 package com.back.hazard.domain;
 
 import com.back.course.domain.Course;
-import com.back.user.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -27,46 +28,40 @@ public class Hazard {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "reporter_user_id", nullable = false)
-    private User reporter;
-
     @Column(name = "hazard_type", nullable = false, length = 50)
     private String hazardType;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private String severity;
-
-    @Column(nullable = false, length = 1000)
-    private String content;
-
-    @Column(name = "upvote_count", nullable = false)
-    private int upvoteCount;
-
-    @Column(name = "expires_at", nullable = false)
-    private LocalDateTime expiresAt;
+    private HazardStatus status;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "activated_at")
+    private LocalDateTime activatedAt;
+
     protected Hazard() {
     }
 
-    public Hazard(
-            Course course,
-            User reporter,
-            String hazardType,
-            String severity,
-            String content,
-            LocalDateTime expiresAt
-    ) {
+    public Hazard(Course course, String hazardType) {
         this.course = course;
-        this.reporter = reporter;
         this.hazardType = hazardType;
-        this.severity = severity;
-        this.content = content;
-        this.expiresAt = expiresAt;
+        this.status = HazardStatus.PENDING;
         this.createdAt = LocalDateTime.now();
+    }
+
+    public void updateStatusByReporterCount(long distinctReporterCount, long threshold) {
+        if (distinctReporterCount >= threshold) {
+            if (status == HazardStatus.PENDING) {
+                status = HazardStatus.ACTIVE;
+                activatedAt = LocalDateTime.now();
+            }
+            return;
+        }
+
+        status = HazardStatus.PENDING;
+        activatedAt = null;
     }
 
     public Long getId() {
@@ -77,35 +72,19 @@ public class Hazard {
         return course;
     }
 
-    public User getReporter() {
-        return reporter;
-    }
-
     public String getHazardType() {
         return hazardType;
     }
 
-    public String getSeverity() {
-        return severity;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public int getUpvoteCount() {
-        return upvoteCount;
-    }
-
-    public LocalDateTime getExpiresAt() {
-        return expiresAt;
+    public HazardStatus getStatus() {
+        return status;
     }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void increaseUpvote() {
-        this.upvoteCount++;
+    public LocalDateTime getActivatedAt() {
+        return activatedAt;
     }
 }

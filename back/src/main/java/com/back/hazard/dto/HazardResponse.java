@@ -1,25 +1,26 @@
 package com.back.hazard.dto;
 
 import com.back.hazard.domain.Hazard;
+import com.back.hazard.domain.HazardStatus;
 
 import java.time.LocalDateTime;
 
 public record HazardResponse(
         Long hazardId,
         String hazardType,
-        String severity,
-        String content,
-        int upvoteCount,
-        LocalDateTime expiresAt
+        HazardStatus status,
+        long confirmationCount,
+        LocalDateTime createdAt,
+        LocalDateTime activatedAt
 ) {
-    public static HazardResponse from(Hazard hazard) {
+    public static HazardResponse from(Hazard hazard, long confirmationCount) {
         return new HazardResponse(
                 hazard.getId(),
                 hazard.getHazardType(),
-                hazard.getSeverity(),
-                hazard.getContent(),
-                hazard.getUpvoteCount(),
-                hazard.getExpiresAt()
+                hazard.getStatus(),
+                confirmationCount,
+                hazard.getCreatedAt(),
+                hazard.getActivatedAt()
         );
     }
 }

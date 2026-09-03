@@ -6,11 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-public record HazardCreateRequest(
-        @NotBlank(message = "위험 유형은 필수입니다.")
-        @Size(max = 50, message = "위험 유형은 50자 이하여야 합니다.")
-        String hazardType,
-
+public record HazardReportCreateRequest(
         @NotBlank(message = "심각도는 필수입니다.")
         @Size(max = 20, message = "심각도는 20자 이하여야 합니다.")
         String severity,
