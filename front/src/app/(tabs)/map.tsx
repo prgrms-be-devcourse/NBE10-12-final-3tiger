@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -29,7 +29,6 @@ import {
   dismissBottomSheet,
 } from "@/components/ui/bottom-sheet-handle";
 import { Button } from "@/components/ui/button";
-import { PrecipitationOverlay } from "@/components/weather/precipitation-overlay";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
@@ -77,6 +76,37 @@ async function getCurrentLocationWithin(
   }
 }
 
+type BboxBounds = {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+};
+
+function parseBboxBounds(geoJson: string): BboxBounds | null {
+  try {
+    const parsed = JSON.parse(geoJson) as { coordinates?: number[][][] };
+    const ring = parsed.coordinates?.[0];
+    if (!ring || ring.length < 3) return null;
+    let minLat = Infinity;
+    let maxLat = -Infinity;
+    let minLng = Infinity;
+    let maxLng = -Infinity;
+    for (const point of ring) {
+      const [lng, lat] = point;
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      if (lat < minLat) minLat = lat;
+      if (lat > maxLat) maxLat = lat;
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+    }
+    if (!Number.isFinite(minLat)) return null;
+    return { minLat, maxLat, minLng, maxLng };
+  } catch {
+    return null;
+  }
+}
+
 export default function MapScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDark = useThemeStore((state) => state.isDark);
@@ -93,31 +123,71 @@ export default function MapScreen() {
   const [placeResults, setPlaceResults] = useState<PlaceSearchItem[]>([]);
   const [regionsOpen, setRegionsOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [weatherCoords, setWeatherCoords] = useState<{
+  const [mapCenter, setMapCenter] = useState<{
     latitude: number;
     longitude: number;
-  }>({ latitude: DEFAULT_REGION.latitude, longitude: DEFAULT_REGION.longitude });
+  }>({
+    latitude: DEFAULT_REGION.latitude,
+    longitude: DEFAULT_REGION.longitude,
+  });
   const profileQuery = useQuery({
     queryKey: ["my-profile"],
     queryFn: getMyProfile,
     enabled: isAuthenticated,
   });
-  const weatherQuery = useQuery({
-    queryKey: [
-      "weather",
-      weatherCoords.latitude.toFixed(2),
-      weatherCoords.longitude.toFixed(2),
-    ],
-    queryFn: () =>
-      getWeatherSnapshot(weatherCoords.latitude, weatherCoords.longitude),
-    staleTime: 10 * 60 * 1000,
-  });
   const regionsQuery = useQuery({
     queryKey: ["regions"],
     queryFn: getRegions,
-    enabled: regionsOpen,
     staleTime: 5 * 60 * 1000,
   });
+  const serviceRegions = regionsQuery.data ?? [];
+  const regionBounds = useMemo(
+    () =>
+      serviceRegions
+        .map((region) => {
+          const bounds = parseBboxBounds(region.bbox);
+          return bounds ? { region, bounds } : null;
+        })
+        .filter(
+          (entry): entry is { region: ServiceRegion; bounds: BboxBounds } =>
+            entry !== null,
+        ),
+    [serviceRegions],
+  );
+  const activeRegion = useMemo(() => {
+    for (const { region, bounds } of regionBounds) {
+      if (
+        mapCenter.latitude >= bounds.minLat &&
+        mapCenter.latitude <= bounds.maxLat &&
+        mapCenter.longitude >= bounds.minLng &&
+        mapCenter.longitude <= bounds.maxLng
+      ) {
+        return region;
+      }
+    }
+    return null;
+  }, [regionBounds, mapCenter]);
+  const weatherQuery = useQuery({
+    queryKey: ["weather", activeRegion?.regionCode ?? "none"],
+    queryFn: () =>
+      activeRegion
+        ? getWeatherSnapshot(activeRegion.centerLat, activeRegion.centerLng)
+        : Promise.resolve(null),
+    enabled: !!activeRegion,
+    staleTime: 10 * 60 * 1000,
+  });
+  const upcomingWeather = activeRegion ? weatherQuery.data?.upcoming ?? null : null;
+  const upcomingBannerText =
+    upcomingWeather && activeRegion
+      ? (() => {
+          const label = upcomingWeather.type === "rain" ? "비" : "눈";
+          const when =
+            upcomingWeather.hoursFromNow <= 0
+              ? "지금"
+              : `${upcomingWeather.hoursFromNow}시간 후`;
+          return `${activeRegion.name}에 ${when} ${label} 소식이 있어요`;
+        })()
+      : null;
   const moveTo = useCallback((next: MapRegion) => {
     if (!isValidCoordinate(next.latitude, next.longitude)) return;
     lastViewedRegionRef.current = next;
@@ -235,9 +305,9 @@ export default function MapScreen() {
   const updateRegion = useCallback((next: MapRegion) => {
     if (!isValidCoordinate(next.latitude, next.longitude)) return;
     if (lastViewedRegionRef.current) lastViewedRegionRef.current = next;
-    setWeatherCoords((prev) =>
-      Math.abs(prev.latitude - next.latitude) < 0.01 &&
-      Math.abs(prev.longitude - next.longitude) < 0.01
+    setMapCenter((prev) =>
+      Math.abs(prev.latitude - next.latitude) < 0.005 &&
+      Math.abs(prev.longitude - next.longitude) < 0.005
         ? prev
         : { latitude: next.latitude, longitude: next.longitude },
     );
@@ -285,8 +355,6 @@ export default function MapScreen() {
         mapPadding={{ top: 120, right: 16, bottom: 170, left: 16 }}
         onRegionChangeComplete={updateRegion}
       />
-
-      <PrecipitationOverlay type={weatherQuery.data?.current ?? null} />
 
       {showLocationLoading && (
         <View
@@ -347,6 +415,21 @@ export default function MapScreen() {
             </Button>
           </View>
         </View>
+        {upcomingBannerText && (
+          <View
+            accessibilityLiveRegion="polite"
+            className="mt-2 flex-row items-center gap-2 rounded-2xl bg-[#E7F0FB] px-3 py-2.5 shadow-md dark:bg-[#1F2A38]"
+          >
+            <Ionicons
+              name={upcomingWeather?.type === "snow" ? "snow-outline" : "water-outline"}
+              size={18}
+              color="#2563EB"
+            />
+            <Text className="flex-1 text-[13px] font-semibold text-[#1E3A5F] dark:text-[#BCD3EE]">
+              {upcomingBannerText}
+            </Text>
+          </View>
+        )}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}

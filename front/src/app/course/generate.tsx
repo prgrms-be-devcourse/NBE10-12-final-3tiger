@@ -40,7 +40,6 @@ import {
 } from "@/components/ui/bottom-sheet-handle";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
-import { PrecipitationOverlay } from "@/components/weather/precipitation-overlay";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { GenerateCandidate } from "@/types/domain";
@@ -450,37 +449,34 @@ export default function CourseGenerateScreen() {
         </View>
 
         <View className="overflow-hidden rounded-2xl bg-white dark:bg-[#1B211D]">
-          <View style={styles.map}>
-            <MapView
-              ref={mapRef}
-              style={StyleSheet.absoluteFill}
-              region={mapRegion}
-              userInterfaceStyle={isDark ? "dark" : "light"}
-              onPress={handleMapPress}
-            >
+          <MapView
+            ref={mapRef}
+            style={styles.map}
+            region={mapRegion}
+            userInterfaceStyle={isDark ? "dark" : "light"}
+            onPress={handleMapPress}
+          >
+            <Marker
+              coordinate={coords}
+              pinColor="#087A3F"
+              title={startPlaceName}
+            />
+            {isOneway && endCoords && (
               <Marker
-                coordinate={coords}
-                pinColor="#087A3F"
-                title={startPlaceName}
+                coordinate={endCoords}
+                pinColor="#F97316"
+                title={endPlaceName ?? "도착지"}
               />
-              {isOneway && endCoords && (
-                <Marker
-                  coordinate={endCoords}
-                  pinColor="#F97316"
-                  title={endPlaceName ?? "도착지"}
-                />
-              )}
-              {candidates.map((candidate, index) => (
-                <Polyline
-                  key={index}
-                  coordinates={toPolyline(candidate)}
-                  strokeColor={CANDIDATE_COLORS[index] ?? "#087A3F"}
-                  strokeWidth={selectedIndex === index ? 6 : 3}
-                />
-              ))}
-            </MapView>
-            <PrecipitationOverlay type={weatherQuery.data?.current ?? null} />
-          </View>
+            )}
+            {candidates.map((candidate, index) => (
+              <Polyline
+                key={index}
+                coordinates={toPolyline(candidate)}
+                strokeColor={CANDIDATE_COLORS[index] ?? "#087A3F"}
+                strokeWidth={selectedIndex === index ? 6 : 3}
+              />
+            ))}
+          </MapView>
           <View className="px-3 py-2">
             <Text className="text-[11px] text-[#6B756D] dark:text-[#AAB5AD]">
               지도를 탭하면 {isOneway ? "도착지" : "출발지"}가 그 지점으로
