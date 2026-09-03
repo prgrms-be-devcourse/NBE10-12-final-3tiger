@@ -3,7 +3,10 @@ package com.back.notification.controller;
 import com.back.global.api.*;
 import com.back.global.auth.CurrentUserId;
 import com.back.notification.service.NotificationService;
+import com.back.notification.service.NotificationSettingService;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -12,7 +15,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RequestMapping("/api/v1/notifications")
 public class NotificationController {
     private final NotificationService service;
-    public NotificationController(NotificationService service) { this.service = service; }
+    private final NotificationSettingService settingService;
+    public NotificationController(NotificationService service, NotificationSettingService settingService) {
+        this.service = service;
+        this.settingService = settingService;
+    }
 
     // SSE 스트림은 ApiResponse 래핑 대상이 아님 (text/event-stream을 직접 반환해야 함)
     @GetMapping(value = "/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -43,4 +50,20 @@ public class NotificationController {
         service.markAllAsRead(userId);
         return ApiResponse.ok("모든 알림을 읽음 처리했습니다.", null);
     }
+
+    @GetMapping("/setting")
+    ApiResponse<NotificationSettingService.SettingResponse> getSetting(@CurrentUserId Long userId) {
+        return ApiResponse.ok("알림 설정 조회 성공",
+                new NotificationSettingService.SettingResponse(settingService.isEnabled(userId)));
+    }
+
+    @PatchMapping("/setting")
+    ApiResponse<NotificationSettingService.SettingResponse> updateSetting(@CurrentUserId Long userId,
+            @Valid @RequestBody UpdateSettingRequest request) {
+        settingService.updateEnabled(userId, request.enabled());
+        return ApiResponse.ok("알림 설정을 변경했습니다.",
+                new NotificationSettingService.SettingResponse(request.enabled()));
+    }
+
+    record UpdateSettingRequest(@NotNull(message = "알림 설정 값은 필수입니다.") Boolean enabled) {}
 }

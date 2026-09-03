@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS notification_setting (
+    id         BIGSERIAL PRIMARY KEY,
+    user_id    BIGINT  NOT NULL UNIQUE REFERENCES "user"(user_id) ON DELETE CASCADE,
+    enabled    BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);

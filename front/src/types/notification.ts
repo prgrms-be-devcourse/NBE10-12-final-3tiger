@@ -15,3 +15,7 @@ export type NotificationItem = {
 export type NotificationUnreadCount = {
   count: number;
 };
+
+export type NotificationSetting = {
+  enabled: boolean;
+};

@@ -4,6 +4,7 @@ import com.back.notification.domain.Notification;
 import com.back.notification.domain.NotificationType;
 import com.back.notification.service.NotificationCommandService;
 import com.back.notification.service.NotificationService;
+import com.back.notification.service.NotificationSettingService;
 import com.back.notification.sse.NotificationSseEmitterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,8 @@ class NotificationEventListenerTest {
     @Mock
     private NotificationCommandService notificationCommandService;
     @Mock
+    private NotificationSettingService notificationSettingService;
+    @Mock
     private NotificationSseEmitterRegistry sseRegistry;
 
     @InjectMocks
@@ -46,6 +49,7 @@ class NotificationEventListenerTest {
         Notification saved = newNotification(1L, NotificationType.LIKE, 10L, null);
         given(notificationCommandService.save(1L, 2L, "액터닉네임", "https://example.com/actor.jpg", NotificationType.LIKE, 10L, null))
                 .willReturn(saved);
+        given(notificationSettingService.isEnabled(1L)).willReturn(true);
 
         // when
         listener.on(event);
@@ -66,6 +70,7 @@ class NotificationEventListenerTest {
         Notification saved = newNotification(1L, NotificationType.COMMENT, 10L, 20L);
         given(notificationCommandService.save(1L, 2L, "액터닉네임", "https://example.com/actor.jpg", NotificationType.COMMENT, 10L, 20L))
                 .willReturn(saved);
+        given(notificationSettingService.isEnabled(1L)).willReturn(true);
 
         // when
         listener.on(event);
@@ -85,6 +90,7 @@ class NotificationEventListenerTest {
         Notification saved = newNotification(1L, NotificationType.COMMENT_UPVOTE, 10L, 20L);
         given(notificationCommandService.save(1L, 2L, "액터닉네임", "https://example.com/actor.jpg", NotificationType.COMMENT_UPVOTE, 10L, 20L))
                 .willReturn(saved);
+        given(notificationSettingService.isEnabled(1L)).willReturn(true);
 
         // when
         listener.on(event);
@@ -134,6 +140,24 @@ class NotificationEventListenerTest {
 
         // then
         verify(notificationCommandService, never()).save(any(), any(), any(), any(), any(), any(), any());
+        verify(sseRegistry, never()).send(any(), any());
+    }
+
+    @Test
+    @DisplayName("t7: 수신자가 알림을 꺼둔 경우 알림은 저장하되 SSE 전송은 건너뛴다")
+    void t7() {
+        // given
+        PostLikedEvent event = new PostLikedEvent(1L, 2L, "액터닉네임", "https://example.com/actor.jpg", 10L);
+        Notification saved = newNotification(1L, NotificationType.LIKE, 10L, null);
+        given(notificationCommandService.save(1L, 2L, "액터닉네임", "https://example.com/actor.jpg", NotificationType.LIKE, 10L, null))
+                .willReturn(saved);
+        given(notificationSettingService.isEnabled(1L)).willReturn(false);
+
+        // when
+        listener.on(event);
+
+        // then
+        verify(notificationCommandService).save(1L, 2L, "액터닉네임", "https://example.com/actor.jpg", NotificationType.LIKE, 10L, null);
         verify(sseRegistry, never()).send(any(), any());
     }
 }
