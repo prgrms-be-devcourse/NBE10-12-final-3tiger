@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
 import * as AuthSession from "expo-auth-session";
+import * as Linking from "expo-linking";
 import { router, useFocusEffect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useCallback, useEffect, useState } from "react";
@@ -22,7 +23,8 @@ import { useAuthStore } from "@/stores/auth-store";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: "front" });
+const KAKAO_BACKEND_REDIRECT_URI = "http://172.30.1.40:8080/api/v1/auth/kakao/callback";
+const GOOGLE_REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: "front" });
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -30,11 +32,11 @@ export default function LoginScreen() {
   const [secure, setSecure] = useState(true);
   const saveTokens = useAuthStore((state) => state.saveTokens);
 
-  const [kakaoRequest, kakaoResponse, kakaoPromptAsync] =
+  const [kakaoRequest, , kakaoPromptAsync] =
     AuthSession.useAuthRequest(
       {
         clientId: process.env.EXPO_PUBLIC_KAKAO_CLIENT_ID ?? "",
-        redirectUri: REDIRECT_URI,
+        redirectUri: KAKAO_BACKEND_REDIRECT_URI,
       },
       { authorizationEndpoint: "https://kauth.kakao.com/oauth/authorize" },
     );
@@ -43,7 +45,7 @@ export default function LoginScreen() {
     AuthSession.useAuthRequest(
       {
         clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? "",
-        redirectUri: REDIRECT_URI,
+        redirectUri: GOOGLE_REDIRECT_URI,
         scopes: ["openid", "profile", "email"],
       },
       { authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth" },
@@ -72,13 +74,25 @@ export default function LoginScreen() {
   });
 
   useEffect(() => {
-    if (kakaoResponse?.type === "success") {
-      socialLoginMutation.mutate({
-        provider: "kakao",
-        code: kakaoResponse.params.code,
-      });
-    }
-  }, [kakaoResponse]); // eslint-disable-line react-hooks/exhaustive-deps
+    const subscription = Linking.addEventListener("url", ({ url }) => {
+      const { path, queryParams } = Linking.parse(url);
+      if (path !== "oauth-callback") return;
+
+      const params = queryParams as Record<string, string>;
+      if (params.error) {
+        socialLoginMutation.reset();
+        return;
+      }
+      if (params.accessToken && params.refreshToken) {
+        saveTokens({
+          accessToken: params.accessToken,
+          refreshToken: params.refreshToken,
+          isNewUser: params.isNewUser === "true",
+        }).then(() => router.replace("/(tabs)/map" as never));
+      }
+    });
+    return () => subscription.remove();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (googleResponse?.type === "success") {
