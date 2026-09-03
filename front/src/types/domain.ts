@@ -182,6 +182,7 @@ export type Region = {
   name: string;
   centerLat: number;
   centerLng: number;
+  bbox: string;
   courseCount: number;
 };
 

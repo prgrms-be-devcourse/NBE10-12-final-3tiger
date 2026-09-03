@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   KeyboardAvoidingView,
@@ -30,6 +31,7 @@ import {
   saveGeneratedCourse,
 } from "@/api/course-api";
 import { searchPlaces, type PlaceSearchItem } from "@/api/place-api";
+import { getWeatherSnapshot } from "@/api/weather-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { getMyProfile } from "@/api/user-api";
 import {
@@ -301,8 +303,17 @@ export default function CourseGenerateScreen() {
     onError: (error: Error) => setErrorMessage(error.message),
   });
 
-  const handleGenerate = () => {
-    setErrorMessage(null);
+  const weatherQuery = useQuery({
+    queryKey: [
+      "weather",
+      coords.latitude.toFixed(2),
+      coords.longitude.toFixed(2),
+    ],
+    queryFn: () => getWeatherSnapshot(coords.latitude, coords.longitude),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const runGenerate = () => {
     if (mode === "oneway") {
       if (!endCoords) {
         setErrorMessage("도착지를 먼저 선택해 주세요.");
@@ -323,6 +334,24 @@ export default function CourseGenerateScreen() {
       distanceM,
       persona: persona ?? undefined,
     });
+  };
+
+  const handleGenerate = () => {
+    setErrorMessage(null);
+    const upcoming = weatherQuery.data?.upcoming;
+    if (upcoming) {
+      const label = upcoming.type === "rain" ? "비" : "눈";
+      const when =
+        upcoming.hoursFromNow <= 0
+          ? `지금 ${label}이 내리고 있어요.`
+          : `${upcoming.hoursFromNow}시간 후에 ${label}이 예보되어있습니다.`;
+      Alert.alert("날씨 알림", `${when}\n계속 진행할까요?`, [
+        { text: "취소", style: "cancel" },
+        { text: "계속", onPress: runGenerate },
+      ]);
+      return;
+    }
+    runGenerate();
   };
 
   const handleSave = () => {

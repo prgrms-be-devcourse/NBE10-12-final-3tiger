@@ -26,6 +26,7 @@ public class RegionService {
                         v.getName(),
                         v.getCenterLat(),
                         v.getCenterLng(),
+                        v.getBbox(),
                         v.getCourseCount()))
                 .toList();
     }
@@ -35,6 +36,7 @@ public class RegionService {
             String name,
             double centerLat,
             double centerLng,
+            String bbox,
             int courseCount
     ) implements Serializable {}
 }

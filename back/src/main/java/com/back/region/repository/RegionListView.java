@@ -5,5 +5,6 @@ public interface RegionListView {
     String getName();
     double getCenterLat();
     double getCenterLng();
+    String getBbox();
     int getCourseCount();
 }
