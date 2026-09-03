@@ -14,6 +14,8 @@ public class Post {
     private User user;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "course_id")
     private Course course;
+    @Column(nullable = false, length = 100)
+    private String title;
     @Column(name = "caption", nullable = false, length = 500)
     private String content;
     @Column(name = "photo_url", length = 2048)
@@ -27,10 +29,11 @@ public class Post {
 
     protected Post() {}
     public Post(User user, Course course, String content, String photoUrl, LocalDateTime walkedAt) {
-        this.user = user; this.course = course; this.content = content; this.photoUrl = photoUrl;
+        this.user = user; this.course = course; this.title = course.getName(); this.content = content; this.photoUrl = photoUrl;
         this.walkedAt = walkedAt; this.createdAt = LocalDateTime.now();
     }
     public Long getId() { return id; } public User getUser() { return user; } public Course getCourse() { return course; }
+    public String getTitle() { return title; }
     public String getContent() { return content; }
     public String getPhotoUrl() { return photoUrl; }
     public int getLikeCount() { return likeCount; } public LocalDateTime getWalkedAt() { return walkedAt; }

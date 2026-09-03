@@ -20,8 +20,9 @@ public class PostController {
     @GetMapping
     ApiResponse<PageResponse<PostService.FeedItem>> feed(@CurrentUserId(required = false) Long userId,
             @RequestParam(defaultValue = "latest") String sort, @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ApiResponse.ok("피드 조회 성공", service.feed(userId, sort, page, size));
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.ok("피드 조회 성공", service.feed(userId, sort, page, size, keyword));
     }
     @GetMapping("/me")
     ApiResponse<PageResponse<PostService.MyPostItem>> mine(@CurrentUserId Long userId,
@@ -54,7 +55,7 @@ public class PostController {
                          @NotBlank(message = "이미지 형식은 필수입니다.")
                          @Pattern(regexp = "image/(jpeg|png|webp)", message = "지원하지 않는 이미지 형식입니다.") String contentType) {}
     record CreateRequest(@Schema(example = "1") @NotNull(message = "코스 ID는 필수입니다.") Long courseId,
-                         @Schema(example = "날씨가 좋아서 즐겁게 걸었습니다.") @NotBlank(message = "내용은 필수입니다.") @Size(max = 1000, message = "내용은 1000자 이하여야 합니다.") String content,
+                         @Schema(example = "날씨가 좋아서 즐겁게 걸었습니다.") @NotBlank(message = "내용은 필수입니다.") @Size(max = 500, message = "내용은 500자 이하여야 합니다.") String content,
                          @Schema(example = "https://example.com/walk.jpg") @Size(max = 2048, message = "사진 URL이 너무 깁니다.") String photoUrl,
                          @Schema(example = "2026-08-26T00:50:00.000Z") @NotNull(message = "산책 시각은 필수입니다.") OffsetDateTime walkedAt) {}
 }

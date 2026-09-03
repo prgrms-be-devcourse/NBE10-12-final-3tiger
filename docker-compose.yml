@@ -30,6 +30,8 @@ services:
       - ./docker/80-bookmark-activity.sh:/docker-entrypoint-initdb.d/80-bookmark-activity.sh:ro
       - ./docker/90-user-memo.sql:/tmp/user-memo.sql:ro
       - ./docker/90-user-memo.sh:/docker-entrypoint-initdb.d/90-user-memo.sh:ro
+      - ./docker/post-title-migration.sql:/tmp/post-title-migration.sql:ro
+      - ./docker/95-post-title-migration.sh:/docker-entrypoint-initdb.d/95-post-title-migration.sh:ro
       - ./docker/100-notification-setting.sql:/tmp/notification-setting.sql:ro
       - ./docker/100-notification-setting.sh:/docker-entrypoint-initdb.d/100-notification-setting.sh:ro
       - ./docker/21_persona_weight.sql:/tmp/persona/21_persona_weight.sql:ro

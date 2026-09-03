@@ -45,16 +45,17 @@ class PostControllerTest {
     @Test
     @DisplayName("피드는 인증 없이 내용·좋아요·댓글 정보를 조회할 수 있다")
     void feed() throws Exception {
-        var item = new PostService.FeedItem(10L, 1L, 2L, "산책러", "https://cdn.example.com/profile.jpg",
+        var item = new PostService.FeedItem(10L, 1L, "POST 테스트 코스", 2L, "산책러", "https://cdn.example.com/profile.jpg",
                 "좋은 산책이었습니다.",
                 "https://example.com/walk.jpg", 3, 2, false, false, false,
                 LocalDateTime.of(2026, 8, 26, 9, 0));
-        given(postService.feed(null, "latest", 0, 20))
+        given(postService.feed(null, "latest", 0, 20, null))
                 .willReturn(new PageResponse<>(List.of(item), 0, 20, 1));
 
         mvc.perform(get("/api/v1/posts"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].postId").value(10))
+                .andExpect(jsonPath("$.data.content[0].title").value("POST 테스트 코스"))
                 .andExpect(jsonPath("$.data.content[0].userId").value(2))
                 .andExpect(jsonPath("$.data.content[0].profileImageUrl")
                         .value("https://cdn.example.com/profile.jpg"))
@@ -64,6 +65,22 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.content[0].isLiked").value(false))
                 .andExpect(jsonPath("$.data.content[0].isBookmarked").value(false))
                 .andExpect(jsonPath("$.data.content[0].isMine").value(false));
+    }
+
+    @Test
+    @DisplayName("피드 검색어를 정렬·페이징 값과 함께 서비스에 전달한다")
+    void passesKeywordToFeedService() throws Exception {
+        given(postService.feed(null, "popularity", 1, 5, "서울숲"))
+                .willReturn(new PageResponse<>(List.of(), 1, 5, 0));
+
+        mvc.perform(get("/api/v1/posts")
+                        .param("keyword", "서울숲")
+                        .param("sort", "popularity")
+                        .param("page", "1")
+                        .param("size", "5"))
+                .andExpect(status().isOk());
+
+        verify(postService).feed(null, "popularity", 1, 5, "서울숲");
     }
 
     @Test
@@ -107,6 +124,20 @@ class PostControllerTest {
                         .content("""
                                 {"courseId":1,"content":"","walkedAt":"2026-08-26T00:00:00.000Z"}
                                 """))
+                .andExpect(status().isBadRequest());
+
+        verify(postService, never()).create(any(), any());
+    }
+
+    @Test
+    @DisplayName("내용이 500자를 초과하면 400을 반환한다")
+    void rejectsContentLongerThanColumnLimit() throws Exception {
+        mvc.perform(post("/api/v1/posts")
+                        .with(authenticatedAs(1L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"courseId":1,"content":"%s","walkedAt":"2026-08-26T00:00:00.000Z"}
+                                """.formatted("가".repeat(501))))
                 .andExpect(status().isBadRequest());
 
         verify(postService, never()).create(any(), any());
