@@ -1,7 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
+import * as AuthSession from "expo-auth-session";
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+import { useCallback, useEffect, useState } from "react";
 import {
   BackHandler,
   KeyboardAvoidingView,
@@ -13,16 +15,40 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { login } from "@/api/auth-api";
+import { login, socialLogin } from "@/api/auth-api";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useAuthStore } from "@/stores/auth-store";
+
+WebBrowser.maybeCompleteAuthSession();
+
+const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: "front" });
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [secure, setSecure] = useState(true);
   const saveTokens = useAuthStore((state) => state.saveTokens);
+
+  const [kakaoRequest, kakaoResponse, kakaoPromptAsync] =
+    AuthSession.useAuthRequest(
+      {
+        clientId: process.env.EXPO_PUBLIC_KAKAO_CLIENT_ID ?? "",
+        redirectUri: REDIRECT_URI,
+      },
+      { authorizationEndpoint: "https://kauth.kakao.com/oauth/authorize" },
+    );
+
+  const [googleRequest, googleResponse, googlePromptAsync] =
+    AuthSession.useAuthRequest(
+      {
+        clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? "",
+        redirectUri: REDIRECT_URI,
+        scopes: ["openid", "profile", "email"],
+      },
+      { authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth" },
+    );
+
   const loginMutation = useMutation({
     mutationFn: login,
     onSuccess: async (tokens) => {
@@ -30,6 +56,39 @@ export default function LoginScreen() {
       router.replace("/(tabs)/map" as never);
     },
   });
+
+  const socialLoginMutation = useMutation({
+    mutationFn: ({
+      provider,
+      code,
+    }: {
+      provider: "kakao" | "google";
+      code: string;
+    }) => socialLogin(provider, code),
+    onSuccess: async (tokens) => {
+      await saveTokens(tokens);
+      router.replace("/(tabs)/map" as never);
+    },
+  });
+
+  useEffect(() => {
+    if (kakaoResponse?.type === "success") {
+      socialLoginMutation.mutate({
+        provider: "kakao",
+        code: kakaoResponse.params.code,
+      });
+    }
+  }, [kakaoResponse]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (googleResponse?.type === "success") {
+      socialLoginMutation.mutate({
+        provider: "google",
+        code: googleResponse.params.code,
+      });
+    }
+  }, [googleResponse]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useFocusEffect(
     useCallback(() => {
       const subscription = BackHandler.addEventListener(
@@ -107,9 +166,9 @@ export default function LoginScreen() {
               />
             </Pressable>
           </View>
-          {loginMutation.isError && (
+          {(loginMutation.isError || socialLoginMutation.isError) && (
             <Text className="mt-3 text-sm text-destructive">
-              {loginMutation.error.message}
+              {loginMutation.error?.message ?? socialLoginMutation.error?.message}
             </Text>
           )}
           <Button
@@ -134,24 +193,28 @@ export default function LoginScreen() {
           <View className="my-6 flex-row items-center gap-2.5">
             <View className="h-px flex-1 bg-[#D7DED8]" />
             <Text className="text-xs text-[#7B867E] dark:text-[#AAB5AD]">
-              소셜 로그인은 인가 코드 설정 후 사용할 수 있어요
+              또는
             </Text>
             <View className="h-px flex-1 bg-[#D7DED8]" />
           </View>
           <Button
             variant="secondary"
             className="mb-2.5 h-[54px] rounded-xl bg-[#FEE500]"
-            disabled
+            disabled={!kakaoRequest || socialLoginMutation.isPending}
+            onPress={() => kakaoPromptAsync()}
           >
-            <Text className="font-extrabold text-black">카카오로 시작하기</Text>
+            <Text className="font-extrabold text-black">
+              {socialLoginMutation.isPending ? "로그인 중..." : "카카오로 시작하기"}
+            </Text>
           </Button>
           <Button
             variant="secondary"
             className="mb-2.5 h-[54px] rounded-xl bg-white dark:bg-[#1B211D]"
-            disabled
+            disabled={!googleRequest || socialLoginMutation.isPending}
+            onPress={() => googlePromptAsync()}
           >
             <Text className="font-extrabold text-black">
-              G　Google로 시작하기
+              {socialLoginMutation.isPending ? "로그인 중..." : "G　Google로 시작하기"}
             </Text>
           </Button>
           <View className="mt-5 flex-row justify-center">
