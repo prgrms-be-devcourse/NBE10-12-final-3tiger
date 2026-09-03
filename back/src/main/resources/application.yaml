@@ -39,6 +39,11 @@ app:
       rest-api-key: ${KAKAO_PLACE_REST_API_KEY}
       connect-timeout: 2s
       read-timeout: 3s
+  map:
+    kakao:
+      rest-api-key: ${KAKAO_PLACE_REST_API_KEY}
+      connect-timeout: 2s
+      read-timeout: 5s
   storage:
     type: ${STORAGE_TYPE:local}
     public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080/local-uploads}

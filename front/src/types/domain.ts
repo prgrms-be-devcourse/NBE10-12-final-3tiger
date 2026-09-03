@@ -56,6 +56,60 @@ export type CourseDetail = Course & {
   surfaceType?: string | null;
 };
 
+export type CourseNavigation = {
+  courseId: number;
+  name: string;
+  distanceM: number;
+  estimatedMinutes: number;
+  isLoop: boolean;
+  startPoint: { lat: number; lng: number };
+  endPoint: { lat: number; lng: number };
+  path: GeoJsonLineString;
+};
+
+export type DirectionsMode = "WALK" | "PUBLIC_TRANSIT" | "BICYCLE";
+
+export type DirectionStop = {
+  name: string;
+  role: "BOARDING" | "PASSING" | "ALIGHTING" | string;
+};
+
+export type DirectionRouteSegment = {
+  segmentIndex: number;
+  mode: "WALK" | "BUS" | "SUBWAY" | "BICYCLE" | string;
+  guidance: string;
+  distanceMeters: number;
+  estimatedSeconds: number;
+  vehicleNames: string[];
+  stops: DirectionStop[];
+  path: GeoJsonLineString;
+};
+
+export type DirectionRoute = {
+  routeIndex: number;
+  type: string;
+  distanceMeters: number;
+  estimatedSeconds: number;
+  transfers: number;
+  fareWon: number | null;
+  segments: DirectionRouteSegment[];
+};
+
+export type CourseStartDirections = {
+  courseId: number;
+  mode: DirectionsMode;
+  status: "ROUTE_AVAILABLE" | "ALREADY_NEAR_START";
+  startable: boolean;
+  startableRadiusMeters: number;
+  destination: {
+    name: string;
+    latitude: number;
+    longitude: number;
+  };
+  routes: DirectionRoute[];
+  landingUrl: string | null;
+};
+
 export type BookmarkedCourse = Course & {
   isBookmarked: boolean;
   rating?: number | null;

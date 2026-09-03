@@ -69,6 +69,78 @@ public enum ErrorCode {
             HttpStatus.TOO_MANY_REQUESTS,
             "PLACE_429_1",
             "장소 검색 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
+    ),
+
+    COURSE_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "COURSE_404_1",
+            "코스를 찾을 수 없습니다."
+    ),
+
+    COURSE_NOT_NAVIGABLE(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "COURSE_422_1",
+            "안내할 수 없는 코스입니다."
+    ),
+
+    COURSE_PATH_DATA_INVALID(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "COURSE_500_1",
+            "코스 경로 데이터를 처리할 수 없습니다."
+    ),
+
+    COURSE_START_POINT_NOT_FOUND(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "COURSE_422_2",
+            "코스 출발점 정보가 없습니다."
+    ),
+
+    INVALID_COORDINATE(
+            HttpStatus.BAD_REQUEST,
+            "COMMON_400_1",
+            "유효하지 않은 좌표입니다."
+    ),
+
+    KAKAO_DIRECTIONS_FAILED(
+            HttpStatus.BAD_GATEWAY,
+            "DIRECTIONS_502_1",
+            "카카오 길찾기 서비스 호출에 실패했습니다."
+    ),
+
+    KAKAO_WALK_ROUTE_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "DIRECTIONS_404_1",
+            "출발점까지의 보행 경로를 찾을 수 없습니다."
+    ),
+
+    KAKAO_TRANSIT_ROUTE_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "DIRECTIONS_404_2",
+            "출발점까지의 대중교통 경로를 찾을 수 없습니다."
+    ),
+
+    KAKAO_BICYCLE_ROUTE_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "DIRECTIONS_404_3",
+            "출발점까지의 자전거 경로를 찾을 수 없습니다."
+    ),
+
+    KAKAO_DIRECTIONS_QUOTA_EXCEEDED(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "DIRECTIONS_503_1",
+            "길찾기 요청이 많아 잠시 후 다시 시도해 주세요."
+    ),
+
+    DIRECTIONS_RATE_LIMIT_EXCEEDED(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "DIRECTIONS_429_1",
+            "길찾기 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
+    ),
+
+    KAKAO_AUTH_FAILED(
+            HttpStatus.UNAUTHORIZED,
+            "AUTH_401_3",
+            "카카오 인증에 실패했습니다."
     );
 
     private final HttpStatus status;
