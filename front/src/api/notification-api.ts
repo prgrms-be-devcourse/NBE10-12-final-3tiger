@@ -2,6 +2,7 @@ import { apiRequest } from "@/api/client";
 import type { PageParams, PageResponse } from "@/types/api";
 import type {
   NotificationItem,
+  NotificationSetting,
   NotificationUnreadCount,
 } from "@/types/notification";
 
@@ -26,4 +27,14 @@ export const readAllNotifications = () =>
   apiRequest<void>({
     url: "/api/v1/notifications/read-all",
     method: "PATCH",
+  });
+
+export const getNotificationSetting = () =>
+  apiRequest<NotificationSetting>({ url: "/api/v1/notifications/setting" });
+
+export const updateNotificationSetting = (enabled: boolean) =>
+  apiRequest<NotificationSetting>({
+    url: "/api/v1/notifications/setting",
+    method: "PATCH",
+    data: { enabled },
   });

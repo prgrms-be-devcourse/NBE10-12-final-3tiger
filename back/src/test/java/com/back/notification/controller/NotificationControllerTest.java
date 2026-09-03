@@ -9,6 +9,7 @@ import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
 import com.back.notification.domain.NotificationType;
 import com.back.notification.service.NotificationService;
+import com.back.notification.service.NotificationSettingService;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,6 +44,9 @@ class NotificationControllerTest {
 
     @MockitoBean
     private NotificationService notificationService;
+
+    @MockitoBean
+    private NotificationSettingService notificationSettingService;
 
     @MockitoBean
     private JwtProvider jwtProvider;
@@ -110,6 +114,43 @@ class NotificationControllerTest {
         // when & then
         mockMvc.perform(patch("/api/v1/notifications/{id}/read", 1L).with(authenticatedAs(2L)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("t7: GET /api/v1/notifications/setting 요청 시 200과 enabled 값을 반환한다")
+    void t7() throws Exception {
+        // given
+        given(notificationSettingService.isEnabled(1L)).willReturn(false);
+
+        // when & then
+        mockMvc.perform(get("/api/v1/notifications/setting").with(authenticatedAs(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.enabled").value(false));
+    }
+
+    @Test
+    @DisplayName("t8: PATCH /api/v1/notifications/setting 요청 시 설정을 갱신하고 200을 반환한다")
+    void t8() throws Exception {
+        // when & then
+        mockMvc.perform(patch("/api/v1/notifications/setting")
+                        .contentType("application/json")
+                        .content("{\"enabled\":false}")
+                        .with(authenticatedAs(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.enabled").value(false));
+
+        verify(notificationSettingService).updateEnabled(1L, false);
+    }
+
+    @Test
+    @DisplayName("t9: PATCH /api/v1/notifications/setting 요청 body에 enabled가 없으면 400을 반환한다")
+    void t9() throws Exception {
+        // when & then
+        mockMvc.perform(patch("/api/v1/notifications/setting")
+                        .contentType("application/json")
+                        .content("{}")
+                        .with(authenticatedAs(1L)))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

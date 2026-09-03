@@ -13,6 +13,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { logout } from "@/api/auth-api";
+import {
+  getNotificationSetting,
+  updateNotificationSetting,
+} from "@/api/notification-api";
 import { getMyProfile, updateMyProfile, withdraw } from "@/api/user-api";
 import { ErrorState } from "@/components/ui/data-state";
 import { Switch } from "@/components/ui/switch";
@@ -104,6 +108,19 @@ export default function ProfileScreen() {
     mutationFn: updateMyProfile,
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ["my-profile"] }),
+  });
+  const notificationSettingQuery = useQuery({
+    queryKey: ["notification-setting"],
+    queryFn: getNotificationSetting,
+    enabled: isAuthenticated,
+  });
+  const notificationEnabled = notificationSettingQuery.data?.enabled ?? true;
+  const notificationSettingMutation = useMutation({
+    mutationFn: updateNotificationSetting,
+    onMutate: (enabled) =>
+      queryClient.setQueryData(["notification-setting"], { enabled }),
+    onError: () =>
+      void queryClient.invalidateQueries({ queryKey: ["notification-setting"] }),
   });
   const logoutMutation = useMutation({
     mutationFn: () =>
@@ -207,17 +224,33 @@ export default function ProfileScreen() {
     >
       <ScrollView contentContainerClassName="gap-3.5 p-5 pb-9">
         <View className="relative rounded-xl bg-white p-4 dark:bg-[#1B211D]">
-          <View className="absolute right-3 top-3 z-10 flex-row items-center gap-1.5">
-            <Ionicons
-              name={isDark ? "moon" : "sunny-outline"}
-              size={16}
-              color={isDark ? "#86EFAC" : "#526056"}
-            />
-            <Switch
-              accessibilityLabel="다크 모드"
-              value={isDark}
-              onValueChange={(value) => void setDark(value)}
-            />
+          <View className="absolute right-3 top-3 z-10 items-end gap-2">
+            <View className="flex-row items-center gap-1.5">
+              <Ionicons
+                name={isDark ? "moon" : "sunny-outline"}
+                size={16}
+                color={isDark ? "#86EFAC" : "#526056"}
+              />
+              <Switch
+                accessibilityLabel="다크 모드"
+                value={isDark}
+                onValueChange={(value) => void setDark(value)}
+              />
+            </View>
+            <View className="flex-row items-center gap-1.5">
+              <Ionicons
+                name={notificationEnabled ? "notifications" : "notifications-off"}
+                size={16}
+                color={notificationEnabled ? "#86EFAC" : "#526056"}
+              />
+              <Switch
+                accessibilityLabel="알림 받기"
+                value={notificationEnabled}
+                onValueChange={(value) =>
+                  notificationSettingMutation.mutate(value)
+                }
+              />
+            </View>
           </View>
           <View className="flex-row items-center gap-3">
             <View>
