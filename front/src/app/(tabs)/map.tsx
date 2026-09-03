@@ -22,12 +22,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getRegions } from "@/api/course-api";
 import { searchPlaces, type PlaceSearchItem } from "@/api/place-api";
 import { getMyProfile } from "@/api/user-api";
+import { getWeatherSnapshot } from "@/api/weather-api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   BottomSheetHandle,
   dismissBottomSheet,
 } from "@/components/ui/bottom-sheet-handle";
 import { Button } from "@/components/ui/button";
+import { PrecipitationOverlay } from "@/components/weather/precipitation-overlay";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
@@ -91,10 +93,24 @@ export default function MapScreen() {
   const [placeResults, setPlaceResults] = useState<PlaceSearchItem[]>([]);
   const [regionsOpen, setRegionsOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [weatherCoords, setWeatherCoords] = useState<{
+    latitude: number;
+    longitude: number;
+  }>({ latitude: DEFAULT_REGION.latitude, longitude: DEFAULT_REGION.longitude });
   const profileQuery = useQuery({
     queryKey: ["my-profile"],
     queryFn: getMyProfile,
     enabled: isAuthenticated,
+  });
+  const weatherQuery = useQuery({
+    queryKey: [
+      "weather",
+      weatherCoords.latitude.toFixed(2),
+      weatherCoords.longitude.toFixed(2),
+    ],
+    queryFn: () =>
+      getWeatherSnapshot(weatherCoords.latitude, weatherCoords.longitude),
+    staleTime: 10 * 60 * 1000,
   });
   const regionsQuery = useQuery({
     queryKey: ["regions"],
@@ -219,6 +235,12 @@ export default function MapScreen() {
   const updateRegion = useCallback((next: MapRegion) => {
     if (!isValidCoordinate(next.latitude, next.longitude)) return;
     if (lastViewedRegionRef.current) lastViewedRegionRef.current = next;
+    setWeatherCoords((prev) =>
+      Math.abs(prev.latitude - next.latitude) < 0.01 &&
+      Math.abs(prev.longitude - next.longitude) < 0.01
+        ? prev
+        : { latitude: next.latitude, longitude: next.longitude },
+    );
   }, []);
 
   const moveToServiceRegion = useCallback(
@@ -263,6 +285,8 @@ export default function MapScreen() {
         mapPadding={{ top: 120, right: 16, bottom: 170, left: 16 }}
         onRegionChangeComplete={updateRegion}
       />
+
+      <PrecipitationOverlay type={weatherQuery.data?.current ?? null} />
 
       {showLocationLoading && (
         <View

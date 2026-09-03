@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   KeyboardAvoidingView,
@@ -30,6 +31,7 @@ import {
   saveGeneratedCourse,
 } from "@/api/course-api";
 import { searchPlaces, type PlaceSearchItem } from "@/api/place-api";
+import { getWeatherSnapshot } from "@/api/weather-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { getMyProfile } from "@/api/user-api";
 import {
@@ -38,6 +40,7 @@ import {
 } from "@/components/ui/bottom-sheet-handle";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
+import { PrecipitationOverlay } from "@/components/weather/precipitation-overlay";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
 import type { GenerateCandidate } from "@/types/domain";
@@ -301,8 +304,17 @@ export default function CourseGenerateScreen() {
     onError: (error: Error) => setErrorMessage(error.message),
   });
 
-  const handleGenerate = () => {
-    setErrorMessage(null);
+  const weatherQuery = useQuery({
+    queryKey: [
+      "weather",
+      coords.latitude.toFixed(2),
+      coords.longitude.toFixed(2),
+    ],
+    queryFn: () => getWeatherSnapshot(coords.latitude, coords.longitude),
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const runGenerate = () => {
     if (mode === "oneway") {
       if (!endCoords) {
         setErrorMessage("도착지를 먼저 선택해 주세요.");
@@ -323,6 +335,24 @@ export default function CourseGenerateScreen() {
       distanceM,
       persona: persona ?? undefined,
     });
+  };
+
+  const handleGenerate = () => {
+    setErrorMessage(null);
+    const upcoming = weatherQuery.data?.upcoming;
+    if (upcoming) {
+      const label = upcoming.type === "rain" ? "비" : "눈";
+      const when =
+        upcoming.hoursFromNow <= 0
+          ? `지금 ${label}이 내리고 있어요.`
+          : `${upcoming.hoursFromNow}시간 후에 ${label}이 예보되어있습니다.`;
+      Alert.alert("날씨 알림", `${when}\n계속 진행할까요?`, [
+        { text: "취소", style: "cancel" },
+        { text: "계속", onPress: runGenerate },
+      ]);
+      return;
+    }
+    runGenerate();
   };
 
   const handleSave = () => {
@@ -420,34 +450,37 @@ export default function CourseGenerateScreen() {
         </View>
 
         <View className="overflow-hidden rounded-2xl bg-white dark:bg-[#1B211D]">
-          <MapView
-            ref={mapRef}
-            style={styles.map}
-            region={mapRegion}
-            userInterfaceStyle={isDark ? "dark" : "light"}
-            onPress={handleMapPress}
-          >
-            <Marker
-              coordinate={coords}
-              pinColor="#087A3F"
-              title={startPlaceName}
-            />
-            {isOneway && endCoords && (
+          <View style={styles.map}>
+            <MapView
+              ref={mapRef}
+              style={StyleSheet.absoluteFill}
+              region={mapRegion}
+              userInterfaceStyle={isDark ? "dark" : "light"}
+              onPress={handleMapPress}
+            >
               <Marker
-                coordinate={endCoords}
-                pinColor="#F97316"
-                title={endPlaceName ?? "도착지"}
+                coordinate={coords}
+                pinColor="#087A3F"
+                title={startPlaceName}
               />
-            )}
-            {candidates.map((candidate, index) => (
-              <Polyline
-                key={index}
-                coordinates={toPolyline(candidate)}
-                strokeColor={CANDIDATE_COLORS[index] ?? "#087A3F"}
-                strokeWidth={selectedIndex === index ? 6 : 3}
-              />
-            ))}
-          </MapView>
+              {isOneway && endCoords && (
+                <Marker
+                  coordinate={endCoords}
+                  pinColor="#F97316"
+                  title={endPlaceName ?? "도착지"}
+                />
+              )}
+              {candidates.map((candidate, index) => (
+                <Polyline
+                  key={index}
+                  coordinates={toPolyline(candidate)}
+                  strokeColor={CANDIDATE_COLORS[index] ?? "#087A3F"}
+                  strokeWidth={selectedIndex === index ? 6 : 3}
+                />
+              ))}
+            </MapView>
+            <PrecipitationOverlay type={weatherQuery.data?.current ?? null} />
+          </View>
           <View className="px-3 py-2">
             <Text className="text-[11px] text-[#6B756D] dark:text-[#AAB5AD]">
               지도를 탭하면 {isOneway ? "도착지" : "출발지"}가 그 지점으로
