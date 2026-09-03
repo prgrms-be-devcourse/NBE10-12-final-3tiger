@@ -20,6 +20,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -312,6 +313,9 @@ function FeedPost({
         }}
       />
       <View className="relative px-3 pb-4">
+        <Text className="mb-1 text-sm font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
+          {item.title}
+        </Text>
         <Text
           accessible={false}
           importantForAccessibility="no-hide-descendants"
@@ -391,10 +395,24 @@ export default function CommunityScreen() {
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sort, setSort] = useState<"latest" | "popularity">("latest");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const submitSearch = () => setKeyword(searchInput.trim());
+  const closeSearch = () => {
+    setSearchInput("");
+    setKeyword("");
+    setSearchOpen(false);
+  };
   const postsQuery = useInfiniteQuery({
-    queryKey: ["posts", sort],
+    queryKey: ["posts", sort, keyword],
     queryFn: ({ pageParam }) =>
-      getPosts({ page: pageParam, size: 20, sort }),
+      getPosts({
+        page: pageParam,
+        size: 20,
+        sort,
+        keyword: keyword || undefined,
+      }),
     initialPageParam: 0,
     getNextPageParam: (lastPage) =>
       (lastPage.page + 1) * lastPage.size < lastPage.totalElements
@@ -486,29 +504,53 @@ export default function CommunityScreen() {
           className="flex-row items-center justify-between px-3"
           style={{ height: headerBarHeight, paddingTop: insets.top }}
         >
-          <View
-            pointerEvents="none"
-            className="absolute inset-x-0 h-14 items-center justify-center"
-            style={{ top: insets.top }}
-          >
-            <Image
-              source={require("../../../assets/title-transparent.png")}
-              className="h-[35px] w-[132px] dark:hidden"
-              resizeMode="contain"
+          {searchOpen ? (
+            <TextInput
+              autoFocus
+              value={searchInput}
+              onChangeText={setSearchInput}
+              onSubmitEditing={submitSearch}
+              returnKeyType="search"
+              placeholder="코스 이름으로 검색"
+              placeholderTextColor={isDark ? "#7F8B82" : "#7A857D"}
+              className="absolute left-14 right-36 h-9 rounded-full bg-white px-4 text-sm text-[#191C1D] dark:bg-[#1B211D] dark:text-[#F1F5F2]"
+              style={{ top: insets.top + 10 }}
             />
-            <Image
-              source={require("../../../assets/title-transparent.png")}
-              className="hidden h-[35px] w-[132px] dark:flex"
-              resizeMode="contain"
-            />
-          </View>
+          ) : (
+            <View
+              pointerEvents="none"
+              className="absolute inset-x-0 h-14 items-center justify-center"
+              style={{ top: insets.top }}
+            >
+              <Image
+                source={require("../../../assets/title-transparent.png")}
+                className="h-[35px] w-[132px] dark:hidden"
+                resizeMode="contain"
+              />
+              <Image
+                source={require("../../../assets/title-transparent.png")}
+                className="hidden h-[35px] w-[132px] dark:flex"
+                resizeMode="contain"
+              />
+            </View>
+          )}
           <IconButton
             label="게시글 작성"
             icon="add"
             onPress={() => router.push("/review/write" as never)}
           />
           <View className="ml-auto flex-row">
-            <IconButton label="피드 검색" icon="search" />
+            <IconButton
+              label={searchOpen ? "검색 실행" : "피드 검색"}
+              icon="search"
+              onPress={() => {
+                if (searchOpen) submitSearch();
+                else setSearchOpen(true);
+              }}
+            />
+            {searchOpen && (
+              <IconButton label="검색 닫기" icon="close" onPress={closeSearch} />
+            )}
             <View>
               <IconButton
                 label="알림"

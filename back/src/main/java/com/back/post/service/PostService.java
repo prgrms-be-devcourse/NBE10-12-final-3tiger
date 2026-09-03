@@ -17,6 +17,7 @@ import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -39,10 +40,14 @@ public class PostService {
         this.commentUpvotes = commentUpvotes; this.storage = storage;
         this.bookmarks = bookmarks;
     }
-    public PageResponse<FeedItem> feed(Long userId, String sort, int page, int size) {
-        Sort sorting = "popularity".equalsIgnoreCase(sort) ? Sort.by(Sort.Direction.DESC, "likeCount", "createdAt") : Sort.by(Sort.Direction.DESC, "createdAt");
+    public PageResponse<FeedItem> feed(Long userId, String sort, int page, int size, String keyword) {
+        Sort sorting = "popularity".equalsIgnoreCase(sort)
+                ? Sort.by(Sort.Direction.DESC, "likeCount", "createdAt", "id")
+                : Sort.by(Sort.Direction.DESC, "createdAt", "id");
         Pageable pageable = PageRequest.of(page, size, sorting);
-        Page<Post> found = posts.findAll(pageable);
+        Page<Post> found = StringUtils.hasText(keyword)
+                ? posts.findByTitleContainingIgnoreCase(keyword.trim(), pageable)
+                : posts.findAll(pageable);
         List<Long> postIds = postIds(found);
         Map<Long, Long> commentCounts = commentCounts(postIds);
         Set<Long> likedPostIds = userId == null || postIds.isEmpty()
@@ -87,7 +92,7 @@ public class PostService {
     }
     private FeedItem toFeedItem(Post p, Long currentUserId, Map<Long, Long> commentCounts, Set<Long> likedPostIds,
                                 Set<Long> bookmarkedCourseIds) {
-        return new FeedItem(p.getId(), p.getCourse().getId(), p.getUser().getId(), p.getUser().getNickname(), p.getUser().getProfileImageUrl(), p.getContent(),
+        return new FeedItem(p.getId(), p.getCourse().getId(), p.getTitle(), p.getUser().getId(), p.getUser().getNickname(), p.getUser().getProfileImageUrl(), p.getContent(),
                 p.getPhotoUrl(), p.getLikeCount(), commentCounts.getOrDefault(p.getId(), 0L),
                 likedPostIds.contains(p.getId()), bookmarkedCourseIds.contains(p.getCourse().getId()),
                 currentUserId != null && p.getUser().getId().equals(currentUserId), p.getWalkedAt());
@@ -112,7 +117,7 @@ public class PostService {
     }
     public record CreateCommand(Long courseId, String content, String photoUrl, LocalDateTime walkedAt) {}
     public record CreatedPost(Long postId) {}
-    public record FeedItem(Long postId, Long courseId, Long userId, String nickname, String profileImageUrl, String content, String photoUrl,
+    public record FeedItem(Long postId, Long courseId, String title, Long userId, String nickname, String profileImageUrl, String content, String photoUrl,
                            int likeCount, long commentCount, boolean isLiked, boolean isBookmarked,
                            boolean isMine, LocalDateTime walkedAt) {}
     public record MyPostItem(Long postId, Long courseId, String content, String photoUrl,

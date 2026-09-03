@@ -17,6 +17,9 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @EntityGraph(attributePaths = {"user", "course"})
     Page<Post> findByUserId(Long userId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"user", "course"})
+    Page<Post> findByTitleContainingIgnoreCase(String title, Pageable pageable);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Post p SET p.likeCount = p.likeCount + 1 WHERE p.id = :postId")
     int increaseLikeCount(@Param("postId") Long postId);

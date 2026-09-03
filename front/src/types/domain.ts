@@ -72,6 +72,7 @@ export type CourseUsageLog = {
 export type Post = {
   postId: number;
   courseId: number;
+  title?: string;
   userId?: number;
   nickname?: string;
   content: string;
@@ -86,6 +87,7 @@ export type Post = {
 };
 
 export type PostFeedItem = Post & {
+  title: string;
   userId: number;
   isLiked: boolean;
   isBookmarked: boolean;
