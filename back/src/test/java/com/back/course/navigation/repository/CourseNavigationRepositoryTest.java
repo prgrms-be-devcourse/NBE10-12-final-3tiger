@@ -63,4 +63,24 @@ class CourseNavigationRepositoryTest {
         assertThat(view.getEndLat()).isEqualTo(37.551);
         assertThat(view.getEndLng()).isEqualTo(126.851);
     }
+
+    @Test
+    @DisplayName("길찾기용 출발점은 필요한 정보만 조회한다")
+    void findsStartPointProjection() {
+        CourseStartPointView view = repository.findStartPointByCourseId(101L).orElseThrow();
+
+        assertThat(view.getCourseId()).isEqualTo(101L);
+        assertThat(view.getName()).isNotBlank();
+        assertThat(view.getStartLat()).isEqualTo(37.544);
+        assertThat(view.getStartLng()).isEqualTo(127.037);
+    }
+
+    @Test
+    @DisplayName("별도 출발점이 없으면 경로의 첫 좌표를 조회한다")
+    void startPointProjectionFallsBackToPathStartPoint() {
+        CourseStartPointView view = repository.findStartPointByCourseId(102L).orElseThrow();
+
+        assertThat(view.getStartLat()).isEqualTo(37.55);
+        assertThat(view.getStartLng()).isEqualTo(126.85);
+    }
 }

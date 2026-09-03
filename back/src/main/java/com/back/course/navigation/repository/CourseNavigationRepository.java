@@ -13,6 +13,19 @@ public interface CourseNavigationRepository extends Repository<Course, Long> {
               SELECT
                   c.course_id AS courseId,
                   c.name AS name,
+                  ST_Y(COALESCE(c.start_point, ST_StartPoint(c.path))) AS startLat,
+                  ST_X(COALESCE(c.start_point, ST_StartPoint(c.path))) AS startLng
+              FROM course c
+              WHERE c.course_id = :courseId
+              """, nativeQuery = true)
+    Optional<CourseStartPointView> findStartPointByCourseId(
+            @Param("courseId") Long courseId
+    );
+
+    @Query(value = """
+              SELECT
+                  c.course_id AS courseId,
+                  c.name AS name,
                   c.distance_m AS distanceM,
                   c.estimated_minutes AS estimatedMinutes,
                   c.is_loop AS isLoop,
