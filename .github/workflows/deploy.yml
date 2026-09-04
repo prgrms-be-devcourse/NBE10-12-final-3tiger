@@ -1,40 +1,60 @@
 name: Deploy to EC2
-
 on:
   push:
     branches: [main]
     paths:
       - 'back/**'
-
+      - '.github/workflows/deploy.yml'
+concurrency:
+  group: deploy-ec2-backend
+  cancel-in-progress: false
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK
-        uses: actions/setup-java@v4
-        with:
-          java-version: '25'
-          distribution: 'corretto'
-
-      - name: Deploy to EC2
+      - name: Build and deploy on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 20m
           script: |
+            set -eu
             cd ~/NBE10-12-final-3tiger
-            git pull origin main
+            echo "=== Update source ==="
+            git pull --ff-only origin main
             cd back
+            echo "=== Build ==="
+            java -version
             ./gradlew build -x test
-            PID=$(pgrep -f "back-0.0.1-SNAPSHOT.jar") || true
-            if [ -n "$PID" ]; then
-              kill $PID
-              sleep 5
+            JAR="build/libs/back-0.0.1-SNAPSHOT.jar"
+            test -f "$JAR"
+            PATTERN='^([^[:space:]]*/)?java[[:space:]].*-jar[[:space:]]+([^[:space:]]*/)?back-0[.]0[.]1-SNAPSHOT[.]jar([[:space:]]|$)'
+            echo "=== Stop existing backend ==="
+            PIDS=$(pgrep -f "$PATTERN" || true)
+            if [ -n "$PIDS" ]; then
+              echo "Stopping PID(s): $PIDS"
+              kill $PIDS
+              COUNT=0
+              while pgrep -f "$PATTERN" > /dev/null; do
+                COUNT=$((COUNT + 1))
+                if [ "$COUNT" -ge 30 ]; then
+                  echo "ERROR: Existing backend did not stop."
+                  exit 1
+                fi
+                sleep 1
+              done
             fi
-            setsid nohup java -Xmx512m -jar build/libs/back-0.0.1-SNAPSHOT.jar > backend.log 2>&1 < /dev/null &
-            disown
-            sleep 3
+            echo "=== Start backend ==="
+            setsid nohup java -Xmx512m -jar "$JAR" \
+              > backend.log 2>&1 < /dev/null &
+            sleep 10
+            echo "=== Verify backend process ==="
+            if pgrep -af "$PATTERN"; then
+              echo "Backend process is running."
+            else
+              echo "ERROR: Backend exited during startup."
+              tail -n 100 backend.log
+              exit 1
+            fi
