@@ -36,6 +36,10 @@ services:
       - ./docker/100-notification-setting.sh:/docker-entrypoint-initdb.d/100-notification-setting.sh:ro
       - ./docker/hazard-schema.sql:/tmp/hazard-schema.sql:ro
       - ./docker/96-hazard-schema.sh:/docker-entrypoint-initdb.d/96-hazard-schema.sh:ro
+      - ./docker/110-report-schema.sql:/tmp/report-schema.sql:ro
+      - ./docker/110-report-schema.sh:/docker-entrypoint-initdb.d/110-report-schema.sh:ro
+      - ./docker/120-user-block-schema.sql:/tmp/user-block-schema.sql:ro
+      - ./docker/120-user-block-schema.sh:/docker-entrypoint-initdb.d/120-user-block-schema.sh:ro
       - ./docker/21_persona_weight.sql:/tmp/persona/21_persona_weight.sql:ro
       - ./docker/22_persona_course_scores.sql:/tmp/persona/22_persona_course_scores.sql:ro
       - ./docker/23_persona_edge_costs.sql:/tmp/persona/23_persona_edge_costs.sql:ro

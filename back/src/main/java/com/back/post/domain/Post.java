@@ -22,6 +22,9 @@ public class Post {
     private String photoUrl;
     @Column(nullable = false)
     private int likeCount;
+    // 신고 누적 임계치 도달 시 자동 숨김 처리된다. 피드 조회에서 제외된다.
+    @Column(nullable = false)
+    private boolean hidden;
     @Column(nullable = false)
     private LocalDateTime walkedAt;
     @Column(nullable = false, updatable = false)
@@ -36,7 +39,8 @@ public class Post {
     public String getTitle() { return title; }
     public String getContent() { return content; }
     public String getPhotoUrl() { return photoUrl; }
-    public int getLikeCount() { return likeCount; } public LocalDateTime getWalkedAt() { return walkedAt; }
+    public int getLikeCount() { return likeCount; } public boolean isHidden() { return hidden; }
+    public LocalDateTime getWalkedAt() { return walkedAt; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 
     public void increaseLikeCount() { this.likeCount++; }

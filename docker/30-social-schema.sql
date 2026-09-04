@@ -22,10 +22,13 @@ CREATE TABLE IF NOT EXISTS post_comment (
     user_id      BIGINT       NOT NULL REFERENCES "user"(user_id)     ON DELETE CASCADE,
     content      VARCHAR(1000) NOT NULL,
     upvote_count INTEGER      NOT NULL DEFAULT 0,
+    hidden       BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at   TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_post_comment_post_created
     ON post_comment (post_id, created_at DESC);
+-- 신고 누적 자동 숨김 대상 컬럼 (report 도메인). 이미 만들어진 DB 재실행 대비 멱등 ALTER.
+ALTER TABLE post_comment ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT FALSE;
 
 ------------------------------------------------------------
 -- 3. Comment upvote (댓글 공감)

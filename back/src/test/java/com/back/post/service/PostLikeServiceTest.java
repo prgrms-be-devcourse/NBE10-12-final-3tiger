@@ -12,6 +12,7 @@ import com.back.post.repository.PostRepository;
 import com.back.comment.repository.CommentRepository;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import com.back.userblock.service.UserBlockService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +58,8 @@ class PostLikeServiceTest {
     private PostLikeWriter postLikeWriter;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private UserBlockService userBlockService;
 
     @InjectMocks
     private PostLikeService postLikeService;
@@ -236,5 +239,28 @@ class PostLikeServiceTest {
         assertThat(item.isBookmarked()).isTrue();
         assertThat(item.isMine()).isTrue();
         assertThat(item.likedAt()).isEqualTo(postLike.getCreatedAt());
+    }
+
+    @Test
+    @DisplayName("t7: 차단 관계인 사용자의 게시물에 좋아요 시도 시 403 ApiException이 발생하고 저장하지 않는다")
+    void t7() {
+        // given
+        Long postId = 1L;
+        Long userId = 1L;
+        User postOwner = User.createLocal("owner@test.com", "dummy-hash", "글쓴이");
+        ReflectionTestUtils.setField(postOwner, "id", 42L);
+        Course course = new Course("서울숲 코스", "11200", 2500);
+        Post post = new Post(postOwner, course, "오늘도 산책", "http://example.com/photo.jpg", LocalDateTime.now());
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(postLikeRepository.existsByPost_IdAndUser_Id(postId, userId)).willReturn(false);
+        given(userBlockService.isBlocked(userId, 42L)).willReturn(true);
+
+        // when
+        ApiException exception = catchThrowableOfType(() -> postLikeService.like(postId, userId), ApiException.class);
+
+        // then
+        assertThat(exception.status()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(postLikeWriter, never()).trySaveLike(any(), any());
+        verify(postRepository, never()).increaseLikeCount(any());
     }
 }

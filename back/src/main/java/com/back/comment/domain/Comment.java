@@ -26,6 +26,9 @@ public class Comment {
     private int upvoteCount;
     @Column(nullable = false)
     private boolean deleted;
+    // 신고 누적 임계치 도달 시 자동 숨김 처리된다. 댓글 목록 조회에서 제외된다.
+    @Column(nullable = false)
+    private boolean hidden;
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -45,6 +48,7 @@ public class Comment {
     public Comment getParent() { return parent; }
     public String getContent() { return content; } public int getUpvoteCount() { return upvoteCount; }
     public boolean isDeleted() { return deleted; }
+    public boolean isHidden() { return hidden; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 
     public boolean isReply() { return parent != null; }
