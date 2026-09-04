@@ -10,6 +10,8 @@ public interface GridOverlayProjection {
     BigDecimal getFlatness();
     BigDecimal getShadeSummer();
     BigDecimal getShadeWinterSun();
+    BigDecimal[] getShadeSummerHourly();
+    BigDecimal[] getShadeWinterHourly();
     BigDecimal getTrafficLow();
     BigDecimal getWheelchair();
     BigDecimal getSurfaceNatural();

@@ -74,10 +74,7 @@ const average = (values: Array<number | null>) => {
 
 const getLayerScore = (grid: GridOverlay, layer: GridLayer) => {
   if (layer === "flatness") return grid.flatness;
-  if (layer === "shade") {
-    const month = new Date().getMonth() + 1;
-    return month >= 6 && month <= 8 ? grid.shadeSummer : grid.shadeWinterSun;
-  }
+  if (layer === "shade") return grid.shadeNow;
   return average([
     grid.benchDensity,
     grid.restroomProximity,
@@ -212,9 +209,10 @@ export default function CourseScreen() {
   });
   const courses = coursesQuery.data?.content ?? [];
   const gridBbox = useMemo(() => toGridBbox(mapCenter), [mapCenter]);
+  const currentHour = useMemo(() => new Date().getHours(), []);
   const gridsQuery = useQuery({
-    queryKey: ["grid-overlays", gridBbox],
-    queryFn: () => getGridOverlays(gridBbox),
+    queryKey: ["grid-overlays", gridBbox, currentHour],
+    queryFn: () => getGridOverlays(gridBbox, currentHour),
     enabled: gridLayer !== null,
     staleTime: 60_000,
   });

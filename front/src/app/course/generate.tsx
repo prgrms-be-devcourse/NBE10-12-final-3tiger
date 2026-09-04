@@ -468,14 +468,21 @@ export default function CourseGenerateScreen() {
                 title={endPlaceName ?? "도착지"}
               />
             )}
-            {candidates.map((candidate, index) => (
-              <Polyline
-                key={index}
-                coordinates={toPolyline(candidate)}
-                strokeColor={CANDIDATE_COLORS[index] ?? "#087A3F"}
-                strokeWidth={selectedIndex === index ? 6 : 3}
-              />
-            ))}
+            {candidates.map((candidate, index) => {
+              const baseColor = CANDIDATE_COLORS[index] ?? "#087A3F";
+              const hasSelection = selectedIndex !== null;
+              const isSelected = selectedIndex === index;
+              const isDimmed = hasSelection && !isSelected;
+              return (
+                <Polyline
+                  key={index}
+                  coordinates={toPolyline(candidate)}
+                  strokeColor={isDimmed ? `${baseColor}40` : baseColor}
+                  strokeWidth={isSelected ? 7 : isDimmed ? 2 : 4}
+                  zIndex={isSelected ? 10 : 1}
+                />
+              );
+            })}
           </MapView>
           <View className="px-3 py-2">
             <Text className="text-[11px] text-[#6B756D] dark:text-[#AAB5AD]">

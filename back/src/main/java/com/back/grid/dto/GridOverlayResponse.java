@@ -10,6 +10,7 @@ public record GridOverlayResponse(
         BigDecimal flatness,
         BigDecimal shadeSummer,
         BigDecimal shadeWinterSun,
+        BigDecimal shadeNow,
         BigDecimal trafficLow,
         BigDecimal wheelchair,
         BigDecimal surfaceNatural,

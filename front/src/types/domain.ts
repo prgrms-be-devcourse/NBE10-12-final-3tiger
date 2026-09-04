@@ -194,6 +194,7 @@ export type GridOverlay = {
   flatness: number | null;
   shadeSummer: number | null;
   shadeWinterSun: number | null;
+  shadeNow: number | null;
   trafficLow: number | null;
   wheelchair: number | null;
   surfaceNatural: number | null;

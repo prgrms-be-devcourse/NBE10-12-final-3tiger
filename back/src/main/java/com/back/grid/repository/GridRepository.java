@@ -15,6 +15,8 @@ public interface GridRepository extends Repository<GridScore, Long> {
                    flatness AS flatness,
                    shade_summer AS "shadeSummer",
                    shade_winter_sun AS "shadeWinterSun",
+                   shade_summer_hourly AS "shadeSummerHourly",
+                   shade_winter_hourly AS "shadeWinterHourly",
                    traffic_low AS "trafficLow",
                    wheelchair AS wheelchair,
                    surface_natural AS "surfaceNatural",
