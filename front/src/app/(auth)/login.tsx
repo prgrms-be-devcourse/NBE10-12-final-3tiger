@@ -23,7 +23,7 @@ import { useAuthStore } from "@/stores/auth-store";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const KAKAO_BACKEND_REDIRECT_URI = "http://172.30.1.40:8080/api/v1/auth/kakao/callback";
+const KAKAO_BACKEND_REDIRECT_URI = "http://3.38.196.152:8080/api/v1/auth/kakao/callback";
 const GOOGLE_REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: "front" });
 
 export default function LoginScreen() {
