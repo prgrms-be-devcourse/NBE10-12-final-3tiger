@@ -19,23 +19,30 @@ import {
 } from "@/components/ui/bottom-sheet-handle";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
+import { ReportModal } from "@/components/report/report-modal";
+import { BlockUserDialog } from "@/components/user/block-user-dialog";
+import { useBlockedUserIds } from "@/hooks/use-blocked-users";
 
 const SHEET_TOP_PADDING = 10;
 const HANDLE_HEIGHT = 32;
 const TITLE_HEIGHT = 40;
 const MENU_ROW_HEIGHT = 56;
-const DIVIDER_HEIGHT = 1;
 const MIN_BOTTOM_PADDING = 16;
 
 export function PostMenuSheet({
   postId,
   open,
   canDelete,
+  authorUserId,
+  authorNickname,
   onClose,
 }: {
   postId: number;
   open: boolean;
   canDelete: boolean;
+  /** 작성자 id. 없으면(목록에 내려오지 않으면) 사용자 신고/차단 메뉴를 숨긴다. */
+  authorUserId?: number;
+  authorNickname?: string;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -43,15 +50,21 @@ export function PostMenuSheet({
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(windowHeight)).current;
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const menuItemCount = canDelete ? 2 : 1;
-  const dividerCount = canDelete ? 1 : 0;
+  const [reportTarget, setReportTarget] = useState<"POST" | "USER" | null>(null);
+  const [blockOpen, setBlockOpen] = useState(false);
+  const { isBlocked } = useBlockedUserIds();
+  const blocked = isBlocked(authorUserId);
+  const nickname = authorNickname ?? "이 사용자";
+  const canActOnUser = !canDelete && authorUserId != null;
+
+  // 1행: 삭제(내 글) 또는 게시물 신고(남의 글) + 남의 글이면 사용자 신고·차단 2행
+  const menuRowCount = 1 + (canActOnUser ? 2 : 0);
   const bottomPadding = Math.max(insets.bottom, MIN_BOTTOM_PADDING);
   const sheetHeight =
     SHEET_TOP_PADDING +
     HANDLE_HEIGHT +
     TITLE_HEIGHT +
-    MENU_ROW_HEIGHT * menuItemCount +
-    DIVIDER_HEIGHT * dividerCount +
+    MENU_ROW_HEIGHT * menuRowCount +
     bottomPadding;
 
   useEffect(() => {
@@ -115,7 +128,8 @@ export function PostMenuSheet({
                 게시물 메뉴
               </Text>
             </View>
-            {canDelete && (
+
+            {canDelete ? (
               <Button
                 variant="ghost"
                 className="h-14 justify-start rounded-none px-5"
@@ -126,18 +140,47 @@ export function PostMenuSheet({
                   삭제
                 </Text>
               </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                className="h-14 justify-start rounded-none px-5"
+                onPress={() => dismiss(() => setReportTarget("POST"))}
+              >
+                <Ionicons name="flag-outline" size={20} color="#33443A" />
+                <Text className="text-[15px] font-semibold text-[#33443A] dark:text-[#D4DDD6]">
+                  게시물 신고
+                </Text>
+              </Button>
             )}
-            {canDelete && <View className="h-px bg-[#EEF1EE]" />}
-            <Button
-              variant="ghost"
-              className="h-14 justify-start rounded-none px-5"
-              onPress={() => dismiss()}
-            >
-              <Ionicons name="flag-outline" size={20} color="#33443A" />
-              <Text className="text-[15px] font-semibold text-[#33443A] dark:text-[#D4DDD6]">
-                신고
-              </Text>
-            </Button>
+
+            {canActOnUser && (
+              <>
+                <Button
+                  variant="ghost"
+                  className="h-14 justify-start rounded-none px-5"
+                  onPress={() => dismiss(() => setReportTarget("USER"))}
+                >
+                  <Ionicons
+                    name="person-remove-outline"
+                    size={20}
+                    color="#33443A"
+                  />
+                  <Text className="text-[15px] font-semibold text-[#33443A] dark:text-[#D4DDD6]">
+                    이 사용자 신고
+                  </Text>
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="h-14 justify-start rounded-none px-5"
+                  onPress={() => dismiss(() => setBlockOpen(true))}
+                >
+                  <Ionicons name="ban-outline" size={20} color="#DC2626" />
+                  <Text className="text-[15px] font-semibold text-[#DC2626]">
+                    {blocked ? "차단 해제" : "차단하기"}
+                  </Text>
+                </Button>
+              </>
+            )}
           </Animated.View>
         </View>
       </Modal>
@@ -194,6 +237,30 @@ export function PostMenuSheet({
           </View>
         </View>
       </Modal>
+
+      <ReportModal
+        open={reportTarget === "POST"}
+        targetType="POST"
+        targetId={postId}
+        onClose={() => setReportTarget(null)}
+      />
+      {authorUserId != null && (
+        <>
+          <ReportModal
+            open={reportTarget === "USER"}
+            targetType="USER"
+            targetId={authorUserId}
+            onClose={() => setReportTarget(null)}
+          />
+          <BlockUserDialog
+            open={blockOpen}
+            userId={authorUserId}
+            nickname={nickname}
+            blocked={blocked}
+            onClose={() => setBlockOpen(false)}
+          />
+        </>
+      )}
     </>
   );
 }

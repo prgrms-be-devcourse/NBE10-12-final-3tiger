@@ -13,6 +13,7 @@ import com.back.post.repository.PostRepository;
 import com.back.post.storage.PhotoStorage;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import com.back.userblock.service.UserBlockService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,6 +53,7 @@ class PostServiceTest {
     @Mock CommentRepository comments;
     @Mock CommentUpvoteRepository commentUpvotes;
     @Mock PhotoStorage storage;
+    @Mock UserBlockService userBlockService;
     @InjectMocks PostService postService;
 
     private User user(Long id) {
@@ -147,7 +149,7 @@ class PostServiceTest {
         Post post = post(10L, author, course(1L));
         post.increaseLikeCount();
         var commentCount = commentCount(10L, 3L);
-        given(posts.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of(post)));
+        given(posts.findFeed(any(), any(Pageable.class))).willReturn(new PageImpl<>(List.of(post)));
         given(postLikes.findLikedPostIds(eq(1L), any())).willReturn(List.of(10L));
         given(bookmarks.findBookmarkedCourseIds(1L, List.of(1L))).willReturn(Set.of(1L));
         given(comments.countByPostIds(any())).willReturn(List.of(commentCount));
@@ -168,7 +170,7 @@ class PostServiceTest {
     @DisplayName("비로그인 피드에서는 좋아요 조회 없이 isLiked=false를 반환한다")
     void anonymousFeed() {
         Post post = post(10L, user(2L), course(1L));
-        given(posts.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of(post)));
+        given(posts.findFeed(any(), any(Pageable.class))).willReturn(new PageImpl<>(List.of(post)));
 
         PostService.FeedItem item = postService.feed(null, "latest", 0, 20, null).content().getFirst();
 
@@ -182,13 +184,13 @@ class PostServiceTest {
     @DisplayName("검색어가 있으면 제목 부분 검색에 최신순 정렬과 페이징을 적용한다")
     void searchesTitleWithLatestSortAndPaging() {
         Post post = post(10L, user(2L), course(1L));
-        given(posts.findByTitleContainingIgnoreCase(eq("테스트"), any(Pageable.class)))
+        given(posts.searchFeed(eq("테스트"), any(), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(post)));
 
         postService.feed(null, "latest", 2, 10, "테스트");
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(posts).findByTitleContainingIgnoreCase(eq("테스트"), pageableCaptor.capture());
+        verify(posts).searchFeed(eq("테스트"), any(), pageableCaptor.capture());
         Pageable pageable = pageableCaptor.getValue();
         assertThat(pageable.getPageNumber()).isEqualTo(2);
         assertThat(pageable.getPageSize()).isEqualTo(10);
@@ -200,13 +202,13 @@ class PostServiceTest {
     @DisplayName("검색어가 있으면 제목 부분 검색에 좋아요순 정렬과 페이징을 적용한다")
     void searchesTitleWithPopularitySortAndPaging() {
         Post post = post(10L, user(2L), course(1L));
-        given(posts.findByTitleContainingIgnoreCase(eq("테스트"), any(Pageable.class)))
+        given(posts.searchFeed(eq("테스트"), any(), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(post)));
 
         postService.feed(null, "popularity", 1, 5, "테스트");
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(posts).findByTitleContainingIgnoreCase(eq("테스트"), pageableCaptor.capture());
+        verify(posts).searchFeed(eq("테스트"), any(), pageableCaptor.capture());
         Pageable pageable = pageableCaptor.getValue();
         assertThat(pageable.getPageNumber()).isEqualTo(1);
         assertThat(pageable.getPageSize()).isEqualTo(5);
@@ -218,14 +220,14 @@ class PostServiceTest {
     @Test
     @DisplayName("검색어가 null이거나 공백이면 기존 전체 피드를 조회한다")
     void blankKeywordUsesExistingFeedQuery() {
-        given(posts.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of()));
+        given(posts.findFeed(any(), any(Pageable.class))).willReturn(new PageImpl<>(List.of()));
 
         postService.feed(null, "latest", 0, 20, null);
         postService.feed(null, "latest", 0, 20, "");
         postService.feed(null, "latest", 0, 20, "   ");
 
-        verify(posts, org.mockito.Mockito.times(3)).findAll(any(Pageable.class));
-        verify(posts, never()).findByTitleContainingIgnoreCase(any(), any(Pageable.class));
+        verify(posts, org.mockito.Mockito.times(3)).findFeed(any(), any(Pageable.class));
+        verify(posts, never()).searchFeed(any(), any(), any(Pageable.class));
     }
 
     @Test

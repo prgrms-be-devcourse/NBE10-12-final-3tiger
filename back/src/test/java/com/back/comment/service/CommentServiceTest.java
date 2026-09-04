@@ -12,6 +12,7 @@ import com.back.post.domain.Post;
 import com.back.post.repository.PostRepository;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import com.back.userblock.service.UserBlockService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,12 +25,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
@@ -55,6 +58,8 @@ class CommentServiceTest {
     private CommentUpvoteWriter commentUpvoteWriter;
     @Mock
     private ApplicationEventPublisher eventPublisher;
+    @Mock
+    private UserBlockService userBlockService;
 
     @InjectMocks
     private CommentService commentService;
@@ -128,9 +133,9 @@ class CommentServiceTest {
         Comment comment = new Comment(post, user, "좋은 코스네요");
         ReflectionTestUtils.setField(comment, "id", 10L);
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
+        given(commentRepository.findVisibleParents(eq(postId), any(), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(comment)));
-        given(commentRepository.findByParent_IdInOrderByCreatedAtAsc(List.of(10L)))
+        given(commentRepository.findVisibleReplies(eq(List.of(10L)), any()))
                 .willReturn(List.of());
 
         // when
@@ -363,9 +368,9 @@ class CommentServiceTest {
         Comment notUpvoted = new Comment(post, author, "공감 안 한 댓글");
         ReflectionTestUtils.setField(notUpvoted, "id", 20L);
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
+        given(commentRepository.findVisibleParents(eq(postId), any(), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(upvoted, notUpvoted)));
-        given(commentRepository.findByParent_IdInOrderByCreatedAtAsc(List.of(10L, 20L)))
+        given(commentRepository.findVisibleReplies(eq(List.of(10L, 20L)), any()))
                 .willReturn(List.of());
         given(commentUpvoteRepository.findUpvotedCommentIds(userId, List.of(10L, 20L)))
                 .willReturn(List.of(10L));
@@ -393,9 +398,9 @@ class CommentServiceTest {
         Comment c2 = new Comment(post, author, "댓글2");
         ReflectionTestUtils.setField(c2, "id", 20L);
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
+        given(commentRepository.findVisibleParents(eq(postId), any(), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(c1, c2)));
-        given(commentRepository.findByParent_IdInOrderByCreatedAtAsc(List.of(10L, 20L)))
+        given(commentRepository.findVisibleReplies(eq(List.of(10L, 20L)), any()))
                 .willReturn(List.of());
 
         // when
@@ -575,9 +580,9 @@ class CommentServiceTest {
         Comment reply = new Comment(post, replier, "답글 내용", parent);
         ReflectionTestUtils.setField(reply, "id", 11L);
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
+        given(commentRepository.findVisibleParents(eq(postId), any(), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(parent)));
-        given(commentRepository.findByParent_IdInOrderByCreatedAtAsc(List.of(10L)))
+        given(commentRepository.findVisibleReplies(eq(List.of(10L)), any()))
                 .willReturn(List.of(reply));
         given(commentUpvoteRepository.findUpvotedCommentIds(userId, List.of(10L, 11L)))
                 .willReturn(List.of(11L));
@@ -600,7 +605,7 @@ class CommentServiceTest {
     }
 
     @Test
-    @DisplayName("t22: sort=upvote면 공감순 조회 메서드를 호출하고, 답글은 기존 createdAt ASC 조회를 그대로 사용한다")
+    @DisplayName("t22: sort=upvote면 공감순(upvoteCount DESC, createdAt DESC) 정렬로 원댓글을 조회하고, 답글은 createdAt ASC 조회를 그대로 사용한다")
     void t22() {
         // given
         Long postId = 1L;
@@ -609,9 +614,9 @@ class CommentServiceTest {
         Comment top = new Comment(post, author, "공감 많은 댓글");
         ReflectionTestUtils.setField(top, "id", 10L);
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findByPost_IdAndParentIsNullOrderByUpvoteCountDescCreatedAtDesc(eq(postId), any(Pageable.class)))
+        given(commentRepository.findVisibleParents(eq(postId), any(), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of(top)));
-        given(commentRepository.findByParent_IdInOrderByCreatedAtAsc(List.of(10L)))
+        given(commentRepository.findVisibleReplies(eq(List.of(10L)), any()))
                 .willReturn(List.of());
 
         // when
@@ -619,19 +624,22 @@ class CommentServiceTest {
 
         // then
         assertThat(response.content()).hasSize(1);
-        verify(commentRepository).findByPost_IdAndParentIsNullOrderByUpvoteCountDescCreatedAtDesc(eq(postId), any(Pageable.class));
-        verify(commentRepository, never()).findByPost_IdAndParentIsNullOrderByCreatedAtDesc(any(), any());
-        verify(commentRepository).findByParent_IdInOrderByCreatedAtAsc(List.of(10L));
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(commentRepository).findVisibleParents(eq(postId), any(), pageableCaptor.capture());
+        Sort sort = pageableCaptor.getValue().getSort();
+        assertThat(sort.getOrderFor("upvoteCount").getDirection()).isEqualTo(Sort.Direction.DESC);
+        assertThat(sort.getOrderFor("createdAt").getDirection()).isEqualTo(Sort.Direction.DESC);
+        verify(commentRepository).findVisibleReplies(eq(List.of(10L)), any());
     }
 
     @Test
-    @DisplayName("t23: 알 수 없는 sort 값이면 예외 없이 최신순(createdAt DESC) 조회로 폴백한다")
+    @DisplayName("t23: 알 수 없는 sort 값이면 예외 없이 최신순(createdAt DESC) 정렬로 폴백한다")
     void t23() {
         // given
         Long postId = 1L;
         Post post = newPost();
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(commentRepository.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class)))
+        given(commentRepository.findVisibleParents(eq(postId), any(), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of()));
 
         // when
@@ -639,7 +647,52 @@ class CommentServiceTest {
 
         // then
         assertThat(response.content()).isEmpty();
-        verify(commentRepository).findByPost_IdAndParentIsNullOrderByCreatedAtDesc(eq(postId), any(Pageable.class));
-        verify(commentRepository, never()).findByPost_IdAndParentIsNullOrderByUpvoteCountDescCreatedAtDesc(any(), any());
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(commentRepository).findVisibleParents(eq(postId), any(), pageableCaptor.capture());
+        Sort sort = pageableCaptor.getValue().getSort();
+        assertThat(sort.getOrderFor("upvoteCount")).isNull();
+        assertThat(sort.getOrderFor("createdAt").getDirection()).isEqualTo(Sort.Direction.DESC);
+    }
+
+    @Test
+    @DisplayName("t24: 차단 관계인 사용자의 게시글에는 댓글을 작성할 수 없다 (403)")
+    void t24() {
+        // given
+        Long postId = 1L;
+        Long userId = 1L;
+        User postAuthor = User.createLocal("author@test.com", "dummy-hash", "글쓴이");
+        ReflectionTestUtils.setField(postAuthor, "id", 42L);
+        Post post = new Post(postAuthor, new Course("서울숲 코스", "11200", 2500), "오늘도 산책",
+                "http://example.com/photo.jpg", LocalDateTime.now());
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(userBlockService.isBlocked(userId, 42L)).willReturn(true);
+
+        // when
+        ApiException exception = catchThrowableOfType(
+                () -> commentService.createComment(postId, userId, "내용"), ApiException.class);
+
+        // then
+        assertThat(exception.status()).isEqualTo(HttpStatus.FORBIDDEN);
+        verify(commentRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
+    @Test
+    @DisplayName("t25: 목록 조회 시 차단 관계 사용자 id 집합을 제외 대상으로 전달한다")
+    void t25() {
+        // given
+        Long postId = 1L;
+        Long userId = 7L;
+        Post post = newPost();
+        given(postRepository.findById(postId)).willReturn(Optional.of(post));
+        given(userBlockService.relatedUserIds(userId)).willReturn(Set.of(99L));
+        given(commentRepository.findVisibleParents(eq(postId), eq(Set.of(99L)), any(Pageable.class)))
+                .willReturn(new PageImpl<>(List.of()));
+
+        // when
+        commentService.getComments(postId, userId, "latest", PageRequest.of(0, 20));
+
+        // then
+        verify(commentRepository).findVisibleParents(eq(postId), eq(Set.of(99L)), any(Pageable.class));
     }
 }

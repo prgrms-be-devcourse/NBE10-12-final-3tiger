@@ -11,6 +11,7 @@ import com.back.post.repository.PostLikeRepository;
 import com.back.post.repository.PostRepository;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import com.back.userblock.service.UserBlockService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
@@ -32,12 +33,15 @@ public class PostLikeService {
     private final CommentRepository comments; private final PostLikeWriter postLikeWriter;
     private final BookmarkRepository bookmarks;
     private final ApplicationEventPublisher eventPublisher;
+    private final UserBlockService userBlockService;
     public PostLikeService(PostRepository posts, UserRepository users, PostLikeRepository postLikes,
                            CommentRepository comments, PostLikeWriter postLikeWriter,
-                           ApplicationEventPublisher eventPublisher, BookmarkRepository bookmarks) {
+                           ApplicationEventPublisher eventPublisher, BookmarkRepository bookmarks,
+                           UserBlockService userBlockService) {
         this.posts = posts; this.users = users; this.postLikes = postLikes; this.comments = comments;
         this.postLikeWriter = postLikeWriter; this.eventPublisher = eventPublisher;
         this.bookmarks = bookmarks;
+        this.userBlockService = userBlockService;
     }
 
     @Transactional
@@ -48,6 +52,9 @@ public class PostLikeService {
             return new LikeResult(true, post.getLikeCount());
         }
 
+        if (userBlockService.isBlocked(userId, post.getUser().getId())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "차단한 사용자의 게시글에는 좋아요를 누를 수 없습니다.");
+        }
         User user = getUserByIdOrThrow(userId);
         try {
             postLikeWriter.trySaveLike(post, user);

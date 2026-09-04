@@ -147,6 +147,26 @@ export default function SettingsScreen() {
             {saveMutation.isPending ? "저장 중..." : "변경 사항 저장"}
           </Text>
         </Button>
+
+        <Text className="mb-2 mt-8 text-sm font-extrabold text-slate-900 dark:text-[#F1F5F2]">
+          개인정보 보호
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="차단한 사용자 관리"
+          className="h-14 flex-row items-center gap-3 rounded-xl border border-[#BCCBB9] px-[15px] dark:border-[#475249] dark:bg-[#1B211D]"
+          onPress={() => router.push("/settings/blocked-users" as never)}
+        >
+          <Ionicons
+            name="ban-outline"
+            size={20}
+            color={isDark ? "#F1F5F2" : "#33443A"}
+          />
+          <Text className="flex-1 text-[15px] font-semibold text-[#191C1D] dark:text-[#F1F5F2]">
+            차단한 사용자
+          </Text>
+          <Ionicons name="chevron-forward" size={20} color="#64748B" />
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );

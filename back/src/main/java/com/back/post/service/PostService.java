@@ -13,12 +13,14 @@ import com.back.post.repository.PostLikeRepository;
 import com.back.post.storage.PhotoStorage;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import com.back.userblock.service.UserBlockService;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -31,23 +33,29 @@ public class PostService {
     private final PostLikeRepository postLikes; private final CommentRepository comments;
     private final BookmarkRepository bookmarks;
     private final CommentUpvoteRepository commentUpvotes; private final PhotoStorage storage;
+    private final UserBlockService userBlockService;
     public PostService(PostRepository posts, UserRepository users, CourseRepository courses,
                        PostLikeRepository postLikes, CommentRepository comments,
                        CommentUpvoteRepository commentUpvotes, PhotoStorage storage,
-                       BookmarkRepository bookmarks) {
+                       BookmarkRepository bookmarks, UserBlockService userBlockService) {
         this.posts = posts; this.users = users; this.courses = courses;
         this.postLikes = postLikes; this.comments = comments;
         this.commentUpvotes = commentUpvotes; this.storage = storage;
         this.bookmarks = bookmarks;
+        this.userBlockService = userBlockService;
     }
+
+    // 빈 in 절을 만들지 않기 위한 sentinel (user id 는 항상 양수)
+    private static final long NO_SUCH_USER_ID = -1L;
     public PageResponse<FeedItem> feed(Long userId, String sort, int page, int size, String keyword) {
         Sort sorting = "popularity".equalsIgnoreCase(sort)
                 ? Sort.by(Sort.Direction.DESC, "likeCount", "createdAt", "id")
                 : Sort.by(Sort.Direction.DESC, "createdAt", "id");
         Pageable pageable = PageRequest.of(page, size, sorting);
+        Collection<Long> excludedUserIds = excludedUserIds(userId);
         Page<Post> found = StringUtils.hasText(keyword)
-                ? posts.findByTitleContainingIgnoreCase(keyword.trim(), pageable)
-                : posts.findAll(pageable);
+                ? posts.searchFeed(keyword.trim(), excludedUserIds, pageable)
+                : posts.findFeed(excludedUserIds, pageable);
         List<Long> postIds = postIds(found);
         Map<Long, Long> commentCounts = commentCounts(postIds);
         Set<Long> likedPostIds = userId == null || postIds.isEmpty()
@@ -105,6 +113,17 @@ public class PostService {
     }
     private Course getCourseByIdOrThrow(Long id) {
         return courses.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 코스입니다."));
+    }
+    // 비로그인이면 차단 관계가 없다. 결과가 비면 sentinel 을 넣어 빈 in 절을 피한다.
+    private Collection<Long> excludedUserIds(Long userId) {
+        if (userId == null) {
+            return List.of(NO_SUCH_USER_ID);
+        }
+        Set<Long> blocked = userBlockService.relatedUserIds(userId);
+        if (blocked.isEmpty()) {
+            return List.of(NO_SUCH_USER_ID);
+        }
+        return blocked;
     }
     private List<Long> postIds(Page<Post> found) {
         return found.getContent().stream().map(Post::getId).toList();

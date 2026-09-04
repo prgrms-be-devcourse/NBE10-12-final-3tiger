@@ -11,15 +11,19 @@ import com.back.post.domain.Post;
 import com.back.post.repository.PostRepository;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import com.back.userblock.service.UserBlockService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,24 +37,32 @@ public class CommentService {
     private final PostRepository posts; private final UserRepository users;
     private final CommentUpvoteWriter commentUpvoteWriter;
     private final ApplicationEventPublisher eventPublisher;
+    private final UserBlockService userBlockService;
     public CommentService(CommentRepository comments, CommentUpvoteRepository commentUpvotes, PostRepository posts,
                           UserRepository users, CommentUpvoteWriter commentUpvoteWriter,
-                          ApplicationEventPublisher eventPublisher) {
+                          ApplicationEventPublisher eventPublisher, UserBlockService userBlockService) {
         this.comments = comments; this.commentUpvotes = commentUpvotes; this.posts = posts; this.users = users;
         this.commentUpvoteWriter = commentUpvoteWriter;
         this.eventPublisher = eventPublisher;
+        this.userBlockService = userBlockService;
     }
+
+    // 빈 in 절을 만들지 않기 위한 sentinel (user id 는 항상 양수)
+    private static final long NO_SUCH_USER_ID = -1L;
 
     public PageResponse<CommentResponse> getComments(Long postId, Long userId, String sort, Pageable pageable) {
         getPostByIdOrThrow(postId);
+        Collection<Long> excludedUserIds = excludedUserIds(userId);
         // 원댓글만 sort 로 분기 (잘못된 값은 latest 로 폴백). 답글은 항상 createdAt ASC 유지
-        Page<Comment> parents = "upvote".equalsIgnoreCase(sort)
-                ? comments.findByPost_IdAndParentIsNullOrderByUpvoteCountDescCreatedAtDesc(postId, pageable)
-                : comments.findByPost_IdAndParentIsNullOrderByCreatedAtDesc(postId, pageable);
+        Sort sorting = "upvote".equalsIgnoreCase(sort)
+                ? Sort.by(Sort.Order.desc("upvoteCount"), Sort.Order.desc("createdAt"))
+                : Sort.by(Sort.Order.desc("createdAt"));
+        Page<Comment> parents = comments.findVisibleParents(postId, excludedUserIds,
+                PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sorting));
         List<Long> parentIds = parents.getContent().stream().map(Comment::getId).toList();
         List<Comment> replies = parentIds.isEmpty()
                 ? List.of()
-                : comments.findByParent_IdInOrderByCreatedAtAsc(parentIds);
+                : comments.findVisibleReplies(parentIds, excludedUserIds);
 
         List<Long> allCommentIds = Stream.concat(parentIds.stream(), replies.stream().map(Comment::getId)).toList();
         Set<Long> upvotedCommentIds = userId == null || allCommentIds.isEmpty()
@@ -67,6 +79,9 @@ public class CommentService {
     @Transactional
     public Long createComment(Long postId, Long userId, String content) {
         Post post = getPostByIdOrThrow(postId);
+        if (userBlockService.isBlocked(userId, post.getUser().getId())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "차단한 사용자의 게시글에는 댓글을 작성할 수 없습니다.");
+        }
         User user = getUserByIdOrThrow(userId);
         Comment comment = comments.save(new Comment(post, user, content));
         eventPublisher.publishEvent(new CommentCreatedEvent(post.getUser().getId(), userId, user.getNickname(),
@@ -79,6 +94,9 @@ public class CommentService {
         Comment parent = getCommentByIdOrThrow(parentCommentId);
         if (parent.isReply()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "답글에는 답글을 달 수 없습니다.");
+        }
+        if (userBlockService.isBlocked(userId, parent.getUser().getId())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "차단한 사용자의 댓글에는 답글을 작성할 수 없습니다.");
         }
         User user = getUserByIdOrThrow(userId);
         Comment reply = comments.save(new Comment(parent.getPost(), user, content, parent));
@@ -103,6 +121,9 @@ public class CommentService {
             return new UpvoteResult(false, Math.max(comment.getUpvoteCount() - 1, 0));
         }
 
+        if (userBlockService.isBlocked(userId, comment.getUser().getId())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "차단한 사용자의 댓글에는 공감할 수 없습니다.");
+        }
         User user = getUserByIdOrThrow(userId);
         try {
             commentUpvoteWriter.trySaveUpvote(comment, user);
@@ -136,6 +157,18 @@ public class CommentService {
             return;
         }
         comments.delete(comment);
+    }
+
+    // 비로그인이면 차단 관계가 없다. 결과가 비면 sentinel 을 넣어 빈 in 절을 피한다.
+    private Collection<Long> excludedUserIds(Long userId) {
+        if (userId == null) {
+            return List.of(NO_SUCH_USER_ID);
+        }
+        Set<Long> blocked = userBlockService.relatedUserIds(userId);
+        if (blocked.isEmpty()) {
+            return List.of(NO_SUCH_USER_ID);
+        }
+        return blocked;
     }
 
     private Post getPostByIdOrThrow(Long id) {

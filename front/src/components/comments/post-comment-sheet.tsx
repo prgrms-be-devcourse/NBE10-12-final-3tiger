@@ -9,6 +9,7 @@ import {
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   FlatList,
   KeyboardAvoidingView,
@@ -42,8 +43,12 @@ import {
   dismissBottomSheet,
 } from "@/components/ui/bottom-sheet-handle";
 import { LIKED_COLOR } from "@/components/feed/post-actions";
+import { ReportModal } from "@/components/report/report-modal";
+import { BlockUserDialog } from "@/components/user/block-user-dialog";
+import { useBlockedUserIds } from "@/hooks/use-blocked-users";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
+import { ApiError } from "@/types/api";
 import type { PostComment } from "@/types/domain";
 
 const COMMENT_SORTS: Array<{ key: "latest" | "upvote"; label: string }> = [
@@ -73,6 +78,10 @@ function CommentRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ left: 20, top: 0 });
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [reportKind, setReportKind] = useState<"COMMENT" | "USER" | null>(null);
+  const [blockOpen, setBlockOpen] = useState(false);
+  const { isBlocked } = useBlockedUserIds();
+  const blocked = isBlocked(item.userId);
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyContent, setReplyContent] = useState("");
   const [repliesExpanded, setRepliesExpanded] = useState(
@@ -90,6 +99,12 @@ function CommentRow({
   const burst = useRef(new Animated.Value(0)).current;
   const mutation = useMutation({
     mutationFn: () => toggleCommentUpvote(item.commentId),
+    onError: (error) => {
+      // 차단 관계면 공감 등록 시 403.
+      if (error instanceof ApiError && error.status === 403) {
+        Alert.alert("알림", error.message);
+      }
+    },
     onSuccess: (result) => {
       setUpvoted(result.upvoted);
       setUpvoteCount(result.upvoteCount);
@@ -157,6 +172,11 @@ function CommentRow({
   });
   const replyMutation = useMutation({
     mutationFn: () => addCommentReply(item.commentId, replyContent.trim()),
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 403) {
+        Alert.alert("알림", error.message);
+      }
+    },
     onSuccess: async () => {
       setReplyContent("");
       setReplyOpen(false);
@@ -403,34 +423,71 @@ function CommentRow({
           />
           <View
             accessibilityRole="menu"
-            className="absolute w-[148px] overflow-hidden rounded-xl border border-[#DDE5DA] bg-white shadow-lg dark:border-[#343D36] dark:bg-[#242B26]"
+            className="absolute w-[168px] overflow-hidden rounded-xl border border-[#DDE5DA] bg-white shadow-lg dark:border-[#343D36] dark:bg-[#242B26]"
             style={menuPosition}
           >
-            <Button
-              variant="ghost"
-              accessibilityLabel="댓글 신고"
-              className="h-12 justify-start rounded-none px-4"
-              onPress={() => {}}
-            >
-              <Ionicons name="flag-outline" size={18} color="#526056" />
-              <Text className="text-sm font-bold text-[#33443A] dark:text-[#D4DDD6]">
-                신고
-              </Text>
-            </Button>
-            {canDelete && (
+            {canDelete ? (
+              <Button
+                variant="ghost"
+                accessibilityLabel="댓글 삭제"
+                className="h-12 justify-start rounded-none px-4"
+                onPress={() => {
+                  setMenuOpen(false);
+                  setDeleteConfirmOpen(true);
+                }}
+              >
+                <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                <Text className="text-sm font-bold text-[#DC2626]">삭제</Text>
+              </Button>
+            ) : (
               <>
-                <View className="mx-3 h-px bg-[#EEF1EE] dark:bg-[#343D36]" />
                 <Button
                   variant="ghost"
-                  accessibilityLabel="댓글 삭제"
+                  accessibilityLabel="댓글 신고"
                   className="h-12 justify-start rounded-none px-4"
                   onPress={() => {
                     setMenuOpen(false);
-                    setDeleteConfirmOpen(true);
+                    setReportKind("COMMENT");
                   }}
                 >
-                  <Ionicons name="trash-outline" size={18} color="#DC2626" />
-                  <Text className="text-sm font-bold text-[#DC2626]">삭제</Text>
+                  <Ionicons name="flag-outline" size={18} color="#526056" />
+                  <Text className="text-sm font-bold text-[#33443A] dark:text-[#D4DDD6]">
+                    댓글 신고
+                  </Text>
+                </Button>
+                <View className="mx-3 h-px bg-[#EEF1EE] dark:bg-[#343D36]" />
+                <Button
+                  variant="ghost"
+                  accessibilityLabel="작성자 신고"
+                  className="h-12 justify-start rounded-none px-4"
+                  onPress={() => {
+                    setMenuOpen(false);
+                    setReportKind("USER");
+                  }}
+                >
+                  <Ionicons
+                    name="person-remove-outline"
+                    size={18}
+                    color="#526056"
+                  />
+                  <Text className="text-sm font-bold text-[#33443A] dark:text-[#D4DDD6]">
+                    작성자 신고
+                  </Text>
+                </Button>
+                <View className="mx-3 h-px bg-[#EEF1EE] dark:bg-[#343D36]" />
+                <Button
+                  variant="ghost"
+                  accessibilityLabel={blocked ? "차단 해제" : "차단하기"}
+                  className="h-12 justify-start rounded-none px-4"
+                  onPress={() => {
+                    setMenuOpen(false);
+                    setBlockOpen(true);
+                  }}
+                >
+                  <Ionicons name="ban-outline" size={18} color="#DC2626" />
+                  <Text className="text-sm font-bold text-[#DC2626]">
+                    {blocked ? "차단 해제" : "차단하기"}
+                  </Text>
                 </Button>
               </>
             )}
@@ -490,6 +547,26 @@ function CommentRow({
           </View>
         </View>
       </Modal>
+
+      <ReportModal
+        open={reportKind === "COMMENT"}
+        targetType="COMMENT"
+        targetId={item.commentId}
+        onClose={() => setReportKind(null)}
+      />
+      <ReportModal
+        open={reportKind === "USER"}
+        targetType="USER"
+        targetId={item.userId}
+        onClose={() => setReportKind(null)}
+      />
+      <BlockUserDialog
+        open={blockOpen}
+        userId={item.userId}
+        nickname={item.nickname}
+        blocked={blocked}
+        onClose={() => setBlockOpen(false)}
+      />
     </View>
   );
 }
@@ -542,6 +619,12 @@ export function PostCommentSheet({
     commentsQuery.data?.pages.flatMap((page) => page.content) ?? [];
   const createMutation = useMutation({
     mutationFn: () => addPostComment(numericPostId!, content.trim()),
+    onError: (error) => {
+      // 차단 관계면 댓글 작성 시 403.
+      if (error instanceof ApiError && error.status === 403) {
+        Alert.alert("알림", error.message);
+      }
+    },
     onSuccess: async () => {
       setContent("");
       await Promise.all([
