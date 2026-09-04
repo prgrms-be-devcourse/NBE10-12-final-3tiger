@@ -41,7 +41,7 @@ public class HazardController {
     }
 
     @PostMapping("/courses/{courseId}/hazards")
-    @Operation(summary = "첫 코스 위험 신고 등록")
+    @Operation(summary = "코스 위험 신고 등록")
     ApiResponse<HazardCreateResponse> create(
             @CurrentUserId Long userId,
             @PathVariable Long courseId,

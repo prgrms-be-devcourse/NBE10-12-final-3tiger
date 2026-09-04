@@ -12,6 +12,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
@@ -52,5 +54,62 @@ class WalkEdgeCandidateRepositoryIntegrationTest {
         assertThat(nearFirst.getFirst().edgeId()).isEqualTo(101L);
         assertThat(nearSecond.getFirst().edgeId()).isEqualTo(102L);
         assertThat(nearFirst.getFirst().distanceM()).isNotEqualTo(nearSecond.getFirst().distanceM());
+    }
+
+    @Test
+    @DisplayName("같은 도로 구간에 가까운 두 GPS는 현재 데이터에서 같은 edge를 선택한다")
+    void selectsSameEdgeForNearbyPointsOnSameRoad() {
+        var first = repository.findNearest(37.5001, 126.8004, 1);
+        var second = repository.findNearest(37.5001, 126.8006, 1);
+
+        assertThat(first.getFirst().edgeId()).isEqualTo(101L);
+        assertThat(second.getFirst().edgeId()).isEqualTo(101L);
+    }
+
+    @Test
+    @DisplayName("두 GPS가 shared vertex 5m 이내인지 5179 좌표계의 meter 거리로 확인한다")
+    void checksBothGpsDistancesFromSharedVertex() {
+        boolean withinFiveMeters = repository.areBothPointsWithinDistanceOfAnyVertex(
+                List.of(1002L),
+                37.5000, 126.80098,
+                37.50002, 126.8010,
+                5.0
+        );
+        boolean onePointOutside = repository.areBothPointsWithinDistanceOfAnyVertex(
+                List.of(1002L),
+                37.5000, 126.80090,
+                37.50002, 126.8010,
+                5.0
+        );
+        boolean otherPointOutside = repository.areBothPointsWithinDistanceOfAnyVertex(
+                List.of(1002L),
+                37.5000, 126.80098,
+                37.50010, 126.8010,
+                5.0
+        );
+        boolean bothPointsOutside = repository.areBothPointsWithinDistanceOfAnyVertex(
+                List.of(1002L),
+                37.5000, 126.80090,
+                37.50010, 126.8010,
+                5.0
+        );
+
+        assertThat(withinFiveMeters).isTrue();
+        assertThat(onePointOutside).isFalse();
+        assertThat(otherPointOutside).isFalse();
+        assertThat(bothPointsOutside).isFalse();
+    }
+
+    @Test
+    @DisplayName("공유 vertex 후보가 둘이면 어느 하나가 두 GPS 모두 5m 이내일 때 참이다")
+    void checksAnyOfMultipleSharedVertices() {
+        boolean result = repository.areBothPointsWithinDistanceOfAnyVertex(
+                List.of(1001L, 1002L),
+                37.5000, 126.80098,
+                37.50002, 126.8010,
+                5.0
+        );
+
+        assertThat(result).isTrue();
     }
 }
