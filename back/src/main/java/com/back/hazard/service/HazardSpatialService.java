@@ -24,4 +24,22 @@ public class HazardSpatialService {
     ) {
         return walkEdgeCandidateRepository.findNearest(latitude, longitude, limit);
     }
+
+    public boolean areBothPointsWithinDistanceOfAnyVertex(
+            List<Long> vertexIds,
+            double firstLatitude,
+            double firstLongitude,
+            double secondLatitude,
+            double secondLongitude,
+            double maxDistanceMeters
+    ) {
+        return walkEdgeCandidateRepository.areBothPointsWithinDistanceOfAnyVertex(
+                vertexIds,
+                firstLatitude,
+                firstLongitude,
+                secondLatitude,
+                secondLongitude,
+                maxDistanceMeters
+        );
+    }
 }

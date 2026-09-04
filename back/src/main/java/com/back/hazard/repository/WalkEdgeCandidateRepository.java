@@ -28,6 +28,27 @@ public class WalkEdgeCandidateRepository {
             LIMIT :limit
             """;
 
+    private static final String CHECK_SHARED_VERTEX_DISTANCE_SQL = """
+            WITH report_points AS (
+                SELECT ST_Transform(
+                           ST_SetSRID(ST_MakePoint(:firstLongitude, :firstLatitude), 4326),
+                           5179
+                       ) AS first_geom,
+                       ST_Transform(
+                           ST_SetSRID(ST_MakePoint(:secondLongitude, :secondLatitude), 4326),
+                           5179
+                       ) AS second_geom
+            )
+            SELECT EXISTS (
+                SELECT 1
+                FROM routing.walk_edges_vertices_pgr vertex
+                CROSS JOIN report_points points
+                WHERE vertex.id IN (:vertexIds)
+                  AND ST_Distance(vertex.the_geom, points.first_geom) <= :maxDistanceMeters
+                  AND ST_Distance(vertex.the_geom, points.second_geom) <= :maxDistanceMeters
+            )
+            """;
+
     private final NamedParameterJdbcTemplate jdbc;
 
     public WalkEdgeCandidateRepository(NamedParameterJdbcTemplate jdbc) {
@@ -51,5 +72,32 @@ public class WalkEdgeCandidateRepository {
                         resultSet.getObject("target", Long.class),
                         resultSet.getDouble("distance_m")
                 ));
+    }
+
+    public boolean areBothPointsWithinDistanceOfAnyVertex(
+            List<Long> vertexIds,
+            double firstLatitude,
+            double firstLongitude,
+            double secondLatitude,
+            double secondLongitude,
+            double maxDistanceMeters
+    ) {
+        if (vertexIds.isEmpty()) {
+            return false;
+        }
+
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("vertexIds", vertexIds)
+                .addValue("firstLatitude", firstLatitude)
+                .addValue("firstLongitude", firstLongitude)
+                .addValue("secondLatitude", secondLatitude)
+                .addValue("secondLongitude", secondLongitude)
+                .addValue("maxDistanceMeters", maxDistanceMeters);
+
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                CHECK_SHARED_VERTEX_DISTANCE_SQL,
+                parameters,
+                Boolean.class
+        ));
     }
 }

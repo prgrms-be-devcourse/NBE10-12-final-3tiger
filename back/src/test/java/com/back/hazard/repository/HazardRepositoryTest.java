@@ -18,6 +18,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -123,5 +125,42 @@ class HazardRepositoryTest {
         assertThat(hazardReportRepository.findByHazard_IdAndReporter_Id(
                 hazard.getId(), reporter.getId())).isEmpty();
         assertThat(hazardConfirmationRepository.countByHazard_Id(hazard.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName("자동 매칭 후보는 course, hazardType, status로 DB에서 먼저 제한한다")
+    void findsMatchingCandidatesByCourseTypeAndStatus() {
+        Course targetCourse = courseRepository.save(new Course("대상 코스", "11500", 3000));
+        Course otherCourse = courseRepository.save(new Course("다른 코스", "11500", 3000));
+        User first = userRepository.save(User.createLocal("candidate1@test.com", "hash", "신고자1"));
+        User second = userRepository.save(User.createLocal("candidate2@test.com", "hash", "신고자2"));
+        User third = userRepository.save(User.createLocal("candidate3@test.com", "hash", "신고자3"));
+        User fourth = userRepository.save(User.createLocal("candidate4@test.com", "hash", "신고자4"));
+
+        Hazard pending = hazardRepository.save(new Hazard(targetCourse, "빙판"));
+        Hazard active = new Hazard(targetCourse, "빙판");
+        active.updateStatusByReporterCount(3, 3);
+        hazardRepository.save(active);
+        Hazard otherType = hazardRepository.save(new Hazard(targetCourse, "침수"));
+        Hazard otherCourseHazard = hazardRepository.save(new Hazard(otherCourse, "빙판"));
+
+        hazardReportRepository.save(new HazardReport(
+                pending, first, "상", "후보1", 37.5, 126.8));
+        hazardReportRepository.save(new HazardReport(
+                active, second, "상", "후보2", 37.5, 126.8));
+        hazardReportRepository.save(new HazardReport(
+                otherType, third, "상", "제외1", 37.5, 126.8));
+        hazardReportRepository.saveAndFlush(new HazardReport(
+                otherCourseHazard, fourth, "상", "제외2", 37.5, 126.8));
+
+        var candidates = hazardReportRepository.findMatchingCandidates(
+                targetCourse.getId(),
+                "빙판",
+                List.of(HazardStatus.PENDING, HazardStatus.ACTIVE)
+        );
+
+        assertThat(candidates)
+                .extracting(report -> report.getHazard().getId())
+                .containsExactlyInAnyOrder(pending.getId(), active.getId());
     }
 }

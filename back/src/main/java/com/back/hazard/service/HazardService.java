@@ -35,19 +35,22 @@ public class HazardService {
     private final HazardConfirmationRepository hazardConfirmationRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final HazardMatchingService hazardMatchingService;
 
     public HazardService(
             HazardRepository hazardRepository,
             HazardReportRepository hazardReportRepository,
             HazardConfirmationRepository hazardConfirmationRepository,
             CourseRepository courseRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            HazardMatchingService hazardMatchingService
     ) {
         this.hazardRepository = hazardRepository;
         this.hazardReportRepository = hazardReportRepository;
         this.hazardConfirmationRepository = hazardConfirmationRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
+        this.hazardMatchingService = hazardMatchingService;
     }
 
     @Transactional
@@ -55,7 +58,18 @@ public class HazardService {
         User reporter = findActiveUser(userId);
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 코스입니다."));
-        Hazard hazard = hazardRepository.save(new Hazard(course, request.hazardType()));
+        Hazard hazard = hazardMatchingService.findMatchingHazard(
+                courseId,
+                request.hazardType(),
+                request.latitude(),
+                request.longitude()
+        ).map(matchedHazard -> {
+            if (hazardReportRepository.existsByHazard_IdAndReporter_Id(
+                    matchedHazard.getId(), userId)) {
+                throw new ApiException(HttpStatus.CONFLICT, "이미 신고한 위험입니다.");
+            }
+            return matchedHazard;
+        }).orElseGet(() -> hazardRepository.save(new Hazard(course, request.hazardType())));
 
         saveReportAndUpdateStatus(
                 hazard,

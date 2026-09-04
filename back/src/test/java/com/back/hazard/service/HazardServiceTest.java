@@ -49,6 +49,8 @@ class HazardServiceTest {
     private CourseRepository courseRepository;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private HazardMatchingService hazardMatchingService;
     @InjectMocks
     private HazardService hazardService;
 
@@ -61,6 +63,8 @@ class HazardServiceTest {
                 "빙판", "상", "그늘진 구간 결빙 주의", 37.5219, 126.8575);
         given(userRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.of(reporter));
         given(courseRepository.findById(10L)).willReturn(Optional.of(course));
+        given(hazardMatchingService.findMatchingHazard(
+                10L, "빙판", 37.5219, 126.8575)).willReturn(Optional.empty());
         given(hazardRepository.save(any(Hazard.class))).willAnswer(invocation -> {
             Hazard hazard = invocation.getArgument(0);
             ReflectionTestUtils.setField(hazard, "id", 30L);
@@ -87,6 +91,97 @@ class HazardServiceTest {
         assertThat(report.getContent()).isEqualTo("그늘진 구간 결빙 주의");
         assertThat(report.getLatitude()).isEqualTo(37.5219);
         assertThat(report.getLongitude()).isEqualTo(126.8575);
+    }
+
+    @Test
+    @DisplayName("자동 매칭된 기존 Hazard에는 새 Hazard 대신 Report를 추가한다")
+    void addsReportToAutomaticallyMatchedHazard() {
+        Course course = new Course("테스트 코스", "11500", 3000);
+        User reporter = user(2L, "second@test.com");
+        Hazard matched = hazard(30L);
+        HazardCreateRequest request = new HazardCreateRequest(
+                "빙판", "상", "추가 결빙 신고", 37.5219, 126.8575);
+        given(userRepository.findByIdAndDeletedAtIsNull(2L)).willReturn(Optional.of(reporter));
+        given(courseRepository.findById(10L)).willReturn(Optional.of(course));
+        given(hazardMatchingService.findMatchingHazard(
+                10L, "빙판", 37.5219, 126.8575)).willReturn(Optional.of(matched));
+        given(hazardReportRepository.existsByHazard_IdAndReporter_Id(30L, 2L)).willReturn(false);
+        given(hazardReportRepository.countDistinctReportersByHazardId(30L)).willReturn(2L);
+
+        var response = hazardService.create(2L, 10L, request);
+
+        assertThat(response.hazardId()).isEqualTo(30L);
+        verify(hazardRepository, never()).save(any(Hazard.class));
+        ArgumentCaptor<HazardReport> captor = ArgumentCaptor.forClass(HazardReport.class);
+        verify(hazardReportRepository).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getHazard()).isSameAs(matched);
+        assertThat(captor.getValue().getReporter()).isSameAs(reporter);
+    }
+
+    @Test
+    @DisplayName("두 명이 신고한 Hazard에 세 번째 사용자가 자동 매칭되면 ACTIVE가 된다")
+    void activatesAutomaticallyMatchedHazardWithThirdReporter() {
+        Course course = new Course("테스트 코스", "11500", 3000);
+        User reporter = user(3L, "third@test.com");
+        Hazard matched = hazard(30L);
+        HazardCreateRequest request = new HazardCreateRequest(
+                "빙판", "상", "세 번째 신고", 37.5219, 126.8575);
+        given(userRepository.findByIdAndDeletedAtIsNull(3L)).willReturn(Optional.of(reporter));
+        given(courseRepository.findById(10L)).willReturn(Optional.of(course));
+        given(hazardMatchingService.findMatchingHazard(
+                10L, "빙판", 37.5219, 126.8575)).willReturn(Optional.of(matched));
+        given(hazardReportRepository.existsByHazard_IdAndReporter_Id(30L, 3L)).willReturn(false);
+        given(hazardReportRepository.countDistinctReportersByHazardId(30L)).willReturn(3L);
+
+        hazardService.create(3L, 10L, request);
+
+        assertThat(matched.getStatus()).isEqualTo(HazardStatus.ACTIVE);
+        assertThat(matched.getActivatedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("자동 매칭된 Hazard에 이미 신고한 사용자는 새 Hazard로 우회하지 않고 409이다")
+    void rejectsDuplicateReporterOnAutomaticallyMatchedHazard() {
+        Course course = new Course("테스트 코스", "11500", 3000);
+        User reporter = user(1L, "first@test.com");
+        Hazard matched = hazard(30L);
+        HazardCreateRequest request = new HazardCreateRequest(
+                "빙판", "상", "중복 신고", 37.5219, 126.8575);
+        given(userRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.of(reporter));
+        given(courseRepository.findById(10L)).willReturn(Optional.of(course));
+        given(hazardMatchingService.findMatchingHazard(
+                10L, "빙판", 37.5219, 126.8575)).willReturn(Optional.of(matched));
+        given(hazardReportRepository.existsByHazard_IdAndReporter_Id(30L, 1L)).willReturn(true);
+
+        ApiException exception = catchThrowableOfType(
+                () -> hazardService.create(1L, 10L, request), ApiException.class);
+
+        assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+        verify(hazardRepository, never()).save(any(Hazard.class));
+        verify(hazardReportRepository, never()).saveAndFlush(any(HazardReport.class));
+    }
+
+    @Test
+    @DisplayName("자동 매칭된 ACTIVE Hazard에도 추가 Report를 저장한다")
+    void addsReportToAutomaticallyMatchedActiveHazard() {
+        Course course = new Course("테스트 코스", "11500", 3000);
+        User reporter = user(4L, "fourth@test.com");
+        Hazard matched = hazard(30L);
+        matched.updateStatusByReporterCount(3, 3);
+        HazardCreateRequest request = new HazardCreateRequest(
+                "공사", "중", "공사 계속 중", 37.5219, 126.8575);
+        given(userRepository.findByIdAndDeletedAtIsNull(4L)).willReturn(Optional.of(reporter));
+        given(courseRepository.findById(10L)).willReturn(Optional.of(course));
+        given(hazardMatchingService.findMatchingHazard(
+                10L, "공사", 37.5219, 126.8575)).willReturn(Optional.of(matched));
+        given(hazardReportRepository.existsByHazard_IdAndReporter_Id(30L, 4L)).willReturn(false);
+        given(hazardReportRepository.countDistinctReportersByHazardId(30L)).willReturn(4L);
+
+        hazardService.create(4L, 10L, request);
+
+        assertThat(matched.getStatus()).isEqualTo(HazardStatus.ACTIVE);
+        verify(hazardReportRepository).saveAndFlush(any(HazardReport.class));
+        verify(hazardRepository, never()).save(any(Hazard.class));
     }
 
     @Test
