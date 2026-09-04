@@ -22,7 +22,8 @@ import { useAuthStore } from "@/stores/auth-store";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: "front" });
+const KAKAO_REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: "front" });
+const GOOGLE_REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: "front" });
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -30,20 +31,20 @@ export default function LoginScreen() {
   const [secure, setSecure] = useState(true);
   const saveTokens = useAuthStore((state) => state.saveTokens);
 
-  const [kakaoRequest, kakaoResponse, kakaoPromptAsync] =
-    AuthSession.useAuthRequest(
-      {
-        clientId: process.env.EXPO_PUBLIC_KAKAO_CLIENT_ID ?? "",
-        redirectUri: REDIRECT_URI,
-      },
-      { authorizationEndpoint: "https://kauth.kakao.com/oauth/authorize" },
-    );
+const [kakaoRequest, kakaoResponse, kakaoPromptAsync] =
+  AuthSession.useAuthRequest(
+    {
+      clientId: process.env.EXPO_PUBLIC_KAKAO_CLIENT_ID ?? "",
+      redirectUri: KAKAO_REDIRECT_URI,
+    },
+    { authorizationEndpoint: "https://kauth.kakao.com/oauth/authorize" },
+  );
 
   const [googleRequest, googleResponse, googlePromptAsync] =
     AuthSession.useAuthRequest(
       {
         clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? "",
-        redirectUri: REDIRECT_URI,
+        redirectUri: GOOGLE_REDIRECT_URI,
         scopes: ["openid", "profile", "email"],
       },
       { authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth" },
@@ -80,14 +81,14 @@ export default function LoginScreen() {
     }
   }, [kakaoResponse]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (googleResponse?.type === "success") {
-      socialLoginMutation.mutate({
-        provider: "google",
-        code: googleResponse.params.code,
-      });
-    }
-  }, [googleResponse]); // eslint-disable-line react-hooks/exhaustive-deps
+useEffect(() => {
+  if (googleResponse?.type === "success") {
+    socialLoginMutation.mutate({
+      provider: "google",
+      code: googleResponse.params.code,
+    });
+  }
+}, [googleResponse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFocusEffect(
     useCallback(() => {
