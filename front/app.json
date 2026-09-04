@@ -4,19 +4,17 @@
     "slug": "front",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/logo-dark.png",
     "scheme": "front",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/logo-dark.png",
       "bundleIdentifier": "com.anonymous.front"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#208AEF",
+        "foregroundImage": "./assets/logo-transparent.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -27,7 +25,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/logo-dark.png"
     },
     "plugins": [
       "expo-router",
@@ -35,7 +33,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/logo-transparent.png",
           "imageWidth": 76
         }
       ],
@@ -52,7 +50,10 @@
           "locationWhenInUsePermission": "주변 산책 코스와 현재 위치를 지도에 표시하기 위해 위치 권한이 필요합니다."
         }
       ],
-      "expo-web-browser"
+      "expo-font",
+      "expo-web-browser",
+      "expo-image",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,

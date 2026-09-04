@@ -507,7 +507,7 @@ export default function CommunityScreen() {
           tint={isDark ? "systemThinMaterialDark" : "systemThinMaterialLight"}
           experimentalBlurMethod="dimezisBlurView"
           blurReductionFactor={3}
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
         />
         <View
           className="flex-row items-center justify-between px-3"
