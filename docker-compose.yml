@@ -34,6 +34,8 @@ services:
       - ./docker/95-post-title-migration.sh:/docker-entrypoint-initdb.d/95-post-title-migration.sh:ro
       - ./docker/100-notification-setting.sql:/tmp/notification-setting.sql:ro
       - ./docker/100-notification-setting.sh:/docker-entrypoint-initdb.d/100-notification-setting.sh:ro
+      - ./docker/hazard-schema.sql:/tmp/hazard-schema.sql:ro
+      - ./docker/96-hazard-schema.sh:/docker-entrypoint-initdb.d/96-hazard-schema.sh:ro
       - ./docker/21_persona_weight.sql:/tmp/persona/21_persona_weight.sql:ro
       - ./docker/22_persona_course_scores.sql:/tmp/persona/22_persona_course_scores.sql:ro
       - ./docker/23_persona_edge_costs.sql:/tmp/persona/23_persona_edge_costs.sql:ro
