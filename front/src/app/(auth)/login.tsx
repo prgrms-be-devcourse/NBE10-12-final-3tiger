@@ -94,14 +94,14 @@ export default function LoginScreen() {
     return () => subscription.remove();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (googleResponse?.type === "success") {
-      socialLoginMutation.mutate({
-        provider: "google",
-        code: googleResponse.params.code,
-      });
-    }
-  }, [googleResponse]); // eslint-disable-line react-hooks/exhaustive-deps
+useEffect(() => {
+  if (googleResponse?.type === "success") {
+    socialLoginMutation.mutate({
+      provider: "google",
+      code: googleResponse.params.code,
+    });
+  }
+}, [googleResponse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFocusEffect(
     useCallback(() => {
