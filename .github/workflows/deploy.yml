@@ -35,4 +35,6 @@ jobs:
               kill $PID
               sleep 5
             fi
-            nohup java -Xmx512m -jar build/libs/back-0.0.1-SNAPSHOT.jar > backend.log 2>&1 &
+            setsid nohup java -Xmx512m -jar build/libs/back-0.0.1-SNAPSHOT.jar > backend.log 2>&1 < /dev/null &
+            disown
+            sleep 3
