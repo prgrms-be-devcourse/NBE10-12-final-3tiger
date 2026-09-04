@@ -11,6 +11,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   FlatList,
   Image,
@@ -40,6 +41,7 @@ import { Text } from "@/components/ui/text";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
+import { ApiError } from "@/types/api";
 import type { PostFeedItem } from "@/types/domain";
 
 const HEADER_BAR_HEIGHT = 56;
@@ -144,11 +146,16 @@ function FeedPost({
       updateMyPostLike(desiredLiked, nextLikeCount);
       return previous;
     },
-    onError: (_error, _variables, context) => {
-      if (!context) return;
-      setLiked(context.liked);
-      setLikeCount(context.likeCount);
-      updateMyPostLike(context.liked, context.likeCount);
+    onError: (error, _variables, context) => {
+      if (context) {
+        setLiked(context.liked);
+        setLikeCount(context.likeCount);
+        updateMyPostLike(context.liked, context.likeCount);
+      }
+      // 차단 관계면 서버가 403 + 안내 메시지를 준다.
+      if (error instanceof ApiError && error.status === 403) {
+        Alert.alert("알림", error.message);
+      }
     },
     onSuccess: (result) => {
       setLiked(result.isLiked);
@@ -361,6 +368,8 @@ function FeedPost({
         postId={item.postId}
         open={menuOpen}
         canDelete={canDelete}
+        authorUserId={item.isMine ? undefined : item.userId}
+        authorNickname={item.nickname ?? "산책러"}
         onClose={() => setMenuOpen(false)}
       />
       {!item.isMine ? (

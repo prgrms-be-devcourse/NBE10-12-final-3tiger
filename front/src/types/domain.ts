@@ -155,6 +155,35 @@ export type PersonalUserMemo = {
   updatedAt: string;
 };
 
+export type ReportReason =
+  | "SPAM"
+  | "ABUSE"
+  | "SEXUAL"
+  | "HARASSMENT"
+  | "ILLEGAL"
+  | "ETC";
+
+export type ReportTargetType = "USER" | "COMMENT" | "POST";
+
+export type ReportResult = {
+  targetType: ReportTargetType;
+  targetId: number;
+  reportCount: number;
+  hidden: boolean;
+};
+
+export type BlockResult = {
+  blockedUserId: number;
+  blocked: boolean;
+};
+
+export type BlockedUser = {
+  userId: number;
+  nickname: string;
+  profileImageUrl?: string | null;
+  blockedAt: string;
+};
+
 export type LikedPostItem = Post & {
   isBookmarked: boolean;
   isMine: boolean;
