@@ -947,18 +947,29 @@ export default function CourseNavigationScreen() {
       return null;
     }).filter((arrow): arrow is NonNullable<typeof arrow> => arrow != null);
   }, [selectedMapSegments]);
-  const startPoint = navigationQuery.data
-    ? {
-        latitude: navigationQuery.data.startPoint.lat,
-        longitude: navigationQuery.data.startPoint.lng,
-      }
-    : null;
-  const endPoint = navigationQuery.data
-    ? {
-        latitude: navigationQuery.data.endPoint.lat,
-        longitude: navigationQuery.data.endPoint.lng,
-      }
-    : null;
+  const startPoint = useMemo(
+    () =>
+      navigationQuery.data
+        ? {
+            latitude: navigationQuery.data.startPoint.lat,
+            longitude: navigationQuery.data.startPoint.lng,
+          }
+        : null,
+    [
+      navigationQuery.data?.startPoint.lat,
+      navigationQuery.data?.startPoint.lng,
+    ],
+  );
+  const endPoint = useMemo(
+    () =>
+      navigationQuery.data
+        ? {
+            latitude: navigationQuery.data.endPoint.lat,
+            longitude: navigationQuery.data.endPoint.lng,
+          }
+        : null,
+    [navigationQuery.data?.endPoint.lat, navigationQuery.data?.endPoint.lng],
+  );
   const distanceToStart =
     userLocation && startPoint
       ? distanceMeters(userLocation, startPoint)
@@ -1035,7 +1046,16 @@ export default function CourseNavigationScreen() {
       nextProgress.traveledDistanceM + 15 < previousProgress.traveledDistanceM;
     if (!didRegressTooFar) {
       previousProgressRef.current = nextProgress;
-      setProgress(nextProgress);
+      setProgress((currentProgress) => {
+        if (
+          currentProgress?.segmentIndex === nextProgress.segmentIndex &&
+          currentProgress.segmentFraction === nextProgress.segmentFraction &&
+          currentProgress.distanceFromRouteM === nextProgress.distanceFromRouteM
+        ) {
+          return currentProgress;
+        }
+        return nextProgress;
+      });
     }
 
     const reliableLocation =
