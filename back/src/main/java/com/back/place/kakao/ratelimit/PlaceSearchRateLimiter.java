@@ -13,9 +13,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PlaceSearchRateLimiter {
 
-    private static final long LIMIT = 30;
-    private static final long WINDOW_SECONDS = 60;
-
     private static final RedisScript<Long> RATE_LIMIT_SCRIPT =
             RedisScript.of("""
                     local count = redis.call("INCR", KEYS[1])
@@ -32,6 +29,7 @@ public class PlaceSearchRateLimiter {
                     """, Long.class);
 
     private final StringRedisTemplate redisTemplate;
+    private final PlaceSearchRateLimitProperties properties;
 
     public void check(String clientId) {
         String key = "RATE_LIMIT:PLACE:" + clientId;
@@ -39,7 +37,7 @@ public class PlaceSearchRateLimiter {
         Long count = redisTemplate.execute(
                 RATE_LIMIT_SCRIPT,
                 List.of(key),
-                String.valueOf(WINDOW_SECONDS)
+                String.valueOf(properties.getWindow().toSeconds())
         );
 
         if (count == null) {
@@ -48,7 +46,7 @@ public class PlaceSearchRateLimiter {
             );
         }
 
-        if (count > LIMIT) {
+        if (count > properties.getLimit()) {
             throw new BusinessException(
                     ErrorCode.PLACE_SEARCH_RATE_LIMIT_EXCEEDED
             );
