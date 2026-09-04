@@ -41,6 +41,7 @@ app:
       read-timeout: 3s
   map:
     kakao:
+      base-url: ${KAKAO_PLACE_BASE_URL:https://dapi.kakao.com}
       rest-api-key: ${KAKAO_PLACE_REST_API_KEY}
       connect-timeout: 2s
       read-timeout: 5s

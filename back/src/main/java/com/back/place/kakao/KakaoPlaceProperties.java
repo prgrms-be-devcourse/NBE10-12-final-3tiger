@@ -12,6 +12,8 @@ import java.time.Duration;
 @Getter
 @Setter
 public class KakaoPlaceProperties {
+
+    private String baseUrl = "https://dapi.kakao.com";
     private String restApiKey;
     private Duration connectTimeout = Duration.ofSeconds(2);
     private Duration readTimeout = Duration.ofSeconds(3);
