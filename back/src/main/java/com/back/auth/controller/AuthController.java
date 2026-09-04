@@ -9,8 +9,13 @@ import com.back.auth.service.AuthService;
 import com.back.global.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -45,5 +50,25 @@ public class AuthController {
     ) {
         AuthResponse response = authService.oauthLogin(provider, request.authorizationCode());
         return ResponseEntity.ok(ApiResponse.ok("소셜 로그인이 완료되었습니다.", response));
+    }
+
+    @GetMapping("/kakao/callback")
+    public ResponseEntity<Void> kakaoCallback(@RequestParam String code) {
+        try {
+            AuthResponse res = authService.oauthLogin("kakao", code);
+            String location = "front://oauth-callback"
+                    + "?accessToken=" + URLEncoder.encode(res.accessToken(), StandardCharsets.UTF_8)
+                    + "&refreshToken=" + URLEncoder.encode(res.refreshToken(), StandardCharsets.UTF_8)
+                    + "&isNewUser=" + res.isNewUser();
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(URI.create(location))
+                    .build();
+        } catch (Exception e) {
+            String location = "front://oauth-callback?error="
+                    + URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8);
+            return ResponseEntity.status(HttpStatus.FOUND)
+                    .location(URI.create(location))
+                    .build();
+        }
     }
 }
