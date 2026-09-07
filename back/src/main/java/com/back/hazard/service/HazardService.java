@@ -15,14 +15,17 @@ import com.back.hazard.dto.HazardResponse;
 import com.back.hazard.repository.HazardConfirmationRepository;
 import com.back.hazard.repository.HazardReportRepository;
 import com.back.hazard.repository.HazardRepository;
+import com.back.point.service.PointRewardService;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import jakarta.persistence.EntityManager;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Transactional(readOnly = true)
@@ -36,6 +39,8 @@ public class HazardService {
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final HazardMatchingService hazardMatchingService;
+    private final PointRewardService pointRewardService;
+    private final EntityManager entityManager;
 
     public HazardService(
             HazardRepository hazardRepository,
@@ -43,7 +48,9 @@ public class HazardService {
             HazardConfirmationRepository hazardConfirmationRepository,
             CourseRepository courseRepository,
             UserRepository userRepository,
-            HazardMatchingService hazardMatchingService
+            HazardMatchingService hazardMatchingService,
+            PointRewardService pointRewardService,
+            EntityManager entityManager
     ) {
         this.hazardRepository = hazardRepository;
         this.hazardReportRepository = hazardReportRepository;
@@ -51,6 +58,8 @@ public class HazardService {
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.hazardMatchingService = hazardMatchingService;
+        this.pointRewardService = pointRewardService;
+        this.entityManager = entityManager;
     }
 
     @Transactional
@@ -58,18 +67,31 @@ public class HazardService {
         User reporter = findActiveUser(userId);
         Course course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 코스입니다."));
-        Hazard hazard = hazardMatchingService.findMatchingHazard(
+        var matchingHazard = hazardMatchingService.findMatchingHazard(
                 courseId,
                 request.hazardType(),
                 request.latitude(),
                 request.longitude()
-        ).map(matchedHazard -> {
+        );
+        Hazard hazard;
+        if (matchingHazard.isPresent()) {
+            var lockedHazard = findHazardForUpdateIfPresent(matchingHazard.get().getId());
+            if (lockedHazard.isPresent()) {
+                hazard = lockedHazard.get();
+            } else {
+                hazard = hazardRepository.save(new Hazard(course, request.hazardType()));
+            }
+        } else {
+            hazard = hazardRepository.save(new Hazard(course, request.hazardType()));
+        }
+
+        if (matchingHazard.isPresent()
+                && hazard.getId().equals(matchingHazard.get().getId())) {
             if (hazardReportRepository.existsByHazard_IdAndReporter_Id(
-                    matchedHazard.getId(), userId)) {
+                    hazard.getId(), userId)) {
                 throw new ApiException(HttpStatus.CONFLICT, "이미 신고한 위험입니다.");
             }
-            return matchedHazard;
-        }).orElseGet(() -> hazardRepository.save(new Hazard(course, request.hazardType())));
+        }
 
         saveReportAndUpdateStatus(
                 hazard,
@@ -85,7 +107,7 @@ public class HazardService {
 
     @Transactional
     public void addReport(Long userId, Long hazardId, HazardReportCreateRequest request) {
-        Hazard hazard = findHazard(hazardId);
+        Hazard hazard = findHazardForUpdate(hazardId);
         User reporter = findActiveUser(userId);
 
         if (hazardReportRepository.existsByHazard_IdAndReporter_Id(hazardId, userId)) {
@@ -125,7 +147,7 @@ public class HazardService {
 
     @Transactional
     public void deleteMyReport(Long userId, Long hazardId) {
-        Hazard hazard = findHazard(hazardId);
+        Hazard hazard = findHazardForUpdate(hazardId);
         findActiveUser(userId);
         HazardReport report = hazardReportRepository
                 .findByHazard_IdAndReporter_Id(hazardId, userId)
@@ -175,25 +197,36 @@ public class HazardService {
             double latitude,
             double longitude
     ) {
+        HazardReport report = new HazardReport(
+                hazard,
+                reporter,
+                severity,
+                content,
+                latitude,
+                longitude
+        );
         try {
-            hazardReportRepository.saveAndFlush(new HazardReport(
-                    hazard,
-                    reporter,
-                    severity,
-                    content,
-                    latitude,
-                    longitude
-            ));
+            hazardReportRepository.saveAndFlush(report);
         } catch (DataIntegrityViolationException exception) {
             throw new ApiException(HttpStatus.CONFLICT, "이미 신고한 위험입니다.");
         }
 
         long distinctReporterCount = hazardReportRepository
                 .countDistinctReportersByHazardId(hazard.getId());
+        boolean wasPending = hazard.getStatus() == HazardStatus.PENDING;
         hazard.updateStatusByReporterCount(
                 distinctReporterCount,
                 ACTIVATION_REPORTER_THRESHOLD
         );
+
+        if (wasPending && hazard.getStatus() == HazardStatus.ACTIVE) {
+            pointRewardService.rewardHazardActivation(
+                    hazard.getId(),
+                    hazardReportRepository.findDistinctReporterIdsByHazardId(hazard.getId())
+            );
+        }
+
+        pointRewardService.rewardHazardReport(reporter.getId(), report.getId());
     }
 
     private Hazard findHazard(Long hazardId) {
@@ -202,6 +235,20 @@ public class HazardService {
                         HttpStatus.NOT_FOUND,
                         "존재하지 않는 위험입니다."
                 ));
+    }
+
+    private Hazard findHazardForUpdate(Long hazardId) {
+        return findHazardForUpdateIfPresent(hazardId)
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "존재하지 않는 위험입니다."
+                ));
+    }
+
+    private Optional<Hazard> findHazardForUpdateIfPresent(Long hazardId) {
+        Optional<Hazard> hazard = hazardRepository.findByIdForUpdate(hazardId);
+        hazard.ifPresent(entityManager::refresh);
+        return hazard;
     }
 
     private User findActiveUser(Long userId) {
