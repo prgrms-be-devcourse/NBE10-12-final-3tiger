@@ -2,61 +2,48 @@ package com.back.place.kakao.ratelimit;
 
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
-import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataAccessException;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.RedisScript;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import io.github.bucket4j.Bucket;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.time.Duration;
 
 @Component
-@RequiredArgsConstructor
 public class PlaceSearchRateLimiter {
 
-    private static final RedisScript<Long> RATE_LIMIT_SCRIPT =
-            RedisScript.of("""
-                    local count = redis.call("INCR", KEYS[1])
-                    
-                    if count == 1 then
-                        redis.call(
-                            "EXPIRE",
-                            KEYS[1],
-                            tonumber(ARGV[1])
-                        )
-                    end
-                    
-                    return count
-                    """, Long.class);
+    private static final long MAX_CLIENTS = 100_000;
 
-    private final StringRedisTemplate redisTemplate;
-    private final PlaceSearchRateLimitProperties properties;
-    private final PlaceSearchLocalRateLimiter localRateLimiter;
+    private final Cache<String, Bucket> buckets;
+    private final long capacity;
+    private final Duration refillPeriod;
+
+    public PlaceSearchRateLimiter(
+            PlaceSearchRateLimitProperties properties
+    ) {
+        this.capacity = properties.getLimit();
+        this.refillPeriod = properties.getWindow();
+        this.buckets = Caffeine.newBuilder()
+                .maximumSize(MAX_CLIENTS)
+                .expireAfterAccess(refillPeriod.multipliedBy(2))
+                .build();
+    }
 
     public void check(String clientId) {
-        String key = "RATE_LIMIT:PLACE:" + clientId;
+        Bucket bucket = buckets.get(clientId, ignored -> newBucket());
 
-        Long count;
-        try {
-            count = redisTemplate.execute(
-                    RATE_LIMIT_SCRIPT,
-                    List.of(key),
-                    String.valueOf(properties.getWindow().toSeconds())
-            );
-        } catch (DataAccessException exception) {
-            localRateLimiter.check(clientId);
-            return;
-        }
-
-        if (count == null) {
-            localRateLimiter.check(clientId);
-            return;
-        }
-
-        if (count > properties.getLimit()) {
+        if (!bucket.tryConsume(1)) {
             throw new BusinessException(
                     ErrorCode.PLACE_SEARCH_RATE_LIMIT_EXCEEDED
             );
         }
+    }
+
+    private Bucket newBucket() {
+        return Bucket.builder()
+                .addLimit(limit -> limit
+                        .capacity(capacity)
+                        .refillGreedy(capacity, refillPeriod))
+                .build();
     }
 }
