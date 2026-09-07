@@ -45,14 +45,12 @@ public class PostService {
         this.userBlockService = userBlockService;
     }
 
-    // 빈 in 절을 만들지 않기 위한 sentinel (user id 는 항상 양수)
-    private static final long NO_SUCH_USER_ID = -1L;
     public PageResponse<FeedItem> feed(Long userId, String sort, int page, int size, String keyword) {
         Sort sorting = "popularity".equalsIgnoreCase(sort)
                 ? Sort.by(Sort.Direction.DESC, "likeCount", "createdAt", "id")
                 : Sort.by(Sort.Direction.DESC, "createdAt", "id");
         Pageable pageable = PageRequest.of(page, size, sorting);
-        Collection<Long> excludedUserIds = excludedUserIds(userId);
+        Collection<Long> excludedUserIds = userBlockService.excludedUserIds(userId);
         Page<Post> found = StringUtils.hasText(keyword)
                 ? posts.searchFeed(keyword.trim(), excludedUserIds, pageable)
                 : posts.findFeed(excludedUserIds, pageable);
@@ -113,17 +111,6 @@ public class PostService {
     }
     private Course getCourseByIdOrThrow(Long id) {
         return courses.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 코스입니다."));
-    }
-    // 비로그인이면 차단 관계가 없다. 결과가 비면 sentinel 을 넣어 빈 in 절을 피한다.
-    private Collection<Long> excludedUserIds(Long userId) {
-        if (userId == null) {
-            return List.of(NO_SUCH_USER_ID);
-        }
-        Set<Long> blocked = userBlockService.relatedUserIds(userId);
-        if (blocked.isEmpty()) {
-            return List.of(NO_SUCH_USER_ID);
-        }
-        return blocked;
     }
     private List<Long> postIds(Page<Post> found) {
         return found.getContent().stream().map(Post::getId).toList();

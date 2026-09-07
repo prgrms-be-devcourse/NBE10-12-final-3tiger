@@ -21,15 +21,17 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReportService {
 
     private final ReportRepository reports;
+    private final ReportWriter reportWriter;
     private final UserRepository users;
     private final PostRepository posts;
     private final CommentRepository comments;
     private final int hideThreshold;
 
-    public ReportService(ReportRepository reports, UserRepository users, PostRepository posts,
+    public ReportService(ReportRepository reports, ReportWriter reportWriter, UserRepository users, PostRepository posts,
                          CommentRepository comments,
                          @Value("${app.report.hide-threshold:5}") int hideThreshold) {
         this.reports = reports;
+        this.reportWriter = reportWriter;
         this.users = users;
         this.posts = posts;
         this.comments = comments;
@@ -46,7 +48,7 @@ public class ReportService {
 
         if (!reports.existsByReporter_IdAndTargetTypeAndTargetId(reporterId, targetType, targetId)) {
             try {
-                reports.save(new Report(users.getReferenceById(reporterId), targetType, targetId, reason));
+                reportWriter.trySave(new Report(users.getReferenceById(reporterId), targetType, targetId, reason));
             } catch (DataIntegrityViolationException e) {
                 // uk_report_reporter_target 위반 = 동시 중복 신고 → 멱등 처리
             }

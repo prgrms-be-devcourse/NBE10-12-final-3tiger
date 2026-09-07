@@ -685,7 +685,7 @@ class CommentServiceTest {
         Long userId = 7L;
         Post post = newPost();
         given(postRepository.findById(postId)).willReturn(Optional.of(post));
-        given(userBlockService.relatedUserIds(userId)).willReturn(Set.of(99L));
+        given(userBlockService.excludedUserIds(userId)).willReturn(Set.of(99L));
         given(commentRepository.findVisibleParents(eq(postId), eq(Set.of(99L)), any(Pageable.class)))
                 .willReturn(new PageImpl<>(List.of()));
 
