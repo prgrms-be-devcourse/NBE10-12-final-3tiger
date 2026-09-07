@@ -9,6 +9,7 @@ public record MyPageResponse(
         String loginType,
         String profileImageUrl,
         String primaryPersona,
-        List<String> personaTags
+        List<String> personaTags,
+        long pointBalance
 ) {
 }

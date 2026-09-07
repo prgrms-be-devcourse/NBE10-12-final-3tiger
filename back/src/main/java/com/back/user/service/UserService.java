@@ -120,7 +120,8 @@ public class UserService {
                 user.getProvider() == Provider.LOCAL ? "NORMAL" : user.getProvider().name(),
                 user.getProfileImageUrl(),
                 primaryPersona,
-                personaTags
+                personaTags,
+                user.getPointBalance()
         );
     }
 

@@ -36,4 +36,12 @@ public interface HazardReportRepository extends JpaRepository<HazardReport, Long
             where report.hazard.id = :hazardId
             """)
     long countDistinctReportersByHazardId(@Param("hazardId") Long hazardId);
+
+    @Query("""
+            select distinct report.reporter.id
+            from HazardReport report
+            where report.hazard.id = :hazardId
+            order by report.reporter.id
+            """)
+    List<Long> findDistinctReporterIdsByHazardId(@Param("hazardId") Long hazardId);
 }

@@ -12,8 +12,10 @@ import com.back.hazard.dto.HazardReportCreateRequest;
 import com.back.hazard.repository.HazardConfirmationRepository;
 import com.back.hazard.repository.HazardReportRepository;
 import com.back.hazard.repository.HazardRepository;
+import com.back.point.service.PointRewardService;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,6 +53,10 @@ class HazardServiceTest {
     private UserRepository userRepository;
     @Mock
     private HazardMatchingService hazardMatchingService;
+    @Mock
+    private PointRewardService pointRewardService;
+    @Mock
+    private EntityManager entityManager;
     @InjectMocks
     private HazardService hazardService;
 
@@ -69,6 +75,11 @@ class HazardServiceTest {
             Hazard hazard = invocation.getArgument(0);
             ReflectionTestUtils.setField(hazard, "id", 30L);
             return hazard;
+        });
+        given(hazardReportRepository.saveAndFlush(any(HazardReport.class))).willAnswer(invocation -> {
+            HazardReport report = invocation.getArgument(0);
+            ReflectionTestUtils.setField(report, "id", 101L);
+            return report;
         });
         given(hazardReportRepository.countDistinctReportersByHazardId(30L)).willReturn(1L);
 
@@ -91,6 +102,8 @@ class HazardServiceTest {
         assertThat(report.getContent()).isEqualTo("그늘진 구간 결빙 주의");
         assertThat(report.getLatitude()).isEqualTo(37.5219);
         assertThat(report.getLongitude()).isEqualTo(126.8575);
+        verify(pointRewardService).rewardHazardReport(1L, 101L);
+        verify(pointRewardService, never()).rewardHazardActivation(any(), any());
     }
 
     @Test
@@ -105,8 +118,14 @@ class HazardServiceTest {
         given(courseRepository.findById(10L)).willReturn(Optional.of(course));
         given(hazardMatchingService.findMatchingHazard(
                 10L, "빙판", 37.5219, 126.8575)).willReturn(Optional.of(matched));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(matched));
         given(hazardReportRepository.existsByHazard_IdAndReporter_Id(30L, 2L)).willReturn(false);
         given(hazardReportRepository.countDistinctReportersByHazardId(30L)).willReturn(2L);
+        given(hazardReportRepository.saveAndFlush(any(HazardReport.class))).willAnswer(invocation -> {
+            HazardReport report = invocation.getArgument(0);
+            ReflectionTestUtils.setField(report, "id", 102L);
+            return report;
+        });
 
         var response = hazardService.create(2L, 10L, request);
 
@@ -116,6 +135,9 @@ class HazardServiceTest {
         verify(hazardReportRepository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getHazard()).isSameAs(matched);
         assertThat(captor.getValue().getReporter()).isSameAs(reporter);
+        verify(entityManager).refresh(matched);
+        verify(pointRewardService).rewardHazardReport(2L, 102L);
+        verify(pointRewardService, never()).rewardHazardActivation(any(), any());
     }
 
     @Test
@@ -130,13 +152,23 @@ class HazardServiceTest {
         given(courseRepository.findById(10L)).willReturn(Optional.of(course));
         given(hazardMatchingService.findMatchingHazard(
                 10L, "빙판", 37.5219, 126.8575)).willReturn(Optional.of(matched));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(matched));
         given(hazardReportRepository.existsByHazard_IdAndReporter_Id(30L, 3L)).willReturn(false);
         given(hazardReportRepository.countDistinctReportersByHazardId(30L)).willReturn(3L);
+        given(hazardReportRepository.findDistinctReporterIdsByHazardId(30L))
+                .willReturn(List.of(1L, 2L, 3L));
+        given(hazardReportRepository.saveAndFlush(any(HazardReport.class))).willAnswer(invocation -> {
+            HazardReport report = invocation.getArgument(0);
+            ReflectionTestUtils.setField(report, "id", 103L);
+            return report;
+        });
 
         hazardService.create(3L, 10L, request);
 
         assertThat(matched.getStatus()).isEqualTo(HazardStatus.ACTIVE);
         assertThat(matched.getActivatedAt()).isNotNull();
+        verify(pointRewardService).rewardHazardReport(3L, 103L);
+        verify(pointRewardService).rewardHazardActivation(30L, List.of(1L, 2L, 3L));
     }
 
     @Test
@@ -151,6 +183,7 @@ class HazardServiceTest {
         given(courseRepository.findById(10L)).willReturn(Optional.of(course));
         given(hazardMatchingService.findMatchingHazard(
                 10L, "빙판", 37.5219, 126.8575)).willReturn(Optional.of(matched));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(matched));
         given(hazardReportRepository.existsByHazard_IdAndReporter_Id(30L, 1L)).willReturn(true);
 
         ApiException exception = catchThrowableOfType(
@@ -174,14 +207,22 @@ class HazardServiceTest {
         given(courseRepository.findById(10L)).willReturn(Optional.of(course));
         given(hazardMatchingService.findMatchingHazard(
                 10L, "공사", 37.5219, 126.8575)).willReturn(Optional.of(matched));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(matched));
         given(hazardReportRepository.existsByHazard_IdAndReporter_Id(30L, 4L)).willReturn(false);
         given(hazardReportRepository.countDistinctReportersByHazardId(30L)).willReturn(4L);
+        given(hazardReportRepository.saveAndFlush(any(HazardReport.class))).willAnswer(invocation -> {
+            HazardReport report = invocation.getArgument(0);
+            ReflectionTestUtils.setField(report, "id", 104L);
+            return report;
+        });
 
         hazardService.create(4L, 10L, request);
 
         assertThat(matched.getStatus()).isEqualTo(HazardStatus.ACTIVE);
         verify(hazardReportRepository).saveAndFlush(any(HazardReport.class));
         verify(hazardRepository, never()).save(any(Hazard.class));
+        verify(pointRewardService).rewardHazardReport(4L, 104L);
+        verify(pointRewardService, never()).rewardHazardActivation(any(), any());
     }
 
     @Test
@@ -191,7 +232,7 @@ class HazardServiceTest {
         User first = user(1L, "first@test.com");
         User second = user(2L, "second@test.com");
         User third = user(3L, "third@test.com");
-        given(hazardRepository.findById(30L)).willReturn(Optional.of(hazard));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
         given(userRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.of(first));
         given(userRepository.findByIdAndDeletedAtIsNull(2L)).willReturn(Optional.of(second));
         given(userRepository.findByIdAndDeletedAtIsNull(3L)).willReturn(Optional.of(third));
@@ -216,7 +257,7 @@ class HazardServiceTest {
     void rejectsDuplicateReporter() {
         Hazard hazard = hazard(30L);
         User reporter = user(1L, "first@test.com");
-        given(hazardRepository.findById(30L)).willReturn(Optional.of(hazard));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
         given(userRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.of(reporter));
         given(hazardReportRepository.existsByHazard_IdAndReporter_Id(30L, 1L)).willReturn(true);
 
@@ -237,7 +278,7 @@ class HazardServiceTest {
         Hazard hazard = hazard(30L);
         hazard.updateStatusByReporterCount(3, 3);
         User fourth = user(4L, "fourth@test.com");
-        given(hazardRepository.findById(30L)).willReturn(Optional.of(hazard));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
         given(userRepository.findByIdAndDeletedAtIsNull(4L)).willReturn(Optional.of(fourth));
         given(hazardReportRepository.existsByHazard_IdAndReporter_Id(30L, 4L)).willReturn(false);
         given(hazardReportRepository.countDistinctReportersByHazardId(30L)).willReturn(4L);
@@ -337,7 +378,7 @@ class HazardServiceTest {
     void deletesOwnReportFromPendingHazard() {
         Hazard hazard = hazard(30L);
         HazardReport report = report(hazard, user(1L, "first@test.com"));
-        given(hazardRepository.findById(30L)).willReturn(Optional.of(hazard));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
         given(userRepository.findByIdAndDeletedAtIsNull(1L))
                 .willReturn(Optional.of(user(1L, "first@test.com")));
         given(hazardReportRepository.findByHazard_IdAndReporter_Id(30L, 1L))
@@ -351,6 +392,8 @@ class HazardServiceTest {
         verify(hazardReportRepository).delete(report);
         verify(hazardReportRepository).flush();
         verify(hazardRepository, never()).delete(any(Hazard.class));
+        verify(pointRewardService, never()).rewardHazardReport(any(), any());
+        verify(pointRewardService, never()).rewardHazardActivation(any(), any());
     }
 
     @Test
@@ -359,7 +402,7 @@ class HazardServiceTest {
         Hazard hazard = hazard(30L);
         hazard.updateStatusByReporterCount(3, 3);
         HazardReport report = report(hazard, user(3L, "third@test.com"));
-        given(hazardRepository.findById(30L)).willReturn(Optional.of(hazard));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
         given(userRepository.findByIdAndDeletedAtIsNull(3L))
                 .willReturn(Optional.of(user(3L, "third@test.com")));
         given(hazardReportRepository.findByHazard_IdAndReporter_Id(30L, 3L))
@@ -379,7 +422,7 @@ class HazardServiceTest {
         hazard.updateStatusByReporterCount(4, 3);
         var activatedAt = hazard.getActivatedAt();
         HazardReport report = report(hazard, user(4L, "fourth@test.com"));
-        given(hazardRepository.findById(30L)).willReturn(Optional.of(hazard));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
         given(userRepository.findByIdAndDeletedAtIsNull(4L))
                 .willReturn(Optional.of(user(4L, "fourth@test.com")));
         given(hazardReportRepository.findByHazard_IdAndReporter_Id(30L, 4L))
@@ -398,7 +441,7 @@ class HazardServiceTest {
     void deletesHazardAfterLastReport() {
         Hazard hazard = hazard(30L);
         HazardReport report = report(hazard, user(1L, "first@test.com"));
-        given(hazardRepository.findById(30L)).willReturn(Optional.of(hazard));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
         given(userRepository.findByIdAndDeletedAtIsNull(1L))
                 .willReturn(Optional.of(user(1L, "first@test.com")));
         given(hazardReportRepository.findByHazard_IdAndReporter_Id(30L, 1L))
@@ -419,7 +462,7 @@ class HazardServiceTest {
     @DisplayName("자신의 신고가 없으면 404이고 다른 사용자의 신고를 삭제하지 않는다")
     void rejectsDeletionWhenOwnReportDoesNotExist() {
         Hazard hazard = hazard(30L);
-        given(hazardRepository.findById(30L)).willReturn(Optional.of(hazard));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
         given(userRepository.findByIdAndDeletedAtIsNull(2L))
                 .willReturn(Optional.of(user(2L, "second@test.com")));
         given(hazardReportRepository.findByHazard_IdAndReporter_Id(30L, 2L))
@@ -438,7 +481,7 @@ class HazardServiceTest {
     @DisplayName("탈퇴했거나 존재하지 않는 사용자는 자신의 위험 신고를 삭제할 수 없다")
     void rejectsReportDeletionByInactiveUser() {
         Hazard hazard = hazard(30L);
-        given(hazardRepository.findById(30L)).willReturn(Optional.of(hazard));
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
         given(userRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.empty());
 
         ApiException exception = catchThrowableOfType(

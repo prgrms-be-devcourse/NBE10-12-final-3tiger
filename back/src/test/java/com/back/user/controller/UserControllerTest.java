@@ -170,7 +170,8 @@ class UserControllerTest {
                         "KAKAO",
                         "https://k.kakaocdn.net/profile.jpg",
                         "dog",
-                        List.of("dog", "senior")
+                        List.of("dog", "senior"),
+                        120L
                 )
         );
 
@@ -188,6 +189,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.data.primaryPersona").value("dog"))
                 .andExpect(jsonPath("$.data.personaTags[0]").value("dog"))
                 .andExpect(jsonPath("$.data.personaTags[1]").value("senior"))
+                .andExpect(jsonPath("$.data.pointBalance").value(120L))
                 .andExpect(jsonPath("$.data.passwordHash").doesNotExist())
                 .andExpect(jsonPath("$.data.providerUid").doesNotExist())
                 .andExpect(jsonPath("$.data.deletedAt").doesNotExist());

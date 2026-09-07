@@ -70,6 +70,9 @@ public class User extends BaseEntity {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "point_balance", nullable = false)
+    private long pointBalance;
+
     protected User() {
     }
 
@@ -166,6 +169,13 @@ public class User extends BaseEntity {
         }
     }
 
+    public void addPoints(long amount) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("적립 포인트는 0보다 커야 합니다.");
+        }
+        this.pointBalance = Math.addExact(this.pointBalance, amount);
+    }
+
     public Long getId() {
         return id;
     }
@@ -204,5 +214,9 @@ public class User extends BaseEntity {
 
     public LocalDateTime getDeletedAt() {
         return deletedAt;
+    }
+
+    public long getPointBalance() {
+        return pointBalance;
     }
 }

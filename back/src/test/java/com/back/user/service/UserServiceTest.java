@@ -138,6 +138,7 @@ class UserServiceTest {
         given(user.getProfileImageUrl()).willReturn("https://k.kakaocdn.net/profile.jpg");
         given(user.getPrimaryPersona()).willReturn(Persona.dog);
         given(user.getPersonaTags()).willReturn(List.of(Persona.dog, Persona.senior));
+        given(user.getPointBalance()).willReturn(120L);
 
         MyPageResponse response = userService.getMyPage(userId);
 
@@ -148,6 +149,7 @@ class UserServiceTest {
         assertThat(response.profileImageUrl()).isEqualTo("https://k.kakaocdn.net/profile.jpg");
         assertThat(response.primaryPersona()).isEqualTo("dog");
         assertThat(response.personaTags()).containsExactly("dog", "senior");
+        assertThat(response.pointBalance()).isEqualTo(120L);
         verify(userRepository, never()).save(any());
         verifyNoInteractions(passwordEncoder);
     }
