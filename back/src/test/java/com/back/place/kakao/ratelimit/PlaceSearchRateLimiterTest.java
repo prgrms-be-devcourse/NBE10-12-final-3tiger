@@ -22,7 +22,16 @@ import static org.mockito.Mockito.verify;
 class PlaceSearchRateLimiterTest {
 
     private final StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
-    private final PlaceSearchRateLimiter rateLimiter = new PlaceSearchRateLimiter(redisTemplate);
+    private final PlaceSearchRateLimitProperties properties = properties();
+    private final PlaceSearchRateLimiter rateLimiter =
+            new PlaceSearchRateLimiter(redisTemplate, properties);
+
+    private static PlaceSearchRateLimitProperties properties() {
+        PlaceSearchRateLimitProperties properties = new PlaceSearchRateLimitProperties();
+        properties.setLimit(30);
+        properties.setWindow(java.time.Duration.ofSeconds(60));
+        return properties;
+    }
 
     @Test
     void allowsRequestAtLimitAndUsesExpectedRedisKeyAndWindow() {

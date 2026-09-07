@@ -9,6 +9,7 @@ import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -35,6 +36,7 @@ public class CourseNavigationService {
         this.objectMapper = objectMapper;
     }
 
+    @Cacheable(cacheNames = "courseNavigation", key = "#courseId", sync = true)
     public CourseNavigationResponse getNavigation(Long courseId) {
         CourseNavigationView view = repository
                 .findNavigationByCourseId(courseId)

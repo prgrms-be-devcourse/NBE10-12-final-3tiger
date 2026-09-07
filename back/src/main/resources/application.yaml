@@ -1,6 +1,10 @@
 spring:
   application:
     name: back
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=30m
   servlet:
     multipart:
       max-file-size: 10MB
