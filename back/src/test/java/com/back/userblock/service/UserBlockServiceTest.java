@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verify;
 class UserBlockServiceTest {
 
     @Mock private UserBlockRepository userBlocks;
+    @Mock private UserBlockWriter userBlockWriter;
     @Mock private UserRepository users;
 
     @InjectMocks private UserBlockService service;
@@ -42,7 +43,7 @@ class UserBlockServiceTest {
         // then
         assertThat(result.blockedUserId()).isEqualTo(2L);
         assertThat(result.blocked()).isTrue();
-        verify(userBlocks).save(any(UserBlock.class));
+        verify(userBlockWriter).trySave(any(UserBlock.class));
     }
 
     @Test
@@ -53,7 +54,7 @@ class UserBlockServiceTest {
 
         // then
         assertThat(exception.status()).isEqualTo(HttpStatus.BAD_REQUEST);
-        verify(userBlocks, never()).save(any());
+        verify(userBlockWriter, never()).trySave(any());
     }
 
     @Test
@@ -68,7 +69,7 @@ class UserBlockServiceTest {
 
         // then
         assertThat(result.blocked()).isTrue();
-        verify(userBlocks, never()).save(any());
+        verify(userBlockWriter, never()).trySave(any());
     }
 
     @Test
@@ -82,7 +83,7 @@ class UserBlockServiceTest {
 
         // then
         assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
-        verify(userBlocks, never()).save(any());
+        verify(userBlockWriter, never()).trySave(any());
     }
 
     @Test
