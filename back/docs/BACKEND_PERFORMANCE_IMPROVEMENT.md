@@ -23,7 +23,7 @@
 | 1 | DB 조회 트랜잭션과 카카오 외부 API 호출 분리 | 해결 | 외부 API 대기 중 DB 트랜잭션과 커넥션이 장시간 유지될 가능성 제거 |
 | 1 | 길찾기용 경량 출발점 조회 쿼리 도입 | 해결 | 불필요한 PostGIS 연산과 대용량 경로 데이터 조회 제거 |
 | 2 | 코스 내부 내비게이션 결과 캐싱 | 해결 | 변경 빈도가 낮은 코스 경로의 반복 DB 조회·검증·역직렬화 비용 감소 |
-| 2 | 공간 데이터 검증과 거리 계산을 쓰기 시점으로 이동 | 미적용 | 조회할 때마다 반복되는 PostGIS 검증 비용 감소 |
+| 2 | 공간 데이터 검증과 거리 계산을 쓰기 시점으로 이동 | 해결 | 조회할 때마다 반복되는 PostGIS 검증·거리 계산 비용 제거 |
 | 2 | 길찾기 응답 HTTP 압축 | 미적용 | 전체 경로 좌표 전송량 감소 |
 | 3 | 외부 HTTP 클라이언트 연결 풀 및 장애 격리 | 미적용 | 대규모 동시 요청 처리와 카카오 장애 전파 방지 |
 | 3 | 장소 검색 요청 최적화 및 단기 캐싱 | 미적용 | 동일 검색어에 대한 카카오 API 중복 호출 감소 |
@@ -278,16 +278,69 @@ spring:
 캐시 프록시를 포함한 테스트에서 같은 `courseId`를 두 번 요청하고 repository 조회가 한 번만 실행되는지 검증했다. 전체 백엔드 테스트도 성공했다.
 
 
-## 6. 2순위: 공간 데이터 검증을 쓰기 시점으로 이동
+## 6. 2순위 해결: 공간 데이터 검증을 쓰기 시점으로 이동
 
-현재 내부 내비게이션 조회는 `ST_IsValid`, `ST_IsEmpty`, SRID, geometry type 및 계산 거리 등을 읽을 때 확인한다. 코스가 등록되거나 수정될 때 한 번 검증하고 검증된 데이터만 저장하면 반복 조회 비용을 줄일 수 있다.
+기존 내부 내비게이션 조회는 `ST_IsValid`, `ST_IsEmpty`, `ST_SRID`, `GeometryType`, `ST_NPoints`, `ST_Length`, `ST_Distance`를 요청마다 실행했다. 이를 애플리케이션 검증, DB 트리거와 CHECK 제약조건으로 이동했다.
 
-적용 방법은 다음과 같다.
+### 6.1 애플리케이션 검증
 
-- 코스 생성·수정 서비스에서 geometry 유효성 검증
-- DB CHECK 제약조건으로 SRID와 geometry type 보장
-- 계산 거리가 자주 필요하면 쓰기 시 계산해 컬럼에 저장
-- 기존 비정상 데이터는 마이그레이션 과정에서 정리
+`CourseGenerationService.save()`가 repository를 호출하기 전에 `CoursePathValidator`로 다음 항목을 검사한다.
+
+- GeoJSON type이 `LineString`인지
+- 좌표가 두 개 이상인지
+- 각 좌표가 `[경도, 위도]` 두 값으로 구성되는지
+- 값이 null, NaN, Infinity가 아닌지
+- 경도 `-180~180`, 위도 `-90~90` 범위인지
+
+잘못된 요청은 `COURSE_PATH_DATA_INVALID`로 거부하므로 DB 호출이 발생하지 않는다.
+
+### 6.2 DB 검증과 파생값 계산
+
+DB는 `geometry(LineString, 4326)` 컬럼 타입으로 geometry 종류와 SRID를 보장한다. 추가 마이그레이션은 모든 `course` INSERT 및 path UPDATE에 트리거를 적용해 다음 값을 한 번 계산한다.
+
+```text
+start_point       = ST_StartPoint(path)
+end_point         = ST_EndPoint(path)
+distance_m        = ST_Length(ST_Transform(path, 5179))
+estimated_minutes = distance_m / 1.2m/s
+```
+
+빈 경로, 유효하지 않은 경로, 좌표가 2개 미만인 경로는 트리거와 CHECK 제약조건이 함께 차단한다. 애플리케이션을 통하지 않는 직접 SQL 입력도 동일하게 보호된다.
+
+### 6.3 조회 쿼리 단순화
+
+내비게이션 조회에서는 저장된 파생값을 사용하고 경로를 응답 형식으로 바꾸는 `ST_AsGeoJSON`만 남겼다.
+
+```sql
+SELECT
+    c.course_id,
+    c.name,
+    c.distance_m,
+    c.estimated_minutes,
+    c.is_loop,
+    ST_Y(c.start_point),
+    ST_X(c.start_point),
+    ST_Y(c.end_point),
+    ST_X(c.end_point),
+    ST_AsGeoJSON(c.path)
+FROM public.course c
+WHERE c.course_id = :courseId;
+```
+
+### 6.4 Docker 적용 방식
+
+`docker/130-course-path-write-validation.sql`은 기존 행을 삭제하지 않고 시작점과 종료점만 경로 기준으로 보정하며, 함수·트리거·제약조건을 멱등하게 생성한다.
+
+- 새 볼륨: PostgreSQL entrypoint의 `130-course-path-write-validation.sh`가 자동 실행된다.
+- 기존 볼륨: entrypoint 초기화 스크립트가 다시 실행되지 않으므로 컨테이너에 마운트된 스크립트를 수동 실행한다.
+
+```bash
+docker compose up -d postgres
+docker exec walking-mvp-postgres \
+  bash /docker-entrypoint-initdb.d/130-course-path-write-validation.sh
+```
+
+실제 로컬 Docker DB에서 40개 코스가 유지됐고 누락됐던 종료점 36개가 보정됐다. 두 번째 실행은 변경 행 `0개`로 정상 종료됐으며 세 CHECK 제약조건과 트리거가 활성화된 것을 확인했다.
 
 ## 7. 2순위: 길찾기 응답 압축
 

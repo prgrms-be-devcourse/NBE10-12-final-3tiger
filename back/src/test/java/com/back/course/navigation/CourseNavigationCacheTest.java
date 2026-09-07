@@ -59,13 +59,6 @@ class CourseNavigationCacheTest {
                   [127.037,37.544],[127.038,37.545]
                 ]}
                 """);
-        given(view.getCoordinateCount()).willReturn(2);
-        given(view.getSrid()).willReturn(4326);
-        given(view.getGeometryType()).willReturn("LINESTRING");
-        given(view.getPathValid()).willReturn(true);
-        given(view.getPathEmpty()).willReturn(false);
-        given(view.getCalculatedDistanceM()).willReturn(2500.0);
-        given(view.getStartEndDistanceM()).willReturn(0.0);
         return view;
     }
 

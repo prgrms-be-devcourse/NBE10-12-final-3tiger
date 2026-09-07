@@ -9,6 +9,7 @@ CREATE TABLE course (
     name              VARCHAR(200) NOT NULL,
     path              geometry(LineString, 4326),
     start_point       geometry(Point, 4326),
+    end_point         geometry(Point, 4326),
     distance_m        INTEGER NOT NULL,
     estimated_minutes INTEGER NOT NULL,
     elevation_gain_m  INTEGER DEFAULT 0,
@@ -20,7 +21,7 @@ CREATE TABLE course (
 );
 
 INSERT INTO course (
-    course_id, region_code, name, path, start_point,
+    course_id, region_code, name, path, start_point, end_point,
     distance_m, estimated_minutes, is_loop, source
 ) VALUES (
     101,
@@ -30,6 +31,7 @@ INSERT INTO course (
         'LINESTRING(127.037 37.544, 127.038 37.545, 127.037 37.544)',
         4326
     ),
+    ST_SetSRID(ST_MakePoint(127.037, 37.544), 4326),
     ST_SetSRID(ST_MakePoint(127.037, 37.544), 4326),
     300,
     5,
@@ -43,7 +45,8 @@ INSERT INTO course (
         'LINESTRING(126.850 37.550, 126.851 37.551)',
         4326
     ),
-    NULL,
+    ST_SetSRID(ST_MakePoint(126.850, 37.550), 4326),
+    ST_SetSRID(ST_MakePoint(126.851, 37.551), 4326),
     150,
     3,
     false,
