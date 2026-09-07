@@ -329,15 +329,15 @@ WHERE c.course_id = :courseId;
 
 ### 6.4 Docker 적용 방식
 
-`docker/130-course-path-write-validation.sql`은 기존 행을 삭제하지 않고 시작점과 종료점만 경로 기준으로 보정하며, 함수·트리거·제약조건을 멱등하게 생성한다.
+`docker/140-course-path-write-validation.sql`은 기존 행을 삭제하지 않고 시작점과 종료점만 경로 기준으로 보정하며, 함수·트리거·제약조건을 멱등하게 생성한다.
 
-- 새 볼륨: PostgreSQL entrypoint의 `130-course-path-write-validation.sh`가 자동 실행된다.
+- 새 볼륨: PostgreSQL entrypoint의 `140-course-path-write-validation.sh`가 자동 실행된다.
 - 기존 볼륨: entrypoint 초기화 스크립트가 다시 실행되지 않으므로 컨테이너에 마운트된 스크립트를 수동 실행한다.
 
 ```bash
 docker compose up -d postgres
 docker exec walking-mvp-postgres \
-  bash /docker-entrypoint-initdb.d/130-course-path-write-validation.sh
+  bash /docker-entrypoint-initdb.d/140-course-path-write-validation.sh
 ```
 
 실제 로컬 Docker DB에서 40개 코스가 유지됐고 누락됐던 종료점 36개가 보정됐다. 두 번째 실행은 변경 행 `0개`로 정상 종료됐으며 세 CHECK 제약조건과 트리거가 활성화된 것을 확인했다.
