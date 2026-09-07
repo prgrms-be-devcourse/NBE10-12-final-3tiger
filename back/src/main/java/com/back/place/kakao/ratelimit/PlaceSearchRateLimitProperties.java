@@ -8,11 +8,12 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 
 @Component
-  @ConfigurationProperties(prefix = "app.place.rate-limit")
-  @Getter
-  @Setter
-  public class PlaceSearchRateLimitProperties {
+@ConfigurationProperties(prefix = "app.place.rate-limit")
+@Getter
+@Setter
+public class PlaceSearchRateLimitProperties {
 
-      private long limit = 30;
-      private Duration window = Duration.ofSeconds(60);
-  }
+    private long limit = 30;
+    private long fallbackLimit = 10;
+    private Duration window = Duration.ofSeconds(60);
+}

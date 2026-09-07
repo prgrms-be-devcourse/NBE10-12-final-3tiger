@@ -3,6 +3,7 @@ package com.back.place.kakao.ratelimit;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 
@@ -23,12 +24,15 @@ class PlaceSearchRateLimiterTest {
 
     private final StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
     private final PlaceSearchRateLimitProperties properties = properties();
+    private final PlaceSearchLocalRateLimiter localRateLimiter =
+            new PlaceSearchLocalRateLimiter(properties);
     private final PlaceSearchRateLimiter rateLimiter =
-            new PlaceSearchRateLimiter(redisTemplate, properties);
+            new PlaceSearchRateLimiter(redisTemplate, properties, localRateLimiter);
 
     private static PlaceSearchRateLimitProperties properties() {
         PlaceSearchRateLimitProperties properties = new PlaceSearchRateLimitProperties();
         properties.setLimit(30);
+        properties.setFallbackLimit(10);
         properties.setWindow(java.time.Duration.ofSeconds(60));
         return properties;
     }
@@ -66,15 +70,33 @@ class PlaceSearchRateLimiterTest {
     }
 
     @Test
-    void failsWhenRedisReturnsNoCount() {
+    void usesLocalFallbackWhenRedisReturnsNoCount() {
         given(redisTemplate.execute(
                 any(RedisScript.class),
                 anyList(),
                 any()
         )).willReturn(null);
 
+        assertThatCode(() -> rateLimiter.check("IP:127.0.0.1"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void usesStricterLocalLimitWhenRedisIsUnavailable() {
+        given(redisTemplate.execute(
+                any(RedisScript.class),
+                anyList(),
+                any()
+        )).willThrow(new RedisConnectionFailureException("Redis unavailable"));
+
+        for (int request = 0; request < 10; request++) {
+            assertThatCode(() -> rateLimiter.check("IP:127.0.0.1"))
+                    .doesNotThrowAnyException();
+        }
+
         assertThatThrownBy(() -> rateLimiter.check("IP:127.0.0.1"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("장소 검색 요청 횟수를 확인할 수 없습니다.");
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.PLACE_SEARCH_RATE_LIMIT_EXCEEDED));
     }
 }

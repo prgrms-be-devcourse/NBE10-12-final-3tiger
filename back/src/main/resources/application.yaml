@@ -53,6 +53,7 @@ app:
       read-timeout: 3s
     rate-limit:
       limit: ${PLACE_SEARCH_RATE_LIMIT:30}
+      fallback-limit: ${PLACE_SEARCH_FALLBACK_RATE_LIMIT:10}
       window: ${PLACE_SEARCH_RATE_LIMIT_WINDOW:60s}
   map:
     kakao:
