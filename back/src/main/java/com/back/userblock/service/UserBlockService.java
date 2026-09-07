@@ -13,17 +13,24 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
 public class UserBlockService {
 
+    // 빈 in 절을 만들지 않기 위한 sentinel (user id 는 항상 양수)
+    private static final long NO_SUCH_USER_ID = -1L;
+
     private final UserBlockRepository userBlocks;
+    private final UserBlockWriter userBlockWriter;
     private final UserRepository users;
 
-    public UserBlockService(UserBlockRepository userBlocks, UserRepository users) {
+    public UserBlockService(UserBlockRepository userBlocks, UserBlockWriter userBlockWriter, UserRepository users) {
         this.userBlocks = userBlocks;
+        this.userBlockWriter = userBlockWriter;
         this.users = users;
     }
 
@@ -39,7 +46,7 @@ public class UserBlockService {
 
         if (!userBlocks.existsByBlocker_IdAndBlocked_Id(blockerId, blockedId)) {
             try {
-                userBlocks.save(new UserBlock(users.getReferenceById(blockerId), users.getReferenceById(blockedId)));
+                userBlockWriter.trySave(new UserBlock(users.getReferenceById(blockerId), users.getReferenceById(blockedId)));
             } catch (DataIntegrityViolationException e) {
                 // uk_user_block_blocker_blocked 위반 = 동시 중복 차단 → 멱등 처리
             }
@@ -68,6 +75,18 @@ public class UserBlockService {
     public boolean isBlocked(Long userIdA, Long userIdB) {
         return userBlocks.existsByBlocker_IdAndBlocked_Id(userIdA, userIdB)
                 || userBlocks.existsByBlocker_IdAndBlocked_Id(userIdB, userIdA);
+    }
+
+    // 비로그인이면 차단 관계가 없다. 결과가 비면 sentinel 을 넣어 빈 in 절을 피한다.
+    public Collection<Long> excludedUserIds(Long userId) {
+        if (userId == null) {
+            return List.of(NO_SUCH_USER_ID);
+        }
+        Set<Long> blocked = relatedUserIds(userId);
+        if (blocked.isEmpty()) {
+            return List.of(NO_SUCH_USER_ID);
+        }
+        return blocked;
     }
 
     private BlockedUser toBlockedUser(UserBlock block) {

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -25,9 +26,11 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -39,6 +42,7 @@ class ReportServiceTest {
     private static final long OTHER_USER_ID = 42L;
 
     @Mock private ReportRepository reports;
+    @Mock private ReportWriter reportWriter;
     @Mock private UserRepository users;
     @Mock private PostRepository posts;
     @Mock private CommentRepository comments;
@@ -47,7 +51,7 @@ class ReportServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ReportService(reports, users, posts, comments, THRESHOLD);
+        service = new ReportService(reports, reportWriter, users, posts, comments, THRESHOLD);
     }
 
     private User user(long id) {
@@ -79,7 +83,7 @@ class ReportServiceTest {
         // then
         assertThat(result.reportCount()).isEqualTo(1L);
         assertThat(result.hidden()).isFalse();
-        verify(reports).save(any(Report.class));
+        verify(reportWriter).trySave(any(Report.class));
         verify(posts, never()).hide(any());
     }
 
@@ -97,7 +101,7 @@ class ReportServiceTest {
         // then
         assertThat(result.reportCount()).isEqualTo(2L);
         assertThat(result.hidden()).isFalse();
-        verify(reports, never()).save(any());
+        verify(reportWriter, never()).trySave(any());
     }
 
     @Test
@@ -142,7 +146,7 @@ class ReportServiceTest {
         // then
         assertThat(exception.status()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(exception.getMessage()).isEqualTo("자기 자신은 신고할 수 없습니다.");
-        verify(reports, never()).save(any());
+        verify(reportWriter, never()).trySave(any());
     }
 
     @Test
@@ -158,7 +162,7 @@ class ReportServiceTest {
         // then
         assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(exception.getMessage()).isEqualTo("존재하지 않는 게시물입니다.");
-        verify(reports, never()).save(any());
+        verify(reportWriter, never()).trySave(any());
     }
 
     @Test
@@ -191,7 +195,7 @@ class ReportServiceTest {
         // then
         assertThat(exception.status()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(exception.getMessage()).isEqualTo("본인 게시물은 신고할 수 없습니다.");
-        verify(reports, never()).save(any());
+        verify(reportWriter, never()).trySave(any());
     }
 
     @Test
@@ -207,6 +211,26 @@ class ReportServiceTest {
         // then
         assertThat(exception.status()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(exception.getMessage()).isEqualTo("본인 댓글은 신고할 수 없습니다.");
-        verify(reports, never()).save(any());
+        verify(reportWriter, never()).trySave(any());
+    }
+
+    @Test
+    @DisplayName("t10: 동시 중복 신고로 Writer가 DataIntegrityViolationException을 던지면 예외 없이 현재 상태를 반환한다(멱등)")
+    void t10() {
+        // given
+        given(posts.findById(10L)).willReturn(Optional.of(post(OTHER_USER_ID)));
+        given(reports.existsByReporter_IdAndTargetTypeAndTargetId(REPORTER_ID, ReportTargetType.POST, 10L)).willReturn(false);
+        willThrow(new DataIntegrityViolationException("uk_report_reporter_target"))
+                .given(reportWriter).trySave(any(Report.class));
+        given(reports.countByTargetTypeAndTargetId(ReportTargetType.POST, 10L)).willReturn(2L);
+
+        // when & then
+        ReportService.ReportResult[] result = new ReportService.ReportResult[1];
+        assertThatCode(() ->
+                result[0] = service.report(REPORTER_ID, ReportTargetType.POST, 10L, ReportReason.SPAM))
+                .doesNotThrowAnyException();
+        assertThat(result[0].reportCount()).isEqualTo(2L);
+        assertThat(result[0].hidden()).isFalse();
+        verify(reportWriter).trySave(any(Report.class));
     }
 }

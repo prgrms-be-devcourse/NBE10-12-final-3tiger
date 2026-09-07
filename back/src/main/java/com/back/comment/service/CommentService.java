@@ -47,12 +47,9 @@ public class CommentService {
         this.userBlockService = userBlockService;
     }
 
-    // 빈 in 절을 만들지 않기 위한 sentinel (user id 는 항상 양수)
-    private static final long NO_SUCH_USER_ID = -1L;
-
     public PageResponse<CommentResponse> getComments(Long postId, Long userId, String sort, Pageable pageable) {
         getPostByIdOrThrow(postId);
-        Collection<Long> excludedUserIds = excludedUserIds(userId);
+        Collection<Long> excludedUserIds = userBlockService.excludedUserIds(userId);
         // 원댓글만 sort 로 분기 (잘못된 값은 latest 로 폴백). 답글은 항상 createdAt ASC 유지
         Sort sorting = "upvote".equalsIgnoreCase(sort)
                 ? Sort.by(Sort.Order.desc("upvoteCount"), Sort.Order.desc("createdAt"))
@@ -157,18 +154,6 @@ public class CommentService {
             return;
         }
         comments.delete(comment);
-    }
-
-    // 비로그인이면 차단 관계가 없다. 결과가 비면 sentinel 을 넣어 빈 in 절을 피한다.
-    private Collection<Long> excludedUserIds(Long userId) {
-        if (userId == null) {
-            return List.of(NO_SUCH_USER_ID);
-        }
-        Set<Long> blocked = userBlockService.relatedUserIds(userId);
-        if (blocked.isEmpty()) {
-            return List.of(NO_SUCH_USER_ID);
-        }
-        return blocked;
     }
 
     private Post getPostByIdOrThrow(Long id) {
