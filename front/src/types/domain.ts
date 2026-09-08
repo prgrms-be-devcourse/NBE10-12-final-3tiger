@@ -6,6 +6,38 @@ export type UserProfile = {
   profileImageUrl?: string | null;
   primaryPersona?: string | null;
   personaTags?: string[];
+  pointBalance: number;
+};
+
+export type ShopItemType = "PROFILE_BORDER" | "POST_BORDER" | "PROFILE_BADGE";
+
+export type ShopItem = {
+  itemId: number;
+  type: ShopItemType;
+  code: string;
+  name: string;
+  description?: string | null;
+  price: number;
+  owned: boolean;
+  equipped: boolean;
+};
+
+export type MyItem = {
+  userItemId: number;
+  itemId: number;
+  type: ShopItemType;
+  code: string;
+  name: string;
+  equipped: boolean;
+  purchasedAt: string;
+};
+
+export type ShopPurchase = {
+  itemId: number;
+  type: ShopItemType;
+  code: string;
+  remainingPointBalance: number;
+  purchasedAt: string;
 };
 
 export type CourseScores = {
@@ -138,6 +170,9 @@ export type Post = {
   isLiked?: boolean;
   isBookmarked?: boolean;
   profileImageUrl?: string;
+  profileBorderCode?: string | null;
+  postBorderCode?: string | null;
+  profileBadgeCode?: string | null;
 };
 
 export type PostFeedItem = Post & {
@@ -156,12 +191,7 @@ export type PersonalUserMemo = {
 };
 
 export type ReportReason =
-  | "SPAM"
-  | "ABUSE"
-  | "SEXUAL"
-  | "HARASSMENT"
-  | "ILLEGAL"
-  | "ETC";
+  "SPAM" | "ABUSE" | "SEXUAL" | "HARASSMENT" | "ILLEGAL" | "ETC";
 
 export type ReportTargetType = "USER" | "COMMENT" | "POST";
 

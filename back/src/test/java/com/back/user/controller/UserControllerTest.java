@@ -86,6 +86,8 @@ class UserControllerTest {
     @ValueSource(strings = {
             "{\"email\":\"\",\"password\":\"plain-password\",\"nickname\":\"산책러\"}",
             "{\"email\":\"invalid-email\",\"password\":\"plain-password\",\"nickname\":\"산책러\"}",
+            "{\"email\":\"test@adb\",\"password\":\"plain-password\",\"nickname\":\"산책러\"}",
+            "{\"email\":\"test@\",\"password\":\"plain-password\",\"nickname\":\"산책러\"}",
             "{\"email\":\"walker@example.com\",\"password\":\"\",\"nickname\":\"산책러\"}",
             "{\"email\":\"walker@example.com\",\"password\":\"plain-password\",\"nickname\":\"\"}"
     })
@@ -95,6 +97,25 @@ class UserControllerTest {
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON_400"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"test@gmail.com", "test@naver.com", "user@company.co.kr"})
+    void signupAcceptsEmailWithTopLevelDomain(String email) throws Exception {
+        given(userService.signup(any())).willReturn(new SignupResponse(1L, "NORMAL"));
+
+        mvc.perform(post("/api/v1/users/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "%s",
+                                  "password": "plain-password",
+                                  "nickname": "산책러"
+                                }
+                                """.formatted(email)))
+                .andExpect(status().isOk());
+
+        verify(userService).signup(any());
     }
 
     @Test

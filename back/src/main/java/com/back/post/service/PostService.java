@@ -11,6 +11,9 @@ import com.back.post.domain.Post;
 import com.back.post.repository.PostRepository;
 import com.back.post.repository.PostLikeRepository;
 import com.back.post.storage.PhotoStorage;
+import com.back.shop.domain.ShopItemType;
+import com.back.shop.domain.UserItem;
+import com.back.shop.repository.UserItemRepository;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
 import com.back.userblock.service.UserBlockService;
@@ -34,15 +37,18 @@ public class PostService {
     private final BookmarkRepository bookmarks;
     private final CommentUpvoteRepository commentUpvotes; private final PhotoStorage storage;
     private final UserBlockService userBlockService;
+    private final UserItemRepository userItems;
     public PostService(PostRepository posts, UserRepository users, CourseRepository courses,
                        PostLikeRepository postLikes, CommentRepository comments,
                        CommentUpvoteRepository commentUpvotes, PhotoStorage storage,
-                       BookmarkRepository bookmarks, UserBlockService userBlockService) {
+                       BookmarkRepository bookmarks, UserBlockService userBlockService,
+                       UserItemRepository userItems) {
         this.posts = posts; this.users = users; this.courses = courses;
         this.postLikes = postLikes; this.comments = comments;
         this.commentUpvotes = commentUpvotes; this.storage = storage;
         this.bookmarks = bookmarks;
         this.userBlockService = userBlockService;
+        this.userItems = userItems;
     }
 
     public PageResponse<FeedItem> feed(Long userId, String sort, int page, int size, String keyword) {
@@ -66,7 +72,10 @@ public class PostService {
         Set<Long> bookmarkedCourseIds = userId == null || courseIds.isEmpty()
                 ? Set.of()
                 : bookmarks.findBookmarkedCourseIds(userId, courseIds);
-        return PageResponse.from(found.map(post -> toFeedItem(post, userId, commentCounts, likedPostIds, bookmarkedCourseIds)));
+        Map<Long, EquippedAppearance> appearances = equippedAppearances(found);
+        return PageResponse.from(found.map(post -> toFeedItem(
+                post, userId, commentCounts, likedPostIds, bookmarkedCourseIds,
+                appearances.getOrDefault(post.getUser().getId(), EquippedAppearance.EMPTY))));
     }
     public PageResponse<MyPostItem> mine(Long userId, int page, int size) {
         Page<Post> found = posts.findByUserId(userId, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
@@ -97,11 +106,12 @@ public class PostService {
         storage.delete(userId, post.getPhotoUrl());
     }
     private FeedItem toFeedItem(Post p, Long currentUserId, Map<Long, Long> commentCounts, Set<Long> likedPostIds,
-                                Set<Long> bookmarkedCourseIds) {
+                                Set<Long> bookmarkedCourseIds, EquippedAppearance appearance) {
         return new FeedItem(p.getId(), p.getCourse().getId(), p.getTitle(), p.getUser().getId(), p.getUser().getNickname(), p.getUser().getProfileImageUrl(), p.getContent(),
                 p.getPhotoUrl(), p.getLikeCount(), commentCounts.getOrDefault(p.getId(), 0L),
                 likedPostIds.contains(p.getId()), bookmarkedCourseIds.contains(p.getCourse().getId()),
-                currentUserId != null && p.getUser().getId().equals(currentUserId), p.getWalkedAt());
+                currentUserId != null && p.getUser().getId().equals(currentUserId), p.getWalkedAt(),
+                appearance.profileBorderCode(), appearance.postBorderCode(), appearance.profileBadgeCode());
     }
     private Post getPostByIdOrThrow(Long id) {
         return posts.findById(id).orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 게시물입니다."));
@@ -121,11 +131,44 @@ public class PostService {
                 .collect(Collectors.toMap(CommentRepository.PostCommentCount::getPostId,
                         CommentRepository.PostCommentCount::getCommentCount));
     }
+    private Map<Long, EquippedAppearance> equippedAppearances(Page<Post> found) {
+        List<Long> authorIds = found.getContent().stream()
+                .map(post -> post.getUser().getId())
+                .distinct()
+                .toList();
+        if (authorIds.isEmpty()) return Map.of();
+
+        Map<Long, EquippedAppearance> result = new java.util.HashMap<>();
+        for (UserItem userItem : userItems.findByUser_IdInAndEquippedTrue(authorIds)) {
+            Long authorId = userItem.getUser().getId();
+            EquippedAppearance current = result.getOrDefault(authorId, EquippedAppearance.EMPTY);
+            String code = userItem.getShopItem().getCode();
+            result.put(authorId, switch (userItem.getShopItem().getType()) {
+                case PROFILE_BORDER -> current.withProfileBorder(code);
+                case POST_BORDER -> current.withPostBorder(code);
+                case PROFILE_BADGE -> current.withProfileBadge(code);
+            });
+        }
+        return result;
+    }
     public record CreateCommand(Long courseId, String content, String photoUrl, LocalDateTime walkedAt) {}
     public record CreatedPost(Long postId) {}
     public record FeedItem(Long postId, Long courseId, String title, Long userId, String nickname, String profileImageUrl, String content, String photoUrl,
                            int likeCount, long commentCount, boolean isLiked, boolean isBookmarked,
-                           boolean isMine, LocalDateTime walkedAt) {}
+                           boolean isMine, LocalDateTime walkedAt, String profileBorderCode,
+                           String postBorderCode, String profileBadgeCode) {}
     public record MyPostItem(Long postId, Long courseId, String content, String photoUrl,
                              int likeCount, long commentCount, LocalDateTime walkedAt) {}
+    private record EquippedAppearance(String profileBorderCode, String postBorderCode, String profileBadgeCode) {
+        private static final EquippedAppearance EMPTY = new EquippedAppearance(null, null, null);
+        private EquippedAppearance withProfileBorder(String code) {
+            return new EquippedAppearance(code, postBorderCode, profileBadgeCode);
+        }
+        private EquippedAppearance withPostBorder(String code) {
+            return new EquippedAppearance(profileBorderCode, code, profileBadgeCode);
+        }
+        private EquippedAppearance withProfileBadge(String code) {
+            return new EquippedAppearance(profileBorderCode, postBorderCode, code);
+        }
+    }
 }

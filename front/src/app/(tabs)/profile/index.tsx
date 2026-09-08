@@ -18,6 +18,11 @@ import {
   updateNotificationSetting,
 } from "@/api/notification-api";
 import { getMyProfile, updateMyProfile, withdraw } from "@/api/user-api";
+import { getMyItems } from "@/api/shop-api";
+import {
+  badgeAppearance,
+  profileBorderStyle,
+} from "@/components/shop/cosmetics";
 import { ErrorState } from "@/components/ui/data-state";
 import { Switch } from "@/components/ui/switch";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
@@ -62,6 +67,13 @@ const MENUS = [
     route: "/course/generate",
   },
   {
+    label: "꾸미기 상점",
+    description: "포인트로 프로필과 게시글을 꾸며보세요",
+    icon: "color-palette" as const,
+    color: "bg-[#087A3F]",
+    route: "/shop",
+  },
+  {
     label: "저장한 코스",
     description: "다시 걷고 싶은 코스를 확인해요",
     icon: "bookmark" as const,
@@ -104,6 +116,11 @@ export default function ProfileScreen() {
     queryFn: getMyProfile,
     enabled: isAuthenticated,
   });
+  const myItemsQuery = useQuery({
+    queryKey: ["my-items"],
+    queryFn: getMyItems,
+    enabled: isAuthenticated,
+  });
   const profileMutation = useMutation({
     mutationFn: updateMyProfile,
     onSuccess: () =>
@@ -120,7 +137,9 @@ export default function ProfileScreen() {
     onMutate: (enabled) =>
       queryClient.setQueryData(["notification-setting"], { enabled }),
     onError: () =>
-      void queryClient.invalidateQueries({ queryKey: ["notification-setting"] }),
+      void queryClient.invalidateQueries({
+        queryKey: ["notification-setting"],
+      }),
   });
   const logoutMutation = useMutation({
     mutationFn: () =>
@@ -217,6 +236,14 @@ export default function ProfileScreen() {
       />
     );
   const profile = profileQuery.data;
+  const profileBorderCode = myItemsQuery.data?.find(
+    (item) => item.type === "PROFILE_BORDER" && item.equipped,
+  )?.code;
+  const profileBadge = badgeAppearance(
+    myItemsQuery.data?.find(
+      (item) => item.type === "PROFILE_BADGE" && item.equipped,
+    )?.code,
+  );
   return (
     <SafeAreaView
       className="flex-1 bg-[#F2F7F2] dark:bg-[#111411]"
@@ -239,7 +266,9 @@ export default function ProfileScreen() {
             </View>
             <View className="flex-row items-center gap-1.5">
               <Ionicons
-                name={notificationEnabled ? "notifications" : "notifications-off"}
+                name={
+                  notificationEnabled ? "notifications" : "notifications-off"
+                }
                 size={16}
                 color={notificationEnabled ? "#86EFAC" : "#526056"}
               />
@@ -253,7 +282,7 @@ export default function ProfileScreen() {
             </View>
           </View>
           <View className="flex-row items-center gap-3">
-            <View>
+            <View className="relative h-16 w-16 rounded-full">
               <Image
                 source={
                   profile?.profileImageUrl
@@ -261,6 +290,7 @@ export default function ProfileScreen() {
                     : DEFAULT_PROFILE_IMAGE
                 }
                 className="h-16 w-16 rounded-full border-2 border-slate-100"
+                style={profileBorderStyle(profileBorderCode)}
               />
               <Pressable
                 accessibilityRole="button"
@@ -272,12 +302,30 @@ export default function ProfileScreen() {
               </Pressable>
             </View>
             <View className="flex-1 pr-16">
-              <Text className="text-[17px] font-semibold text-[#191C1D] dark:text-[#F1F5F2]">
-                {profile?.nickname}
-              </Text>
+              <View className="flex-row items-center gap-1.5">
+                <Text className="text-[17px] font-semibold text-[#191C1D] dark:text-[#F1F5F2]">
+                  {profile?.nickname}
+                </Text>
+                {profileBadge && (
+                  <Ionicons
+                    name={profileBadge.icon}
+                    size={16}
+                    color={profileBadge.color}
+                  />
+                )}
+              </View>
               <Text className="mt-0.5 text-xs text-slate-500 dark:text-[#AAB5AD]">
                 {profile?.email}
               </Text>
+              <Pressable
+                className="mt-2 self-start flex-row items-center gap-1 rounded-full bg-[#E9FBEF] px-2.5 py-1 dark:bg-[#24382B]"
+                onPress={() => router.push("/shop" as never)}
+              >
+                <Ionicons name="leaf" size={13} color="#087A3F" />
+                <Text className="text-xs font-extrabold text-[#087A3F] dark:text-[#86EFAC]">
+                  {profile?.pointBalance ?? 0} P
+                </Text>
+              </Pressable>
             </View>
           </View>
           <View className="mt-3.5 border-t border-slate-200 pt-3 dark:border-[#343D36]">
