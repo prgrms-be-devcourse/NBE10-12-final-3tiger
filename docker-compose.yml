@@ -6,6 +6,7 @@ services:
     image: walking-mvp-postgis-pgrouting:17-3.5
     platform: linux/amd64
     container_name: walking-mvp-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: walking_mvp
       POSTGRES_USER: walking
@@ -59,6 +60,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: walking-mvp-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
