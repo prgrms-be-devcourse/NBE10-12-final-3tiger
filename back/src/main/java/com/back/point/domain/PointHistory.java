@@ -69,8 +69,8 @@ public class PointHistory {
             Long referenceId,
             LocalDateTime createdAt
     ) {
-        if (amount <= 0) {
-            throw new IllegalArgumentException("적립 포인트는 0보다 커야 합니다.");
+        if (amount == 0) {
+            throw new IllegalArgumentException("포인트 변동액은 0일 수 없습니다.");
         }
         this.user = user;
         this.amount = amount;

@@ -34,6 +34,11 @@ import { PostCommentSheet } from "@/components/comments/post-comment-sheet";
 import { PostActions } from "@/components/feed/post-actions";
 import { PostMenuSheet } from "@/components/feed/post-menu-sheet";
 import { PersonalUserMemoSheet } from "@/components/user/personal-user-memo-sheet";
+import {
+  badgeAppearance,
+  postBorderStyle,
+  profileBorderStyle,
+} from "@/components/shop/cosmetics";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
@@ -106,6 +111,7 @@ function FeedPost({
   const [contentLineCount, setContentLineCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [memoOpen, setMemoOpen] = useState(false);
+  const profileBadge = badgeAppearance(item.profileBadgeCode);
   useEffect(() => {
     setLiked(item.isLiked);
     setLikeCount(item.likeCount);
@@ -231,25 +237,40 @@ function FeedPost({
   });
 
   return (
-    <View className="w-full bg-white dark:bg-[#1B211D]">
+    <View
+      className="w-full bg-white dark:bg-[#1B211D]"
+      style={postBorderStyle(item.postBorderCode)}
+    >
       <View className="min-h-[52px] flex-row items-center gap-2 px-3 py-2">
-        <Avatar
-          alt={`${item.nickname ?? "사용자"} 프로필`}
-          className="h-8 w-8 border border-[#E4EAE5]"
-        >
-          <AvatarImage
-            source={
-              item.profileImageUrl
-                ? { uri: item.profileImageUrl }
-                : DEFAULT_PROFILE_IMAGE
-            }
-          />
-          <AvatarFallback className="bg-[#E9F5EC]" />
-        </Avatar>
+        <View className="rounded-full">
+          <Avatar
+            alt={`${item.nickname ?? "사용자"} 프로필`}
+            className="h-8 w-8 border border-[#E4EAE5]"
+            style={profileBorderStyle(item.profileBorderCode)}
+          >
+            <AvatarImage
+              source={
+                item.profileImageUrl
+                  ? { uri: item.profileImageUrl }
+                  : DEFAULT_PROFILE_IMAGE
+              }
+            />
+            <AvatarFallback className="bg-[#E9F5EC]" />
+          </Avatar>
+        </View>
         <View className="flex-1">
-          <Text className="text-[13px] font-semibold leading-4 text-[#191C1D] dark:text-[#F1F5F2]">
-            {item.nickname ?? "산책러"}
-          </Text>
+          <View className="flex-row items-center gap-1">
+            <Text className="text-[13px] font-semibold leading-4 text-[#191C1D] dark:text-[#F1F5F2]">
+              {item.nickname ?? "산책러"}
+            </Text>
+            {profileBadge && (
+              <Ionicons
+                name={profileBadge.icon}
+                size={13}
+                color={profileBadge.color}
+              />
+            )}
+          </View>
           <Text className="text-[10px] text-[#6B756D] dark:text-[#AAB5AD]">
             {formatTime(item.walkedAt)}
           </Text>
@@ -558,7 +579,11 @@ export default function CommunityScreen() {
               }}
             />
             {searchOpen && (
-              <IconButton label="검색 닫기" icon="close" onPress={closeSearch} />
+              <IconButton
+                label="검색 닫기"
+                icon="close"
+                onPress={closeSearch}
+              />
             )}
             <View>
               <IconButton
@@ -650,7 +675,9 @@ export default function CommunityScreen() {
             scrollEventThrottle={16}
             ListHeaderComponent={<View style={{ height: headerHeight }} />}
             contentContainerClassName="grow pb-6"
-            ListEmptyComponent={<EmptyState title="아직 공유된 산책이 없어요" />}
+            ListEmptyComponent={
+              <EmptyState title="아직 공유된 산책이 없어요" />
+            }
             onEndReached={() => {
               if (postsQuery.hasNextPage && !postsQuery.isFetchingNextPage)
                 void postsQuery.fetchNextPage();

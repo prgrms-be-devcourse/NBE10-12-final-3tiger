@@ -176,6 +176,16 @@ public class User extends BaseEntity {
         this.pointBalance = Math.addExact(this.pointBalance, amount);
     }
 
+    public void spendPoints(long amount) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("사용 포인트는 0보다 커야 합니다.");
+        }
+        if (this.pointBalance < amount) {
+            throw new IllegalStateException("보유 포인트보다 많이 사용할 수 없습니다.");
+        }
+        this.pointBalance = Math.subtractExact(this.pointBalance, amount);
+    }
+
     public Long getId() {
         return id;
     }

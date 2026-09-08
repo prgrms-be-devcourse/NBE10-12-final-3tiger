@@ -48,7 +48,7 @@ class PostControllerTest {
         var item = new PostService.FeedItem(10L, 1L, "POST 테스트 코스", 2L, "산책러", "https://cdn.example.com/profile.jpg",
                 "좋은 산책이었습니다.",
                 "https://example.com/walk.jpg", 3, 2, false, false, false,
-                LocalDateTime.of(2026, 8, 26, 9, 0));
+                LocalDateTime.of(2026, 8, 26, 9, 0), "GOLD", "BLUE", "STAR");
         given(postService.feed(null, "latest", 0, 20, null))
                 .willReturn(new PageResponse<>(List.of(item), 0, 20, 1));
 
@@ -64,7 +64,10 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.content[0].commentCount").value(2))
                 .andExpect(jsonPath("$.data.content[0].isLiked").value(false))
                 .andExpect(jsonPath("$.data.content[0].isBookmarked").value(false))
-                .andExpect(jsonPath("$.data.content[0].isMine").value(false));
+                .andExpect(jsonPath("$.data.content[0].isMine").value(false))
+                .andExpect(jsonPath("$.data.content[0].profileBorderCode").value("GOLD"))
+                .andExpect(jsonPath("$.data.content[0].postBorderCode").value("BLUE"))
+                .andExpect(jsonPath("$.data.content[0].profileBadgeCode").value("STAR"));
     }
 
     @Test

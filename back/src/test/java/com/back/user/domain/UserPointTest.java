@@ -30,4 +30,39 @@ class UserPointTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(user.getPointBalance()).isZero();
     }
+
+    @Test
+    @DisplayName("보유 포인트 범위 안에서 포인트를 차감한다")
+    void spendsPointsWithinBalance() {
+        User user = User.createLocal("spend@test.com", "hash", "사용자");
+        user.addPoints(100L);
+
+        user.spendPoints(70L);
+
+        assertThat(user.getPointBalance()).isEqualTo(30L);
+    }
+
+    @Test
+    @DisplayName("0 이하 금액은 차감할 수 없다")
+    void rejectsNonPositiveSpendAmount() {
+        User user = User.createLocal("invalid-spend@test.com", "hash", "사용자");
+        user.addPoints(100L);
+
+        assertThatThrownBy(() -> user.spendPoints(0L))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> user.spendPoints(-10L))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(user.getPointBalance()).isEqualTo(100L);
+    }
+
+    @Test
+    @DisplayName("보유 포인트보다 큰 금액은 차감할 수 없다")
+    void rejectsSpendOverBalance() {
+        User user = User.createLocal("over-spend@test.com", "hash", "사용자");
+        user.addPoints(50L);
+
+        assertThatThrownBy(() -> user.spendPoints(60L))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(user.getPointBalance()).isEqualTo(50L);
+    }
 }

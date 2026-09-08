@@ -11,6 +11,10 @@ import com.back.post.domain.Post;
 import com.back.post.repository.PostLikeRepository;
 import com.back.post.repository.PostRepository;
 import com.back.post.storage.PhotoStorage;
+import com.back.shop.domain.ShopItem;
+import com.back.shop.domain.ShopItemType;
+import com.back.shop.domain.UserItem;
+import com.back.shop.repository.UserItemRepository;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
 import com.back.userblock.service.UserBlockService;
@@ -54,6 +58,7 @@ class PostServiceTest {
     @Mock CommentUpvoteRepository commentUpvotes;
     @Mock PhotoStorage storage;
     @Mock UserBlockService userBlockService;
+    @Mock UserItemRepository userItems;
     @InjectMocks PostService postService;
 
     private User user(Long id) {
@@ -153,6 +158,17 @@ class PostServiceTest {
         given(postLikes.findLikedPostIds(eq(1L), any())).willReturn(List.of(10L));
         given(bookmarks.findBookmarkedCourseIds(1L, List.of(1L))).willReturn(Set.of(1L));
         given(comments.countByPostIds(any())).willReturn(List.of(commentCount));
+        ShopItem profileBorder = new ShopItem(ShopItemType.PROFILE_BORDER, "GOLD", "골드", null, 100L, true);
+        ShopItem postBorder = new ShopItem(ShopItemType.POST_BORDER, "BLUE", "블루", null, 100L, true);
+        ShopItem badge = new ShopItem(ShopItemType.PROFILE_BADGE, "STAR", "별", null, 50L, true);
+        UserItem profileBorderOwned = new UserItem(author, profileBorder, LocalDateTime.now());
+        UserItem postBorderOwned = new UserItem(author, postBorder, LocalDateTime.now());
+        UserItem badgeOwned = new UserItem(author, badge, LocalDateTime.now());
+        profileBorderOwned.equip();
+        postBorderOwned.equip();
+        badgeOwned.equip();
+        given(userItems.findByUser_IdInAndEquippedTrue(List.of(2L)))
+                .willReturn(List.of(profileBorderOwned, postBorderOwned, badgeOwned));
 
         PageResponse<PostService.FeedItem> result = postService.feed(1L, "latest", 0, 20, null);
 
@@ -164,6 +180,9 @@ class PostServiceTest {
         assertThat(item.commentCount()).isEqualTo(3);
         assertThat(item.isLiked()).isTrue();
         assertThat(item.isBookmarked()).isTrue();
+        assertThat(item.profileBorderCode()).isEqualTo("GOLD");
+        assertThat(item.postBorderCode()).isEqualTo("BLUE");
+        assertThat(item.profileBadgeCode()).isEqualTo("STAR");
     }
 
     @Test
