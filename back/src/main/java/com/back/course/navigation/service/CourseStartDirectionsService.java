@@ -3,35 +3,31 @@ package com.back.course.navigation.service;
 import com.back.course.navigation.dto.CourseStartDirectionsResponse;
 import com.back.course.navigation.dto.DirectionsMode;
 import com.back.course.navigation.dto.DirectionsStatus;
-import com.back.course.navigation.repository.CourseNavigationRepository;
-import com.back.course.navigation.repository.CourseNavigationView;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.map.kakao.KakaoDirectionsClient;
 import com.back.map.kakao.dto.KakaoRouteDirectionsResponse;
 import com.back.map.kakao.dto.KakaoTransitDirectionsResponse;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
-@Transactional(readOnly = true)
 public class CourseStartDirectionsService {
 
     private static final int STARTABLE_RADIUS_METERS = 50;
     private static final double EARTH_RADIUS_METERS = 6_371_000;
 
-    private final CourseNavigationRepository repository;
+    private final CourseStartPointQueryService startPointQueryService;
     private final KakaoDirectionsClient directionsClient;
 
     public CourseStartDirectionsService(
-            CourseNavigationRepository repository,
+            CourseStartPointQueryService startPointQueryService,
             KakaoDirectionsClient directionsClient
     ) {
-        this.repository = repository;
+        this.startPointQueryService = startPointQueryService;
         this.directionsClient = directionsClient;
     }
 
@@ -46,19 +42,15 @@ public class CourseStartDirectionsService {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
-        CourseNavigationView startPoint =
-                repository.findNavigationByCourseId(courseId)
-                        .orElseThrow(() ->
-                                new BusinessException(ErrorCode.COURSE_NOT_FOUND)
-                        );
+        CourseStartPoint startPoint = startPointQueryService.getStartPoint(courseId);
 
         validateStartPoint(startPoint);
 
-        String destinationName = destinationName(startPoint.getName());
+        String destinationName = destinationName(startPoint.name());
 
         if (distanceMeters(
                 currentLatitude, currentLongitude,
-                startPoint.getStartLat(), startPoint.getStartLng()
+                startPoint.latitude(), startPoint.longitude()
         ) <= STARTABLE_RADIUS_METERS) {
             return createResponse(
                     startPoint, destinationName, mode,
@@ -72,7 +64,7 @@ public class CourseStartDirectionsService {
                     startPoint, destinationName, mode,
                     directionsClient.getWalk(
                             currentLatitude, currentLongitude,
-                            startPoint.getStartLat(), startPoint.getStartLng(),
+                            startPoint.latitude(), startPoint.longitude(),
                             destinationName
                     )
             );
@@ -80,7 +72,7 @@ public class CourseStartDirectionsService {
                     startPoint, destinationName, mode,
                     directionsClient.getBicycle(
                             currentLatitude, currentLongitude,
-                            startPoint.getStartLat(), startPoint.getStartLng(),
+                            startPoint.latitude(), startPoint.longitude(),
                             destinationName
                     )
             );
@@ -92,7 +84,7 @@ public class CourseStartDirectionsService {
     }
 
     private CourseStartDirectionsResponse routeResponse(
-            CourseNavigationView startPoint,
+            CourseStartPoint startPoint,
             String destinationName,
             DirectionsMode mode,
             KakaoRouteDirectionsResponse result
@@ -131,14 +123,14 @@ public class CourseStartDirectionsService {
     }
 
     private CourseStartDirectionsResponse transitResponse(
-            CourseNavigationView startPoint,
+            CourseStartPoint startPoint,
             String destinationName,
             double currentLatitude,
             double currentLongitude
     ) {
         var result = directionsClient.getPublicTransit(
                 currentLatitude, currentLongitude,
-                startPoint.getStartLat(), startPoint.getStartLng(),
+                startPoint.latitude(), startPoint.longitude(),
                 destinationName
         );
 
@@ -375,12 +367,12 @@ public class CourseStartDirectionsService {
         }
     }
 
-    private void validateStartPoint(CourseNavigationView startPoint) {
-        if (startPoint.getStartLat() == null || startPoint.getStartLng() == null) {
+    private void validateStartPoint(CourseStartPoint startPoint) {
+        if (startPoint.latitude() == null || startPoint.longitude() == null) {
             throw new BusinessException(ErrorCode.COURSE_START_POINT_NOT_FOUND);
         }
         try {
-            validateCoordinates(startPoint.getStartLat(), startPoint.getStartLng());
+            validateCoordinates(startPoint.latitude(), startPoint.longitude());
         } catch (BusinessException exception) {
             throw new BusinessException(ErrorCode.COURSE_START_POINT_NOT_FOUND);
         }
@@ -418,7 +410,7 @@ public class CourseStartDirectionsService {
     }
 
     private CourseStartDirectionsResponse createResponse(
-            CourseNavigationView startPoint,
+            CourseStartPoint startPoint,
             String destinationName,
             DirectionsMode mode,
             DirectionsStatus status,
@@ -427,15 +419,15 @@ public class CourseStartDirectionsService {
             String landingUrl
     ) {
         return new CourseStartDirectionsResponse(
-                startPoint.getCourseId(),
+                startPoint.courseId(),
                 mode,
                 status,
                 startable,
                 STARTABLE_RADIUS_METERS,
                 new CourseStartDirectionsResponse.Destination(
                         destinationName,
-                        startPoint.getStartLat(),
-                        startPoint.getStartLng()
+                        startPoint.latitude(),
+                        startPoint.longitude()
                 ),
                 routes,
                 landingUrl

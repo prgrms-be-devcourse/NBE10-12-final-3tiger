@@ -2,8 +2,8 @@ package com.back.course.navigation;
 
 import com.back.course.navigation.dto.DirectionsMode;
 import com.back.course.navigation.dto.DirectionsStatus;
-import com.back.course.navigation.repository.CourseNavigationRepository;
-import com.back.course.navigation.repository.CourseNavigationView;
+import com.back.course.navigation.service.CourseStartPoint;
+import com.back.course.navigation.service.CourseStartPointQueryService;
 import com.back.course.navigation.service.CourseStartDirectionsService;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
@@ -14,7 +14,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -27,20 +26,18 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 class CourseStartDirectionsServiceTest {
 
-    private final CourseNavigationRepository repository = mock(CourseNavigationRepository.class);
+    private final CourseStartPointQueryService startPointQueryService = mock(CourseStartPointQueryService.class);
     private final KakaoDirectionsClient directionsClient = mock(KakaoDirectionsClient.class);
-    private final CourseNavigationView startPoint = mock(CourseNavigationView.class);
+    private final CourseStartPoint startPoint = new CourseStartPoint(
+            15L, "서울식물원 코스", 37.5690, 126.8350
+    );
 
     private CourseStartDirectionsService service;
 
     @BeforeEach
     void setUp() {
-        service = new CourseStartDirectionsService(repository, directionsClient);
-        given(startPoint.getCourseId()).willReturn(15L);
-        given(startPoint.getName()).willReturn("서울식물원 코스");
-        given(startPoint.getStartLat()).willReturn(37.5690);
-        given(startPoint.getStartLng()).willReturn(126.8350);
-        given(repository.findNavigationByCourseId(15L)).willReturn(Optional.of(startPoint));
+        service = new CourseStartDirectionsService(startPointQueryService, directionsClient);
+        given(startPointQueryService.getStartPoint(15L)).willReturn(startPoint);
     }
 
     @Test
@@ -161,7 +158,8 @@ class CourseStartDirectionsServiceTest {
 
     @Test
     void missingCourseReturnsCourseNotFound() {
-        given(repository.findNavigationByCourseId(99L)).willReturn(Optional.empty());
+        given(startPointQueryService.getStartPoint(99L))
+                .willThrow(new BusinessException(ErrorCode.COURSE_NOT_FOUND));
 
         assertError(
                 () -> service.getDirectionsToStart(99L, 37.50, 126.80, DirectionsMode.WALK),
@@ -175,12 +173,14 @@ class CourseStartDirectionsServiceTest {
                 () -> service.getDirectionsToStart(15L, 91, 126.80, DirectionsMode.WALK),
                 ErrorCode.INVALID_COORDINATE
         );
-        verifyNoInteractions(repository);
+        verifyNoInteractions(startPointQueryService);
     }
 
     @Test
     void missingStartPointReturnsUnprocessableEntity() {
-        given(startPoint.getStartLat()).willReturn(null);
+        given(startPointQueryService.getStartPoint(15L)).willReturn(
+                new CourseStartPoint(15L, "서울식물원 코스", null, 126.8350)
+        );
 
         assertError(
                 () -> service.getDirectionsToStart(15L, 37.50, 126.80, DirectionsMode.WALK),

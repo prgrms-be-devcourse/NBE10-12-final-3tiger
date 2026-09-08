@@ -23,7 +23,7 @@ public class KakaoPlaceClientConfig {
         );
 
         return RestClient.builder()
-                .baseUrl("https://dapi.kakao.com")
+                .baseUrl(properties.getBaseUrl())
                 .defaultHeader(
                         HttpHeaders.AUTHORIZATION,
                         "KakaoAK " + properties.getRestApiKey()

@@ -35,7 +35,7 @@ class CourseNavigationRepositoryTest {
     }
 
     @Test
-    @DisplayName("PostGIS 경로에서 안내 좌표와 검증 정보를 조회한다")
+    @DisplayName("저장된 경로 정보로 안내 응답 projection을 조회한다")
     void findsNavigationProjection() {
         CourseNavigationView view = repository.findNavigationByCourseId(101L).orElseThrow();
 
@@ -43,24 +43,37 @@ class CourseNavigationRepositoryTest {
         assertThat(view.getStartLng()).isEqualTo(127.037);
         assertThat(view.getEndLat()).isEqualTo(37.544);
         assertThat(view.getEndLng()).isEqualTo(127.037);
-        assertThat(view.getGeometryType()).isEqualToIgnoringCase("LINESTRING");
-        assertThat(view.getSrid()).isEqualTo(4326);
-        assertThat(view.getCoordinateCount()).isEqualTo(3);
-        assertThat(view.getPathValid()).isTrue();
-        assertThat(view.getPathEmpty()).isFalse();
-        assertThat(view.getCalculatedDistanceM()).isPositive();
-        assertThat(view.getStartEndDistanceM()).isLessThan(0.1);
         assertThat(view.getPathGeoJson()).contains("LineString", "127.037", "37.544");
     }
 
     @Test
-    @DisplayName("start_point가 없으면 경로의 첫 좌표를 출발점으로 사용한다")
-    void fallsBackToPathStartPoint() {
+    @DisplayName("저장 시 계산된 시작점과 종료점을 조회한다")
+    void findsStoredStartAndEndPoints() {
         CourseNavigationView view = repository.findNavigationByCourseId(102L).orElseThrow();
 
         assertThat(view.getStartLat()).isEqualTo(37.55);
         assertThat(view.getStartLng()).isEqualTo(126.85);
         assertThat(view.getEndLat()).isEqualTo(37.551);
         assertThat(view.getEndLng()).isEqualTo(126.851);
+    }
+
+    @Test
+    @DisplayName("길찾기용 출발점은 필요한 정보만 조회한다")
+    void findsStartPointProjection() {
+        CourseStartPointView view = repository.findStartPointByCourseId(101L).orElseThrow();
+
+        assertThat(view.getCourseId()).isEqualTo(101L);
+        assertThat(view.getName()).isNotBlank();
+        assertThat(view.getStartLat()).isEqualTo(37.544);
+        assertThat(view.getStartLng()).isEqualTo(127.037);
+    }
+
+    @Test
+    @DisplayName("길찾기 projection도 저장된 출발점을 조회한다")
+    void startPointProjectionUsesStoredStartPoint() {
+        CourseStartPointView view = repository.findStartPointByCourseId(102L).orElseThrow();
+
+        assertThat(view.getStartLat()).isEqualTo(37.55);
+        assertThat(view.getStartLng()).isEqualTo(126.85);
     }
 }

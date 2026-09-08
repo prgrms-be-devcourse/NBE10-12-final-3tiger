@@ -22,18 +22,4 @@ public interface CourseNavigationView {
 
     String getPathGeoJson();
 
-    Integer getCoordinateCount();
-
-    Integer getSrid();
-
-    String getGeometryType();
-
-    Boolean getPathValid();
-
-    Boolean getPathEmpty();
-
-    Double getCalculatedDistanceM();
-
-    Double getStartEndDistanceM();
-
 }

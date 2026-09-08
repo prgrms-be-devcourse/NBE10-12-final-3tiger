@@ -82,6 +82,7 @@ public class CourseGenerationService {
     /** 사용자가 선택한 코스 저장 → courseId */
     @Transactional
     public Long save(Long userId, SaveCourseRequest req) {
+        CoursePathValidator.validateForWrite(req.path());
         boolean isLoop = req.isLoopOrDefault();
         Long courseId = repo.saveFromPath(
                 req.path(), req.regionCode(), isLoop, req.endLng(), req.endLat(), req.name()

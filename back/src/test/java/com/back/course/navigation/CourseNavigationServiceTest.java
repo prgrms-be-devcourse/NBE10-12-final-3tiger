@@ -64,24 +64,6 @@ class CourseNavigationServiceTest {
     }
 
     @Test
-    @DisplayName("LineString이 아닌 경로를 거부한다")
-    void rejectsNonLineStringGeometry() {
-        CourseNavigationView view = validView();
-        given(view.getGeometryType()).willReturn("POINT");
-        given(repository.findNavigationByCourseId(101L)).willReturn(Optional.of(view));
-        assertErrorCode(101L, ErrorCode.COURSE_NOT_NAVIGABLE);
-    }
-
-    @Test
-    @DisplayName("SRID 4326이 아닌 경로를 거부한다")
-    void rejectsUnexpectedSrid() {
-        CourseNavigationView view = validView();
-        given(view.getSrid()).willReturn(3857);
-        given(repository.findNavigationByCourseId(101L)).willReturn(Optional.of(view));
-        assertErrorCode(101L, ErrorCode.COURSE_NOT_NAVIGABLE);
-    }
-
-    @Test
     @DisplayName("파싱할 수 없는 GeoJSON을 서버 데이터 오류로 변환한다")
     void rejectsMalformedGeoJson() {
         CourseNavigationView view = validView();
@@ -117,13 +99,6 @@ class CourseNavigationServiceTest {
                   [127.037,37.544],[127.038,37.545]
                 ]}
                 """);
-        given(view.getCoordinateCount()).willReturn(2);
-        given(view.getSrid()).willReturn(4326);
-        given(view.getGeometryType()).willReturn("LINESTRING");
-        given(view.getPathValid()).willReturn(true);
-        given(view.getPathEmpty()).willReturn(false);
-        given(view.getCalculatedDistanceM()).willReturn(2500.0);
-        given(view.getStartEndDistanceM()).willReturn(0.0);
         return view;
     }
 }

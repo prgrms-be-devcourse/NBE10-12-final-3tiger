@@ -7,6 +7,8 @@ import com.back.course.dto.GeoJsonLineString;
 import com.back.course.dto.SaveCourseRequest;
 import com.back.course.repository.CourseGenerationRepository;
 import com.back.course.service.CourseGenerationService;
+import com.back.global.exception.BusinessException;
+import com.back.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -25,6 +27,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 class CourseGenerationServiceTest {
 
@@ -113,5 +116,17 @@ class CourseGenerationServiceTest {
 
         verify(repo).saveFromPath(eq(path), eq("11500"), eq(false), eq(126.852), eq(37.556), eq("서울숲"));
         verify(bookmarkService).add(1L, 7L);
+    }
+
+    @Test void save_rejectsInvalidPathBeforeRepositoryCall() {
+        var path = new GeoJsonLineString("LineString", List.of(List.of(126.844, 91.0)));
+        var req = new SaveCourseRequest("잘못된 코스", path, "11500", true, null, null);
+
+        assertThatThrownBy(() -> service.save(1L, req))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.COURSE_PATH_DATA_INVALID));
+
+        verify(repo, never()).saveFromPath(any(), any(), anyBoolean(), any(), any(), any());
     }
 }

@@ -13,42 +13,28 @@ public interface CourseNavigationRepository extends Repository<Course, Long> {
               SELECT
                   c.course_id AS courseId,
                   c.name AS name,
+                  ST_Y(c.start_point) AS startLat,
+                  ST_X(c.start_point) AS startLng
+              FROM course c
+              WHERE c.course_id = :courseId
+              """, nativeQuery = true)
+    Optional<CourseStartPointView> findStartPointByCourseId(
+            @Param("courseId") Long courseId
+    );
+
+    @Query(value = """
+              SELECT
+                  c.course_id AS courseId,
+                  c.name AS name,
                   c.distance_m AS distanceM,
                   c.estimated_minutes AS estimatedMinutes,
                   c.is_loop AS isLoop,
 
-                  ST_Y(
-                      COALESCE(
-                          c.start_point,
-                          ST_StartPoint(c.path)
-                      )
-                  ) AS startLat,
-
-                  ST_X(
-                      COALESCE(
-                          c.start_point,
-                          ST_StartPoint(c.path)
-                      )
-                  ) AS startLng,
-
-                  ST_Y(ST_EndPoint(c.path)) AS endLat,
-                  ST_X(ST_EndPoint(c.path)) AS endLng,
-
-                  ST_AsGeoJSON(c.path) AS pathGeoJson,
-
-                  ST_NPoints(c.path) AS coordinateCount,
-                  ST_SRID(c.path) AS srid,
-                  GeometryType(c.path) AS geometryType,
-                  ST_IsValid(c.path) AS pathValid,
-                  ST_IsEmpty(c.path) AS pathEmpty,
-
-                  ST_Length(c.path::geography)
-                      AS calculatedDistanceM,
-
-                  ST_Distance(
-                      ST_StartPoint(c.path)::geography,
-                      ST_EndPoint(c.path)::geography
-                  ) AS startEndDistanceM
+                  ST_Y(c.start_point) AS startLat,
+                  ST_X(c.start_point) AS startLng,
+                  ST_Y(c.end_point) AS endLat,
+                  ST_X(c.end_point) AS endLng,
+                  ST_AsGeoJSON(c.path) AS pathGeoJson
 
               FROM course c
               WHERE c.course_id = :courseId
