@@ -101,6 +101,18 @@ public enum ErrorCode {
             "유효하지 않은 좌표입니다."
     ),
 
+    LOCATION_ADDRESS_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "LOCATION_404_1",
+            "해당 위치의 주소를 찾을 수 없습니다."
+    ),
+
+    NAVER_REVERSE_GEOCODING_FAILED(
+            HttpStatus.BAD_GATEWAY,
+            "LOCATION_502_1",
+            "주소 변환 서비스에 일시적인 오류가 발생했습니다."
+    ),
+
     KAKAO_DIRECTIONS_FAILED(
             HttpStatus.BAD_GATEWAY,
             "DIRECTIONS_502_1",

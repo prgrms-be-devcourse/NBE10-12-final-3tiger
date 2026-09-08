@@ -23,7 +23,7 @@ public class SecurityConfig {
                         .requestMatchers("/", "/api/v1/auth/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/posts", "/api/v1/posts/*/comments",
                                 "/api/v1/courses/**", "/api/v1/regions/**", "/api/v1/grids/**",
-                                "/api/v1/places/**").permitAll()
+                                "/api/v1/places/**", "/api/v1/locations/**").permitAll()
                         .requestMatchers("/local-uploads/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/courses/generate", "/api/v1/courses/save").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/signup").permitAll()

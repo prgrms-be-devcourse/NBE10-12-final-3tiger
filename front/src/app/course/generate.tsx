@@ -30,7 +30,12 @@ import {
   generateCourseCandidates,
   saveGeneratedCourse,
 } from "@/api/course-api";
-import { searchPlaces, type PlaceSearchItem } from "@/api/place-api";
+import {
+  reverseGeocode,
+  searchPlaces,
+  type PlaceSearchItem,
+  type ReverseGeocodeResult,
+} from "@/api/place-api";
 import { getWeatherSnapshot } from "@/api/weather-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { getMyProfile } from "@/api/user-api";
@@ -75,6 +80,29 @@ const toPolyline = (candidate: GenerateCandidate) =>
     latitude: lat,
     longitude: lng,
   }));
+
+const locationAddressLabel = (location: ReverseGeocodeResult) =>
+  location.roadAddress ||
+  location.jibunAddress ||
+  [location.city, location.district, location.neighborhood]
+    .filter(Boolean)
+    .join(" ") ||
+  "현재 위치";
+
+const resolveLocationLabel = async (coordinates: {
+  latitude: number;
+  longitude: number;
+}) => {
+  try {
+    const location = await reverseGeocode(
+      coordinates.latitude,
+      coordinates.longitude,
+    );
+    return locationAddressLabel(location);
+  } catch {
+    return "현재 위치";
+  }
+};
 
 export default function CourseGenerateScreen() {
   const queryClient = useQueryClient();
@@ -128,11 +156,12 @@ export default function CourseGenerateScreen() {
 
         const position = await Location.getLastKnownPositionAsync();
         if (position) {
-          setCoords({
+          const next = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-          });
-          setStartPlaceName("현재 위치");
+          };
+          setCoords(next);
+          setStartPlaceName(await resolveLocationLabel(next));
         }
       } catch {
         // Keep the default coordinates when the saved location is unavailable.
@@ -162,12 +191,13 @@ export default function CourseGenerateScreen() {
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
       };
+      const address = await resolveLocationLabel(next);
       if (target === "start") {
         setCoords(next);
-        setStartPlaceName("현재 위치");
+        setStartPlaceName(address);
       } else {
         setEndCoords(next);
-        setEndPlaceName("현재 위치");
+        setEndPlaceName(address);
       }
       resetCandidates();
       setErrorMessage(null);

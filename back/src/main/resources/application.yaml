@@ -55,6 +55,12 @@ app:
       rest-api-key: ${KAKAO_PLACE_REST_API_KEY}
       connect-timeout: 2s
       read-timeout: 5s
+    naver:
+      base-url: ${NAVER_MAP_BASE_URL:https://maps.apigw.ntruss.com}
+      client-id: ${NAVER_MAP_CLIENT_ID:}
+      client-secret: ${NAVER_MAP_CLIENT_SECRET:}
+      connect-timeout: 2s
+      read-timeout: 3s
   report:
     hide-threshold: 5   # 신고 누적 시 자동 숨김 임계치
   storage:

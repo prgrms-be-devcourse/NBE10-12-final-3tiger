@@ -20,7 +20,11 @@ import {
 import MapView, { type Region as MapRegion } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getRegions } from "@/api/course-api";
-import { searchPlaces, type PlaceSearchItem } from "@/api/place-api";
+import {
+  reverseGeocode,
+  searchPlaces,
+  type PlaceSearchItem,
+} from "@/api/place-api";
 import { getMyProfile } from "@/api/user-api";
 import { getWeatherSnapshot } from "@/api/weather-api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -123,6 +127,10 @@ export default function MapScreen() {
   const [placeResults, setPlaceResults] = useState<PlaceSearchItem[]>([]);
   const [regionsOpen, setRegionsOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [currentCoordinates, setCurrentCoordinates] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [mapCenter, setMapCenter] = useState<{
     latitude: number;
     longitude: number;
@@ -134,6 +142,22 @@ export default function MapScreen() {
     queryKey: ["my-profile"],
     queryFn: getMyProfile,
     enabled: isAuthenticated,
+  });
+  const currentAddressQuery = useQuery({
+    queryKey: [
+      "current-location-address",
+      currentCoordinates?.latitude,
+      currentCoordinates?.longitude,
+    ],
+    queryFn: () => {
+      if (!currentCoordinates) throw new Error("현재 위치가 없습니다.");
+      return reverseGeocode(
+        currentCoordinates.latitude,
+        currentCoordinates.longitude,
+      );
+    },
+    enabled: currentCoordinates !== null,
+    staleTime: 5 * 60 * 1000,
   });
   const regionsQuery = useQuery({
     queryKey: ["regions"],
@@ -176,7 +200,9 @@ export default function MapScreen() {
     enabled: !!activeRegion,
     staleTime: 10 * 60 * 1000,
   });
-  const upcomingWeather = activeRegion ? weatherQuery.data?.upcoming ?? null : null;
+  const upcomingWeather = activeRegion
+    ? (weatherQuery.data?.upcoming ?? null)
+    : null;
   const upcomingBannerText =
     upcomingWeather && activeRegion
       ? (() => {
@@ -201,6 +227,7 @@ export default function MapScreen() {
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== Location.PermissionStatus.GRANTED) {
+        setCurrentCoordinates(null);
         setMessage("위치 권한이 없어 서울숲을 표시하고 있어요.");
         moveTo(DEFAULT_REGION);
         return;
@@ -215,6 +242,10 @@ export default function MapScreen() {
         lastKnown &&
         isValidCoordinate(lastKnown.coords.latitude, lastKnown.coords.longitude)
       ) {
+        setCurrentCoordinates({
+          latitude: lastKnown.coords.latitude,
+          longitude: lastKnown.coords.longitude,
+        });
         moveTo(toRegion(lastKnown));
         return;
       }
@@ -228,13 +259,19 @@ export default function MapScreen() {
         current &&
         isValidCoordinate(current.coords.latitude, current.coords.longitude)
       ) {
+        setCurrentCoordinates({
+          latitude: current.coords.latitude,
+          longitude: current.coords.longitude,
+        });
         moveTo(toRegion(current));
         return;
       }
 
+      setCurrentCoordinates(null);
       moveTo(DEFAULT_REGION);
       setMessage("현재 위치를 찾지 못해 서울숲을 표시하고 있어요.");
     } catch {
+      setCurrentCoordinates(null);
       moveTo(DEFAULT_REGION);
       setMessage("현재 위치를 확인하지 못해 서울숲을 표시하고 있어요.");
     } finally {
@@ -415,13 +452,81 @@ export default function MapScreen() {
             </Button>
           </View>
         </View>
+        {(locating || currentCoordinates) && (
+          <View
+            accessibilityLiveRegion="polite"
+            className="mt-2 flex-row items-center rounded-2xl bg-white px-3.5 py-3 shadow-md dark:bg-[#1B211D]"
+          >
+            <View className="h-9 w-9 items-center justify-center rounded-xl bg-[#E9FBEF] dark:bg-[#24382B]">
+              <Ionicons name="navigate" size={18} color="#087A3F" />
+            </View>
+            <View className="ml-3 flex-1">
+              <Text className="text-[11px] font-bold text-[#6D7B6D] dark:text-[#AAB5AD]">
+                현재 위치
+              </Text>
+              {locating || currentAddressQuery.isPending ? (
+                <View className="mt-1 flex-row items-center gap-2">
+                  <ActivityIndicator size="small" color="#087A3F" />
+                  <Text className="text-[13px] font-semibold text-[#526056] dark:text-[#CBD5CE]">
+                    주소를 확인하고 있어요
+                  </Text>
+                </View>
+              ) : currentAddressQuery.isError ? (
+                <Text className="mt-0.5 text-[13px] font-semibold text-[#526056] dark:text-[#CBD5CE]">
+                  현재 위치의 주소를 확인하지 못했어요
+                </Text>
+              ) : (
+                <Text
+                  numberOfLines={1}
+                  className="mt-0.5 text-[14px] font-extrabold text-[#24372A] dark:text-[#F1F5F2]"
+                >
+                  {currentAddressQuery.data?.roadAddress ||
+                    currentAddressQuery.data?.jibunAddress ||
+                    [
+                      currentAddressQuery.data?.city,
+                      currentAddressQuery.data?.district,
+                      currentAddressQuery.data?.neighborhood,
+                    ]
+                      .filter(Boolean)
+                      .join(" ") ||
+                    "주소 정보 없음"}
+                </Text>
+              )}
+            </View>
+            {currentAddressQuery.data && (
+              <View
+                className={
+                  currentAddressQuery.data.supportedRegion
+                    ? "rounded-full bg-[#E9FBEF] px-2.5 py-1 dark:bg-[#24382B]"
+                    : "rounded-full bg-[#F1F3F1] px-2.5 py-1 dark:bg-[#303632]"
+                }
+              >
+                <Text
+                  className={
+                    currentAddressQuery.data.supportedRegion
+                      ? "text-[10px] font-extrabold text-[#087A3F] dark:text-[#73D99B]"
+                      : "text-[10px] font-extrabold text-[#6D7B6D] dark:text-[#AAB5AD]"
+                  }
+                >
+                  {currentAddressQuery.data.supportedRegion
+                    ? "탐색 가능"
+                    : "지원 지역 외"}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
         {upcomingBannerText && (
           <View
             accessibilityLiveRegion="polite"
             className="mt-2 flex-row items-center gap-2 rounded-2xl bg-[#E7F0FB] px-3 py-2.5 shadow-md dark:bg-[#1F2A38]"
           >
             <Ionicons
-              name={upcomingWeather?.type === "snow" ? "snow-outline" : "water-outline"}
+              name={
+                upcomingWeather?.type === "snow"
+                  ? "snow-outline"
+                  : "water-outline"
+              }
               size={18}
               color="#2563EB"
             />
