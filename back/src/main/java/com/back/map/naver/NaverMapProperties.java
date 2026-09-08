@@ -13,7 +13,7 @@ import java.time.Duration;
 @Setter
 public class NaverMapProperties {
 
-    private String baseUrl = "https://naveropenapi.apigw.ntruss.com";
+    private String baseUrl = "https://maps.apigw.ntruss.com";
     private String clientId = "";
     private String clientSecret = "";
     private Duration connectTimeout = Duration.ofSeconds(2);

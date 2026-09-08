@@ -80,12 +80,12 @@ public class BookmarkService {
 
     private BookmarkItem toItem(Bookmark bookmark) {
         Course course = bookmark.getCourse();
-        return new BookmarkItem(course.getId(), course.getName(), course.getDistanceM(), true,
+        return new BookmarkItem(course.getId(), course.getName(), course.getMapImageUrl(), course.getDistanceM(), true,
                 bookmark.getCreatedAt(), bookmark.getRating(), bookmark.getUsageCount(), bookmark.getLastUsedAt());
     }
 
     public record BookmarkState(boolean isBookmarked) {}
-    public record BookmarkItem(Long courseId, String name, int distanceM, boolean isBookmarked,
+    public record BookmarkItem(Long courseId, String name, String mapImageUrl, int distanceM, boolean isBookmarked,
                                LocalDateTime bookmarkedAt, Integer rating, int usageCount, LocalDateTime lastUsedAt) {}
     public record UsageLogItem(Long usageLogId, Long courseId, LocalDateTime usedAt) {}
 }

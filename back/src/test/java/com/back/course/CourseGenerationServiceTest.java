@@ -7,9 +7,11 @@ import com.back.course.dto.GeoJsonLineString;
 import com.back.course.dto.SaveCourseRequest;
 import com.back.course.repository.CourseGenerationRepository;
 import com.back.course.service.CourseGenerationService;
+import com.back.course.map.event.CourseMapImageRequested;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -33,7 +35,9 @@ class CourseGenerationServiceTest {
 
     private final CourseGenerationRepository repo = mock(CourseGenerationRepository.class);
     private final BookmarkService bookmarkService = mock(BookmarkService.class);
-    private final CourseGenerationService service = new CourseGenerationService(repo, bookmarkService);
+    private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+    private final CourseGenerationService service =
+            new CourseGenerationService(repo, bookmarkService, eventPublisher);
 
     @Test void generate_forwardsPersonaAsStringToRepository() {
         var at = LocalDateTime.of(2026, 8, 27, 14, 0);
@@ -104,6 +108,7 @@ class CourseGenerationServiceTest {
 
         verify(repo).saveFromPath(eq(path), eq("11500"), eq(true), eq(null), eq(null), eq("서울숲"));
         verify(bookmarkService).add(1L, 42L);
+        verify(eventPublisher).publishEvent(new CourseMapImageRequested(42L, path));
     }
 
     @Test void save_forwardsOnewayEndPointToRepository() {

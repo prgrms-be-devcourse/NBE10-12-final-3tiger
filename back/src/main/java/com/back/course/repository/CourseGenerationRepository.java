@@ -127,6 +127,14 @@ public class CourseGenerationRepository {
         return courseId;
     }
 
+    public void updateMapImageUrl(Long courseId, String mapImageUrl) {
+        jdbc.update(
+                "UPDATE public.course SET map_image_url = ? WHERE course_id = ?",
+                mapImageUrl,
+                courseId
+        );
+    }
+
     public record GenerateRow(GeoJsonLineString path, Integer totalM, BigDecimal avgScore,
                               BigDecimal errorPct, String regionCode) {}
 

@@ -39,6 +39,7 @@ class CourseServiceTest {
         given(view.getPathGeoJson()).willReturn("""
                 {"type":"LineString","coordinates":[[127.037,37.544],[127.038,37.545]]}
                 """);
+        given(view.getMapImageUrl()).willReturn("https://cdn.example.com/course-maps/101.png");
         given(view.getDistanceM()).willReturn(2500);
         given(view.getEstimatedMinutes()).willReturn(35);
         given(view.getIsLoop()).willReturn(true);
@@ -57,6 +58,7 @@ class CourseServiceTest {
                 java.util.List.of(127.037, 37.544),
                 java.util.List.of(127.038, 37.545)
         );
+        assertThat(result.mapImageUrl()).isEqualTo("https://cdn.example.com/course-maps/101.png");
         assertThat(result.scoreWalker()).isEqualTo(0.91);
         assertThat(result.scoreSenior()).isEqualTo(0.87);
         assertThat(result.scoreStroller()).isEqualTo(0.83);
