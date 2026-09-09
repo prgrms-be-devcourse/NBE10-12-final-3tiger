@@ -51,6 +51,7 @@ const DEFAULT_REGION: MapRegion = {
 };
 
 const CURRENT_LOCATION_TIMEOUT_MS = 3_000;
+const PLACE_SEARCH_DEBOUNCE_MS = 500;
 
 const isValidCoordinate = (latitude?: number, longitude?: number) =>
   Number.isFinite(latitude) && Number.isFinite(longitude);
@@ -115,6 +116,10 @@ export default function MapScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDark = useThemeStore((state) => state.isDark);
   const mapRef = useRef<MapView>(null);
+  const placeSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const placeSearchRequestRef = useRef(0);
   const lastViewedRegionRef = useRef<MapRegion | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const regionsSheetTranslateY = useRef(
@@ -280,34 +285,69 @@ export default function MapScreen() {
     }
   }, [moveTo]);
 
-  const searchPlace = useCallback(async () => {
-    const keyword = query.trim();
-    if (!keyword) return;
-
-    Keyboard.dismiss();
-    setSearching(true);
-    setMessage(null);
-
-    try {
-      const response = await searchPlaces(keyword);
-      const results = response.items;
-      setPlaceResults(results);
-      if (response.correctionApplied && response.correctedQuery) {
-        setMessage(`‘${response.correctedQuery}’(으)로 검색한 결과예요.`);
+  const searchPlace = useCallback(
+    async (keyword: string, shouldDismissKeyboard = false) => {
+      if (placeSearchTimerRef.current) {
+        clearTimeout(placeSearchTimerRef.current);
+        placeSearchTimerRef.current = null;
       }
-      if (results.length === 0) {
-        setMessage(
-          "검색 결과가 없어요. 다른 동네나 공원 이름을 입력해 주세요.",
-        );
-        return;
+      if (!keyword) return;
+
+      const requestId = ++placeSearchRequestRef.current;
+      if (shouldDismissKeyboard) Keyboard.dismiss();
+      setSearching(true);
+      setMessage(null);
+
+      try {
+        const response = await searchPlaces(keyword);
+        if (requestId !== placeSearchRequestRef.current) return;
+        const results = response.items;
+        setPlaceResults(results);
+        if (response.correctionApplied && response.correctedQuery) {
+          setMessage(`‘${response.correctedQuery}’(으)로 검색한 결과예요.`);
+        }
+        if (results.length === 0) {
+          setMessage(
+            "검색 결과가 없어요. 다른 동네나 공원 이름을 입력해 주세요.",
+          );
+          return;
+        }
+      } catch {
+        if (requestId !== placeSearchRequestRef.current) return;
+        setPlaceResults([]);
+        setMessage("장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.");
+      } finally {
+        if (requestId === placeSearchRequestRef.current) setSearching(false);
       }
-    } catch {
-      setPlaceResults([]);
-      setMessage("장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.");
-    } finally {
-      setSearching(false);
+    },
+    [],
+  );
+
+  useEffect(() => {
+    placeSearchRequestRef.current += 1;
+    if (placeSearchTimerRef.current) {
+      clearTimeout(placeSearchTimerRef.current);
+      placeSearchTimerRef.current = null;
     }
-  }, [query]);
+
+    const keyword = query.trim();
+    if (!keyword) {
+      setSearching(false);
+      setPlaceResults([]);
+      return;
+    }
+
+    placeSearchTimerRef.current = setTimeout(() => {
+      void searchPlace(keyword);
+    }, PLACE_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      if (placeSearchTimerRef.current) {
+        clearTimeout(placeSearchTimerRef.current);
+        placeSearchTimerRef.current = null;
+      }
+    };
+  }, [query, searchPlace]);
 
   const dismissRegionsSheet = useCallback(
     () =>
@@ -430,7 +470,7 @@ export default function MapScreen() {
               returnKeyType="search"
               value={query}
               onChangeText={setQuery}
-              onSubmitEditing={() => void searchPlace()}
+              onSubmitEditing={() => void searchPlace(query.trim(), true)}
             />
             {searching && <ActivityIndicator size="small" color="#087A3F" />}
             <Button

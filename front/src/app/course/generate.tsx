@@ -50,6 +50,7 @@ import { useThemeStore } from "@/stores/theme-store";
 import type { GenerateCandidate } from "@/types/domain";
 
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
+const PLACE_SEARCH_DEBOUNCE_MS = 500;
 
 type CourseMode = "loop" | "oneway";
 type PlaceSearchTarget = "start" | "end";
@@ -111,6 +112,10 @@ export default function CourseGenerateScreen() {
   const placeSearchTranslateY = useRef(
     new Animated.Value(windowHeight),
   ).current;
+  const placeSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const placeSearchRequestRef = useRef(0);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDark = useThemeStore((state) => state.isDark);
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
@@ -129,7 +134,9 @@ export default function CourseGenerateScreen() {
   const [placeResults, setPlaceResults] = useState<PlaceSearchItem[]>([]);
   const [placeSearching, setPlaceSearching] = useState(false);
   const [placeSearchError, setPlaceSearchError] = useState<string | null>(null);
-  const [placeSearchNotice, setPlaceSearchNotice] = useState<string | null>(null);
+  const [placeSearchNotice, setPlaceSearchNotice] = useState<string | null>(
+    null,
+  );
   const [locatingTarget, setLocatingTarget] =
     useState<PlaceSearchTarget | null>(null);
   const [distanceM, setDistanceM] = useState(3000);
@@ -264,14 +271,20 @@ export default function CourseGenerateScreen() {
     }).start();
   }, [placeSearchOpen, placeSearchTranslateY, windowHeight]);
 
-  const handlePlaceSearch = async () => {
-    const keyword = placeQuery.trim();
-    if (!keyword || placeSearching) return;
+  const handlePlaceSearch = async (keyword: string) => {
+    if (placeSearchTimerRef.current) {
+      clearTimeout(placeSearchTimerRef.current);
+      placeSearchTimerRef.current = null;
+    }
+    if (!keyword) return;
+
+    const requestId = ++placeSearchRequestRef.current;
     setPlaceSearching(true);
     setPlaceSearchError(null);
     setPlaceSearchNotice(null);
     try {
       const response = await searchPlaces(keyword);
+      if (requestId !== placeSearchRequestRef.current) return;
       const results = response.items;
       setPlaceResults(results);
       if (response.correctionApplied && response.correctedQuery) {
@@ -282,14 +295,43 @@ export default function CourseGenerateScreen() {
       if (results.length === 0)
         setPlaceSearchError("검색 결과가 없어요. 장소명을 다시 입력해 주세요.");
     } catch {
+      if (requestId !== placeSearchRequestRef.current) return;
       setPlaceResults([]);
       setPlaceSearchError(
         "장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.",
       );
     } finally {
-      setPlaceSearching(false);
+      if (requestId === placeSearchRequestRef.current) setPlaceSearching(false);
     }
   };
+
+  useEffect(() => {
+    placeSearchRequestRef.current += 1;
+    if (placeSearchTimerRef.current) {
+      clearTimeout(placeSearchTimerRef.current);
+      placeSearchTimerRef.current = null;
+    }
+
+    const keyword = placeQuery.trim();
+    if (!placeSearchOpen || !keyword) {
+      setPlaceSearching(false);
+      setPlaceResults([]);
+      setPlaceSearchError(null);
+      setPlaceSearchNotice(null);
+      return;
+    }
+
+    placeSearchTimerRef.current = setTimeout(() => {
+      void handlePlaceSearch(keyword);
+    }, PLACE_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      if (placeSearchTimerRef.current) {
+        clearTimeout(placeSearchTimerRef.current);
+        placeSearchTimerRef.current = null;
+      }
+    };
+  }, [placeQuery, placeSearchOpen]);
 
   const selectPlace = (place: PlaceSearchItem) => {
     if (!place.supportedRegion) return;
@@ -790,7 +832,9 @@ export default function CourseGenerateScreen() {
                   <TextInput
                     value={placeQuery}
                     onChangeText={setPlaceQuery}
-                    onSubmitEditing={() => void handlePlaceSearch()}
+                    onSubmitEditing={() =>
+                      void handlePlaceSearch(placeQuery.trim())
+                    }
                     returnKeyType="search"
                     placeholder="공원이나 장소를 검색해 보세요"
                     placeholderTextColor={isDark ? "#758078" : "#94A09A"}
@@ -801,7 +845,7 @@ export default function CourseGenerateScreen() {
                   ) : (
                     <Pressable
                       accessibilityLabel="장소 검색"
-                      onPress={() => void handlePlaceSearch()}
+                      onPress={() => void handlePlaceSearch(placeQuery.trim())}
                     >
                       <Ionicons
                         name="arrow-forward-circle"
