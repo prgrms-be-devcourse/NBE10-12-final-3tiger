@@ -32,6 +32,20 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class PointRewardServiceTest {
 
+    @Test
+    @DisplayName("해결 확인 보상은 신고 보상과 별도인 10P 이력을 남긴다")
+    void rewardsHazardResolutionSeparately() {
+        User user = User.createLocal("resolution@test.com", "hash", "해결자");
+        given(userRepository.findByIdAndDeletedAtIsNullForUpdate(1L)).willReturn(Optional.of(user));
+        given(pointHistoryRepository.sumAmountByUserAndTypeAndCreatedAtRange(eq(1L), eq(PointType.HAZARD_RESOLUTION), any(), any())).willReturn(0L);
+        boolean rewarded = pointRewardService.rewardHazardResolution(1L, 201L);
+        assertThat(rewarded).isTrue();
+        assertThat(user.getPointBalance()).isEqualTo(10L);
+        ArgumentCaptor<PointHistory> captor = ArgumentCaptor.forClass(PointHistory.class);
+        verify(pointHistoryRepository).save(captor.capture());
+        assertThat(captor.getValue().getType()).isEqualTo(PointType.HAZARD_RESOLUTION);
+    }
+
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     @Mock

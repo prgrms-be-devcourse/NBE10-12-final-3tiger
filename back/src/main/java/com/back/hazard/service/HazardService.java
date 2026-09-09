@@ -12,9 +12,11 @@ import com.back.hazard.dto.HazardCreateRequest;
 import com.back.hazard.dto.HazardCreateResponse;
 import com.back.hazard.dto.HazardReportCreateRequest;
 import com.back.hazard.dto.HazardResponse;
+import com.back.hazard.dto.HazardResolutionResponse;
 import com.back.hazard.repository.HazardConfirmationRepository;
 import com.back.hazard.repository.HazardReportRepository;
 import com.back.hazard.repository.HazardRepository;
+import com.back.hazard.repository.HazardResolutionRepository;
 import com.back.point.service.PointRewardService;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
@@ -32,10 +34,12 @@ import java.util.Optional;
 public class HazardService {
 
     private static final long ACTIVATION_REPORTER_THRESHOLD = 3L;
+    private static final long RESOLUTION_REPORTER_THRESHOLD = 3L;
 
     private final HazardRepository hazardRepository;
     private final HazardReportRepository hazardReportRepository;
     private final HazardConfirmationRepository hazardConfirmationRepository;
+    private final HazardResolutionRepository hazardResolutionRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final HazardMatchingService hazardMatchingService;
@@ -46,6 +50,7 @@ public class HazardService {
             HazardRepository hazardRepository,
             HazardReportRepository hazardReportRepository,
             HazardConfirmationRepository hazardConfirmationRepository,
+            HazardResolutionRepository hazardResolutionRepository,
             CourseRepository courseRepository,
             UserRepository userRepository,
             HazardMatchingService hazardMatchingService,
@@ -55,6 +60,7 @@ public class HazardService {
         this.hazardRepository = hazardRepository;
         this.hazardReportRepository = hazardReportRepository;
         this.hazardConfirmationRepository = hazardConfirmationRepository;
+        this.hazardResolutionRepository = hazardResolutionRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.hazardMatchingService = hazardMatchingService;
@@ -146,6 +152,33 @@ public class HazardService {
     }
 
     @Transactional
+    public HazardResolutionResponse resolve(Long userId, Long hazardId) {
+        Hazard hazard = findHazardForUpdate(hazardId);
+        if (hazard.getStatus() != HazardStatus.ACTIVE) {
+            throw new ApiException(HttpStatus.CONFLICT, "활성 상태의 위험만 해결 확인할 수 있습니다.");
+        }
+        User user = findActiveUser(userId);
+        if (hazardResolutionRepository.existsByHazard_IdAndUser_Id(hazardId, userId)) {
+            throw new ApiException(HttpStatus.CONFLICT, "이미 해결 확인한 위험입니다.");
+        }
+        com.back.hazard.domain.HazardResolution resolution;
+        try {
+            resolution = hazardResolutionRepository.saveAndFlush(
+                    new com.back.hazard.domain.HazardResolution(hazard, user));
+        } catch (DataIntegrityViolationException exception) {
+            throw new ApiException(HttpStatus.CONFLICT, "이미 해결 확인한 위험입니다.");
+        }
+        pointRewardService.rewardHazardResolution(userId, resolution.getId());
+        long count = hazardResolutionRepository.countByHazard_Id(hazardId);
+        if (count >= RESOLUTION_REPORTER_THRESHOLD) {
+            hazard.resolve();
+            pointRewardService.rewardHazardResolved(
+                    hazardId, hazardResolutionRepository.findDistinctUserIdsByHazardId(hazardId));
+        }
+        return new HazardResolutionResponse(hazard.getStatus() == HazardStatus.RESOLVED, count);
+    }
+
+    @Transactional
     public void deleteMyReport(Long userId, Long hazardId) {
         Hazard hazard = findHazardForUpdate(hazardId);
         findActiveUser(userId);
@@ -164,6 +197,8 @@ public class HazardService {
         if (distinctReporterCount == 0) {
             hazardConfirmationRepository.deleteByHazard_Id(hazardId);
             hazardConfirmationRepository.flush();
+            hazardResolutionRepository.deleteByHazard_Id(hazardId);
+            hazardResolutionRepository.flush();
             hazardRepository.delete(hazard);
             return;
         }
@@ -174,19 +209,17 @@ public class HazardService {
         );
     }
 
-    public List<HazardResponse> getActiveHazards(Long courseId) {
+    public List<HazardResponse> getActiveHazards(Long courseId, Long userId) {
         if (!courseRepository.existsById(courseId)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "존재하지 않는 코스입니다.");
         }
 
-        return hazardRepository
-                .findByCourse_IdAndStatusOrderByCreatedAtDesc(courseId, HazardStatus.ACTIVE)
-                .stream()
-                .map(hazard -> HazardResponse.from(
-                        hazard,
-                        hazardConfirmationRepository.countByHazard_Id(hazard.getId())
-                ))
-                .toList();
+        return hazardReportRepository.findVisibleHazardResponsesByCourseId(
+                courseId,
+                HazardStatus.ACTIVE,
+                HazardStatus.PENDING,
+                userId
+        );
     }
 
     private void saveReportAndUpdateStatus(

@@ -25,6 +25,9 @@ public class PointRewardService {
     static final long HAZARD_REPORT_REWARD = 10L;
     static final long DAILY_HAZARD_REPORT_REWARD_LIMIT = 50L;
     static final long HAZARD_ACTIVATION_REWARD = 100L;
+    static final long HAZARD_RESOLUTION_REWARD = 10L;
+    static final long DAILY_HAZARD_RESOLUTION_REWARD_LIMIT = 50L;
+    static final long HAZARD_RESOLVED_REWARD = 100L;
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
@@ -114,6 +117,27 @@ public class PointRewardService {
                                 hazardId,
                                 rewardedAt
                         )));
+    }
+
+    @Transactional
+    public boolean rewardHazardResolution(Long userId, Long resolutionId) {
+        User user = findActiveUserForUpdate(userId);
+        if (pointHistoryRepository.existsByUser_IdAndTypeAndReferenceId(userId, PointType.HAZARD_RESOLUTION, resolutionId)) return false;
+        LocalDate today = LocalDate.now(clock);
+        long earned = pointHistoryRepository.sumAmountByUserAndTypeAndCreatedAtRange(
+                userId, PointType.HAZARD_RESOLUTION, today.atStartOfDay(), today.plusDays(1).atStartOfDay());
+        if (earned > DAILY_HAZARD_RESOLUTION_REWARD_LIMIT - HAZARD_RESOLUTION_REWARD) return false;
+        award(user, HAZARD_RESOLUTION_REWARD, PointType.HAZARD_RESOLUTION, resolutionId, LocalDateTime.now(clock));
+        return true;
+    }
+
+    @Transactional
+    public void rewardHazardResolved(Long hazardId, List<Long> contributorIds) {
+        if (pointHistoryRepository.existsByTypeAndReferenceId(PointType.HAZARD_RESOLVED, hazardId)) return;
+        LocalDateTime rewardedAt = LocalDateTime.now(clock);
+        contributorIds.stream().distinct().sorted().forEach(userId -> findActiveUserForUpdateIfPresent(userId)
+                .filter(user -> !pointHistoryRepository.existsByUser_IdAndTypeAndReferenceId(userId, PointType.HAZARD_RESOLVED, hazardId))
+                .ifPresent(user -> award(user, HAZARD_RESOLVED_REWARD, PointType.HAZARD_RESOLVED, hazardId, rewardedAt)));
     }
 
     private User findActiveUserForUpdate(Long userId) {

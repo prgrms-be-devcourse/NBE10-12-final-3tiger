@@ -6,12 +6,15 @@ import com.back.global.error.ApiException;
 import com.back.hazard.domain.Hazard;
 import com.back.hazard.domain.HazardConfirmation;
 import com.back.hazard.domain.HazardReport;
+import com.back.hazard.domain.HazardResolution;
 import com.back.hazard.domain.HazardStatus;
 import com.back.hazard.dto.HazardCreateRequest;
 import com.back.hazard.dto.HazardReportCreateRequest;
+import com.back.hazard.dto.HazardResponse;
 import com.back.hazard.repository.HazardConfirmationRepository;
 import com.back.hazard.repository.HazardReportRepository;
 import com.back.hazard.repository.HazardRepository;
+import com.back.hazard.repository.HazardResolutionRepository;
 import com.back.point.service.PointRewardService;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
@@ -48,6 +51,8 @@ class HazardServiceTest {
     @Mock
     private HazardConfirmationRepository hazardConfirmationRepository;
     @Mock
+    private HazardResolutionRepository hazardResolutionRepository;
+    @Mock
     private CourseRepository courseRepository;
     @Mock
     private UserRepository userRepository;
@@ -59,6 +64,57 @@ class HazardServiceTest {
     private EntityManager entityManager;
     @InjectMocks
     private HazardService hazardService;
+
+    @Test
+    @DisplayName("세 번째 서로 다른 해결 확인은 ACTIVE Hazard를 RESOLVED로 전환한다")
+    void resolvesHazardOnThirdResolution() {
+        Hazard hazard = hazard(30L);
+        hazard.updateStatusByReporterCount(3, 3);
+        User user = user(3L, "third@test.com");
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
+        given(userRepository.findByIdAndDeletedAtIsNull(3L)).willReturn(Optional.of(user));
+        given(hazardResolutionRepository.existsByHazard_IdAndUser_Id(30L, 3L)).willReturn(false);
+        given(hazardResolutionRepository.saveAndFlush(any(HazardResolution.class))).willAnswer(invocation -> {
+            HazardResolution resolution = invocation.getArgument(0);
+            ReflectionTestUtils.setField(resolution, "id", 103L);
+            return resolution;
+        });
+        given(hazardResolutionRepository.countByHazard_Id(30L)).willReturn(3L);
+        given(hazardResolutionRepository.findDistinctUserIdsByHazardId(30L)).willReturn(List.of(1L, 2L, 3L));
+
+        var response = hazardService.resolve(3L, 30L);
+
+        assertThat(response.resolved()).isTrue();
+        assertThat(response.resolutionCount()).isEqualTo(3L);
+        assertThat(hazard.getStatus()).isEqualTo(HazardStatus.RESOLVED);
+        verify(pointRewardService).rewardHazardResolution(3L, 103L);
+        verify(pointRewardService).rewardHazardResolved(30L, List.of(1L, 2L, 3L));
+    }
+
+    @Test
+    @DisplayName("동일 사용자의 해결 확인은 409로 거부한다")
+    void rejectsDuplicateResolution() {
+        Hazard hazard = hazard(30L);
+        hazard.updateStatusByReporterCount(3, 3);
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
+        given(userRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.of(user(1L, "first@test.com")));
+        given(hazardResolutionRepository.existsByHazard_IdAndUser_Id(30L, 1L)).willReturn(true);
+
+        ApiException exception = catchThrowableOfType(() -> hazardService.resolve(1L, 30L), ApiException.class);
+
+        assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+        verify(hazardResolutionRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    @DisplayName("PENDING Hazard는 해결 확인할 수 없다")
+    void rejectsPendingResolution() {
+        Hazard hazard = hazard(30L);
+        given(hazardRepository.findByIdForUpdate(30L)).willReturn(Optional.of(hazard));
+        ApiException exception = catchThrowableOfType(() -> hazardService.resolve(1L, 30L), ApiException.class);
+        assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+        verify(userRepository, never()).findByIdAndDeletedAtIsNull(any());
+    }
 
     @Test
     @DisplayName("최초 신고는 PENDING Hazard와 GPS가 담긴 HazardReport를 생성한다")
@@ -345,20 +401,41 @@ class HazardServiceTest {
     @Test
     @DisplayName("공개 조회는 코스의 ACTIVE Hazard만 최신순으로 조회한다")
     void returnsOnlyActiveHazards() {
-        Hazard hazard = hazard(30L);
-        hazard.updateStatusByReporterCount(3, 3);
+        HazardResponse hazard = new HazardResponse(
+                30L,
+                "빙판",
+                HazardStatus.ACTIVE,
+                37.5219,
+                126.8575,
+                3L,
+                2L,
+                false,
+                null,
+                null
+        );
         given(courseRepository.existsById(10L)).willReturn(true);
-        given(hazardRepository.findByCourse_IdAndStatusOrderByCreatedAtDesc(10L, HazardStatus.ACTIVE))
+        given(hazardReportRepository.findVisibleHazardResponsesByCourseId(
+                10L,
+                HazardStatus.ACTIVE,
+                HazardStatus.PENDING,
+                null
+        ))
                 .willReturn(List.of(hazard));
-        given(hazardConfirmationRepository.countByHazard_Id(30L)).willReturn(2L);
 
-        var result = hazardService.getActiveHazards(10L);
+        var result = hazardService.getActiveHazards(10L, null);
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().hazardId()).isEqualTo(30L);
         assertThat(result.getFirst().status()).isEqualTo(HazardStatus.ACTIVE);
+        assertThat(result.getFirst().latitude()).isEqualTo(37.5219);
+        assertThat(result.getFirst().longitude()).isEqualTo(126.8575);
         assertThat(result.getFirst().confirmationCount()).isEqualTo(2L);
-        verify(hazardRepository).findByCourse_IdAndStatusOrderByCreatedAtDesc(10L, HazardStatus.ACTIVE);
+        verify(hazardReportRepository).findVisibleHazardResponsesByCourseId(
+                10L,
+                HazardStatus.ACTIVE,
+                HazardStatus.PENDING,
+                null
+        );
     }
 
     @Test
@@ -367,10 +444,10 @@ class HazardServiceTest {
         given(courseRepository.existsById(999L)).willReturn(false);
 
         ApiException exception = catchThrowableOfType(
-                () -> hazardService.getActiveHazards(999L), ApiException.class);
+                () -> hazardService.getActiveHazards(999L, null), ApiException.class);
 
         assertThat(exception.status()).isEqualTo(HttpStatus.NOT_FOUND);
-        verify(hazardRepository, never()).findByCourse_IdAndStatusOrderByCreatedAtDesc(any(), any());
+        verify(hazardReportRepository, never()).findVisibleHazardResponsesByCourseId(any(), any(), any(), any());
     }
 
     @Test
@@ -450,11 +527,13 @@ class HazardServiceTest {
 
         hazardService.deleteMyReport(1L, 30L);
 
-        var order = inOrder(hazardReportRepository, hazardConfirmationRepository, hazardRepository);
+        var order = inOrder(hazardReportRepository, hazardConfirmationRepository, hazardResolutionRepository, hazardRepository);
         order.verify(hazardReportRepository).delete(report);
         order.verify(hazardReportRepository).flush();
         order.verify(hazardConfirmationRepository).deleteByHazard_Id(30L);
         order.verify(hazardConfirmationRepository).flush();
+        order.verify(hazardResolutionRepository).deleteByHazard_Id(30L);
+        order.verify(hazardResolutionRepository).flush();
         order.verify(hazardRepository).delete(hazard);
     }
 
