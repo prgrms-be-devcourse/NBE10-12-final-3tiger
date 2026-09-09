@@ -1,6 +1,7 @@
 package com.back.course.map.service;
 
 import com.back.course.dto.GeoJsonLineString;
+import com.back.course.map.event.CourseMapImageRequested;
 import com.back.course.map.render.CourseMapImageRenderer;
 import com.back.course.map.storage.CourseMapImageStorage;
 import com.back.course.repository.CourseGenerationRepository;
@@ -41,9 +42,23 @@ class CourseMapImageServiceTest {
         service.generate(44L, path);
 
         verify(storage).upload(44L, rendered);
-        verify(repository).updateMapImageUrl(
+        verify(repository).markMapImageCompleted(
                 44L,
                 "https://cdn.example.com/course-maps/44.png"
         );
+    }
+
+    @Test
+    void marksImageAsFailedWhenGenerationFails() {
+        var path = new GeoJsonLineString("LineString", List.of(
+                List.of(126.827658, 37.5667106),
+                List.of(126.849500, 37.550900)
+        ));
+        given(client.getMapImage(anyDouble(), anyDouble(), anyInt()))
+                .willThrow(new IllegalStateException("static map unavailable"));
+
+        service.generateAfterCommit(new CourseMapImageRequested(44L, path));
+
+        verify(repository).markMapImageFailed(44L);
     }
 }

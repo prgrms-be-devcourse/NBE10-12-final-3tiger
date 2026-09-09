@@ -53,6 +53,8 @@ services:
       - ./docker/143-course-map-image.sh:/docker-entrypoint-initdb.d/143-course-map-image.sh:ro
       - ./docker/144-push-token-schema.sql:/tmp/push-token-schema.sql:ro
       - ./docker/144-push-token-schema.sh:/docker-entrypoint-initdb.d/144-push-token-schema.sh:ro
+      - ./docker/145-course-map-image-status.sql:/tmp/course-map-image-status.sql:ro
+      - ./docker/145-course-map-image-status.sh:/docker-entrypoint-initdb.d/145-course-map-image-status.sh:ro
       - ./docker/21_persona_weight.sql:/tmp/persona/21_persona_weight.sql:ro
       - ./docker/22_persona_course_scores.sql:/tmp/persona/22_persona_course_scores.sql:ro
       - ./docker/23_persona_edge_costs.sql:/tmp/persona/23_persona_edge_costs.sql:ro

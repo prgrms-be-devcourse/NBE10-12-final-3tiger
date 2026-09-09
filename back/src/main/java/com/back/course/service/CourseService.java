@@ -40,7 +40,8 @@ public class CourseService {
         Double avgSlopeDegree = flatness == null ? null : (1.0 - flatness) * 30.0;
 
         return new CourseDetail(
-                view.getCourseId(), view.getName(), parsePath(view.getPathGeoJson()), view.getMapImageUrl(),
+                view.getCourseId(), view.getName(), parsePath(view.getPathGeoJson()),
+                view.getMapImageUrl(), view.getMapImageStatus(),
                 view.getDistanceM(), view.getEstimatedMinutes(),
                 view.getElevationGainM(), view.getElevationLossM(),
                 Boolean.TRUE.equals(view.getIsLoop()), view.getSource(),
@@ -143,6 +144,7 @@ public class CourseService {
             String name,
             GeoJsonLineString path,
             String mapImageUrl,
+            String mapImageStatus,
             int distanceM,
             int estimatedMinutes,
             Integer elevationGainM,
