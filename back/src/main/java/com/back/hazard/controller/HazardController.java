@@ -6,6 +6,7 @@ import com.back.hazard.dto.HazardConfirmationResponse;
 import com.back.hazard.dto.HazardCreateRequest;
 import com.back.hazard.dto.HazardCreateResponse;
 import com.back.hazard.dto.HazardResponse;
+import com.back.hazard.dto.HazardResolutionResponse;
 import com.back.hazard.service.HazardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,11 +34,19 @@ public class HazardController {
 
     @GetMapping("/courses/{courseId}/hazards")
     @Operation(
-            summary = "코스 활성 위험 조회",
-            description = "서로 다른 신고자 3명 이상이 신고해 ACTIVE가 된 위험만 조회합니다."
+            summary = "코스 공개 위험 조회",
+            description = "ACTIVE 위험과 로그인 사용자가 직접 신고한 PENDING 위험을 조회합니다."
     )
-    ApiResponse<List<HazardResponse>> getActiveHazards(@PathVariable Long courseId) {
-        return ApiResponse.ok("코스 위험 신고 조회 성공", hazardService.getActiveHazards(courseId));
+    ApiResponse<List<HazardResponse>> getActiveHazards(
+            @CurrentUserId(required = false) Long userId,
+            @PathVariable Long courseId) {
+        return ApiResponse.ok("코스 위험 신고 조회 성공", hazardService.getActiveHazards(courseId, userId));
+    }
+
+    @PostMapping("/hazards/{hazardId}/resolutions")
+    @Operation(summary = "위험 해결 확인")
+    ApiResponse<HazardResolutionResponse> resolve(@CurrentUserId Long userId, @PathVariable Long hazardId) {
+        return ApiResponse.ok("위험 해결 확인이 반영되었습니다.", hazardService.resolve(userId, hazardId));
     }
 
     @PostMapping("/courses/{courseId}/hazards")

@@ -89,6 +89,43 @@ export type CourseDetail = Course & {
   surfaceType?: string | null;
 };
 
+export type HazardStatus = "PENDING" | "ACTIVE" | "RESOLVED";
+
+export type Hazard = {
+  hazardId: number;
+  hazardType: string;
+  status: HazardStatus;
+  latitude: number;
+  longitude: number;
+  reportCount: number;
+  confirmationCount: number;
+  reportedByMe: boolean;
+  createdAt: string;
+  activatedAt: string | null;
+};
+
+export type HazardCreateRequest = {
+  hazardType: string;
+  severity: string;
+  content: string;
+  latitude: number;
+  longitude: number;
+};
+
+export type HazardCreateResponse = {
+  hazardId: number;
+};
+
+export type HazardConfirmationResponse = {
+  confirmed: boolean;
+  confirmationCount: number;
+};
+
+export type HazardResolutionResponse = {
+  resolved: boolean;
+  resolutionCount: number;
+};
+
 export type CourseNavigation = {
   courseId: number;
   name: string;

@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Location from "expo-location";
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Easing,
   Pressable,
@@ -13,7 +14,14 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import MapView, { Circle, Marker, Polyline } from "react-native-maps";
+import MapView, {
+  Callout,
+  Circle,
+  Marker,
+  Polyline,
+  type LatLng,
+  type LongPressEvent,
+} from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -23,8 +31,17 @@ import {
   unbookmarkCourse,
 } from "@/api/course-api";
 import { getGridOverlays } from "@/api/grid-api";
+import {
+  confirmHazard,
+  createHazard,
+  deleteMyHazardReport,
+  getActiveHazards,
+  resolveHazard,
+} from "@/api/hazard-api";
 import { getMyProfile } from "@/api/user-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
+import { HazardDeleteConfirmModal } from "@/components/hazard/hazard-delete-confirm-modal";
+import { HazardReportSheet } from "@/components/hazard/hazard-report-sheet";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
@@ -34,7 +51,12 @@ import {
 } from "@/components/ui/bottom-sheet-handle";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
-import type { Course, GridOverlay } from "@/types/domain";
+import type {
+  Course,
+  GridOverlay,
+  Hazard,
+  HazardCreateRequest,
+} from "@/types/domain";
 
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
 const COURSE_MAP_VIEW = {
@@ -146,6 +168,11 @@ export default function CourseScreen() {
   const [showDetails, setShowDetails] = useState(true);
   const [persona, setPersona] = useState<string | null | undefined>(undefined);
   const [gridLayer, setGridLayer] = useState<GridLayer | null>(null);
+  const [hazardCoordinate, setHazardCoordinate] = useState<LatLng | null>(null);
+  const [hazardSheetOpen, setHazardSheetOpen] = useState(false);
+  const [selectedHazard, setSelectedHazard] = useState<Hazard | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [hazardNotice, setHazardNotice] = useState<string | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
   const dismissDetails = () =>
@@ -217,7 +244,11 @@ export default function CourseScreen() {
     staleTime: 60_000,
   });
   useEffect(() => {
-    setSelectedId(courses[0]?.courseId ?? null);
+    setSelectedId((current) =>
+      current !== null && courses.some((course) => course.courseId === current)
+        ? current
+        : (courses[0]?.courseId ?? null),
+    );
   }, [courses]);
   useEffect(() => {
     if (!showDetails) return;
@@ -234,6 +265,21 @@ export default function CourseScreen() {
     queryFn: () => getCourseDetail(selectedId!),
     enabled: selectedId !== null,
   });
+  const hazardsQuery = useQuery({
+    queryKey: ["hazards", selectedId],
+    queryFn: () => getActiveHazards(selectedId!),
+    enabled: selectedId !== null,
+  });
+  useFocusEffect(
+    useCallback(() => {
+      if (selectedId !== null) {
+        void queryClient.refetchQueries({
+          queryKey: ["hazards", selectedId],
+          exact: true,
+        });
+      }
+    }, [queryClient, selectedId]),
+  );
   const detail = detailQuery.data;
   const personaScore = detail
     ? effectivePersona === "walker"
@@ -288,6 +334,82 @@ export default function CourseScreen() {
       });
     },
   });
+  const hazardCreateMutation = useMutation({
+    mutationFn: ({
+      courseId,
+      request,
+    }: {
+      courseId: number;
+      request: HazardCreateRequest;
+    }) => createHazard(courseId, request),
+    onSuccess: async (_result, { courseId }) => {
+      setHazardSheetOpen(false);
+      setHazardCoordinate(null);
+      setShowDetails(true);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["hazards", courseId] }),
+        queryClient.invalidateQueries({ queryKey: ["my-profile"] }),
+      ]);
+      setHazardNotice(
+        "위험 신고가 접수되었습니다. 3명의 신고가 모이면 지도에 표시됩니다.",
+      );
+    },
+  });
+  const hazardConfirmationMutation = useMutation({
+    mutationFn: ({ hazardId }: { courseId: number; hazardId: number }) =>
+      confirmHazard(hazardId),
+    onSuccess: (result, { courseId, hazardId }) => {
+      queryClient.setQueryData<Hazard[]>(
+        ["hazards", courseId],
+        (current) =>
+          current?.map((hazard) =>
+            hazard.hazardId === hazardId
+              ? { ...hazard, confirmationCount: result.confirmationCount }
+              : hazard,
+          ) ?? current,
+      );
+      void queryClient.invalidateQueries({
+        queryKey: ["hazards", courseId],
+      });
+      setSelectedHazard((current) =>
+        current?.hazardId === hazardId
+          ? { ...current, confirmationCount: result.confirmationCount }
+          : current,
+      );
+      setHazardNotice("아직 존재하는 위험으로 확인했습니다.");
+    },
+    onError: (error: Error) => {
+      Alert.alert("위험을 확인할 수 없어요", error.message);
+    },
+  });
+  const hazardResolutionMutation = useMutation({
+    mutationFn: ({ hazardId }: { courseId: number; hazardId: number }) =>
+      resolveHazard(hazardId),
+    onSuccess: async (result, { courseId }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["hazards", courseId] }),
+        queryClient.invalidateQueries({ queryKey: ["my-profile"] }),
+      ]);
+      setSelectedHazard(null);
+      setHazardNotice(
+        result.resolved
+          ? "위험이 해결된 것으로 확인되어 지도에서 제거되었습니다."
+          : `해결 확인이 반영되었습니다. (${result.resolutionCount}/3)`,
+      );
+    },
+    onError: (error: Error) => Alert.alert("해결 확인 실패", error.message),
+  });
+  const hazardDeleteMutation = useMutation({
+    mutationFn: ({ hazardId }: { courseId: number; hazardId: number }) =>
+      deleteMyHazardReport(hazardId),
+    onSuccess: async (_result, { courseId }) => {
+      setDeleteConfirmOpen(false);
+      setSelectedHazard(null);
+      await queryClient.invalidateQueries({ queryKey: ["hazards", courseId] });
+      setHazardNotice("내 위험 신고를 취소했습니다.");
+    },
+    onError: (error: Error) => Alert.alert("신고 취소 실패", error.message),
+  });
   const route = useMemo(() => {
     const path = detail?.path;
     const values = Array.isArray(path) ? path : path?.coordinates;
@@ -306,6 +428,50 @@ export default function CourseScreen() {
     setSelectedId(course.courseId);
     const center = getCourseCenter(course);
     if (center) setMapCenter(center);
+  };
+
+  const handleMapLongPress = (event: LongPressEvent) => {
+    if (selectedId === null) {
+      Alert.alert("코스를 선택해 주세요", "신고할 코스를 먼저 선택해 주세요.");
+      return;
+    }
+    hazardCreateMutation.reset();
+    setHazardCoordinate(event.nativeEvent.coordinate);
+    setSelectedHazard(null);
+    setHazardSheetOpen(false);
+    setShowDetails(false);
+  };
+
+  const clearHazardSelection = () => {
+    if (hazardCreateMutation.isPending) return;
+    hazardCreateMutation.reset();
+    setHazardSheetOpen(false);
+    setHazardCoordinate(null);
+    setShowDetails(true);
+  };
+
+  const openHazardReportSheet = () => {
+    if (!isAuthenticated) {
+      setLoginRequiredOpen(true);
+      return;
+    }
+    if (selectedId === null || hazardCoordinate === null) return;
+    hazardCreateMutation.reset();
+    setHazardSheetOpen(true);
+  };
+
+  const submitHazardReport = (request: HazardCreateRequest) => {
+    if (selectedId === null || hazardCreateMutation.isPending) return;
+    hazardCreateMutation.mutate({ courseId: selectedId, request });
+  };
+
+  const handleHazardConfirmation = (hazardId: number) => {
+    if (!isAuthenticated) {
+      setLoginRequiredOpen(true);
+      return;
+    }
+    if (selectedId === null || hazardConfirmationMutation.isPending) return;
+    hazardConfirmationMutation.mutate({ courseId: selectedId, hazardId });
   };
 
   if (coursesQuery.isError)
@@ -327,6 +493,7 @@ export default function CourseScreen() {
       <MapView
         style={StyleSheet.absoluteFill}
         onPress={dismissDetails}
+        onLongPress={handleMapLongPress}
         region={{ ...mapCenter, ...COURSE_MAP_VIEW }}
         userInterfaceStyle={isDark ? "dark" : "light"}
       >
@@ -367,6 +534,76 @@ export default function CourseScreen() {
               />
             ),
         )}
+        {hazardsQuery.data?.map((hazard) => (
+          <Marker
+            key={`hazard-${hazard.hazardId}`}
+            coordinate={{
+              latitude: hazard.latitude,
+              longitude: hazard.longitude,
+            }}
+            anchor={{ x: 0.5, y: 0.5 }}
+            zIndex={4}
+            onPress={() => {
+              setSelectedHazard(hazard);
+              setDeleteConfirmOpen(false);
+              setHazardCoordinate(null);
+              setShowDetails(false);
+            }}
+          >
+            <View
+              style={[
+                styles.hazardMarker,
+                hazard.status === "PENDING" && styles.pendingHazardMarker,
+              ]}
+            >
+              <Ionicons
+                name={hazard.status === "PENDING" ? "time" : "warning"}
+                size={18}
+                color="white"
+              />
+            </View>
+            <Callout
+              tooltip
+              accessibilityLabel={`${hazard.hazardType} 위험 정보`}
+            >
+              <View
+                style={[
+                  styles.hazardCallout,
+                  { backgroundColor: isDark ? "#1B211D" : "#FFFFFF" },
+                ]}
+              >
+                <Text
+                  className={`text-[11px] font-black ${
+                    hazard.status === "PENDING"
+                      ? "text-[#D97706] dark:text-[#FCD34D]"
+                      : "text-[#DC2626] dark:text-[#FCA5A5]"
+                  }`}
+                >
+                  {hazard.status === "PENDING" ? "검증 대기 중" : "활성 위험"}
+                </Text>
+                <Text className="mt-1 text-base font-black text-[#191C1D] dark:text-[#F1F5F2]">
+                  {hazard.hazardType}
+                </Text>
+                <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
+                  {hazard.status === "PENDING"
+                    ? `신고 ${hazard.reportCount}/3명`
+                    : `위험 확인 ${hazard.confirmationCount}회`}
+                </Text>
+                <Text className="mt-2 text-[11px] font-bold text-[#087A3F]">
+                  아래 카드에서 상태를 알려주세요
+                </Text>
+              </View>
+            </Callout>
+          </Marker>
+        ))}
+        {hazardCoordinate && (
+          <Marker
+            coordinate={hazardCoordinate}
+            pinColor="#F59E0B"
+            title="선택한 신고 위치"
+            zIndex={5}
+          />
+        )}
       </MapView>
       <SafeAreaView
         edges={["top"]}
@@ -392,6 +629,11 @@ export default function CourseScreen() {
           </Text>
           <View className="h-12 w-12" />
         </View>
+        {hazardsQuery.isError && (
+          <Text className="mt-2 rounded-xl bg-white/90 px-3 py-2 text-xs font-bold text-[#B91C1C] dark:bg-[#1B211D]/90 dark:text-[#FCA5A5]">
+            위험 정보를 불러오지 못했어요
+          </Text>
+        )}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -499,6 +741,82 @@ export default function CourseScreen() {
           ))}
         </ScrollView>
       </SafeAreaView>
+      {hazardNotice && (
+        <Pressable
+          onPress={() => setHazardNotice(null)}
+          className="absolute left-5 right-5 top-24 rounded-2xl bg-[#163C29] px-4 py-3 shadow-lg"
+        >
+          <Text className="text-sm font-bold text-white">{hazardNotice}</Text>
+        </Pressable>
+      )}
+      {selectedHazard && (
+        <View className="absolute bottom-7 left-4 right-4 rounded-[22px] bg-white p-4 shadow-xl dark:bg-[#1B211D]">
+          <View className="flex-row items-start justify-between">
+            <View>
+              <Text
+                className={`text-xs font-black ${
+                  selectedHazard.status === "PENDING"
+                    ? "text-[#D97706]"
+                    : "text-[#DC2626]"
+                }`}
+              >
+                {selectedHazard.status === "PENDING"
+                  ? "검증 대기 중"
+                  : "활성 위험"}
+              </Text>
+              <Text className="mt-1 text-lg font-black dark:text-white">
+                {selectedHazard.hazardType}
+              </Text>
+              <Text className="mt-1 text-xs text-[#6B756D] dark:text-[#AAB5AD]">
+                {selectedHazard.status === "PENDING"
+                  ? `신고 ${selectedHazard.reportCount}/3명`
+                  : `위험 확인 ${selectedHazard.confirmationCount}회`}
+              </Text>
+            </View>
+            <Pressable onPress={() => setSelectedHazard(null)} className="p-2">
+              <Ionicons name="close" size={20} color="#6B756D" />
+            </Pressable>
+          </View>
+          {selectedHazard.status === "ACTIVE" && (
+            <View className="mt-3 flex-row gap-2">
+              <Button
+                className="flex-1 bg-[#B91C1C]"
+                disabled={hazardConfirmationMutation.isPending}
+                onPress={() =>
+                  handleHazardConfirmation(selectedHazard.hazardId)
+                }
+              >
+                <Text className="font-black text-white">아직 위험해요</Text>
+              </Button>
+              <Button
+                className="flex-1 bg-[#087A3F]"
+                disabled={hazardResolutionMutation.isPending}
+                onPress={() => {
+                  if (!isAuthenticated) return setLoginRequiredOpen(true);
+                  if (selectedId !== null)
+                    hazardResolutionMutation.mutate({
+                      courseId: selectedId,
+                      hazardId: selectedHazard.hazardId,
+                    });
+                }}
+              >
+                <Text className="font-black text-white">해결됐어요</Text>
+              </Button>
+            </View>
+          )}
+          {selectedHazard.reportedByMe && (
+            <Pressable
+              disabled={hazardDeleteMutation.isPending}
+              onPress={() => setDeleteConfirmOpen(true)}
+              className="mt-3 items-center py-2"
+            >
+              <Text className="text-xs font-bold text-[#6B756D] dark:text-[#AAB5AD]">
+                내 신고 취소
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
       {showDetails && (
         <Animated.View
           className="absolute inset-x-0 bottom-0 h-[36%] rounded-t-[30px] bg-white px-5 pb-[22px] pt-2.5 shadow-2xl dark:bg-[#1B211D]"
@@ -623,7 +941,7 @@ export default function CourseScreen() {
           </ScrollView>
         </Animated.View>
       )}
-      {!showDetails && (
+      {!showDetails && !hazardCoordinate && !selectedHazard && (
         <SafeAreaView
           edges={["bottom"]}
           className="absolute inset-x-0 bottom-5 items-center"
@@ -640,6 +958,70 @@ export default function CourseScreen() {
           </Button>
         </SafeAreaView>
       )}
+      {hazardCoordinate && (
+        <SafeAreaView
+          edges={["bottom"]}
+          className="absolute inset-x-0 bottom-0 px-5 pb-3"
+          pointerEvents="box-none"
+        >
+          <View className="rounded-3xl bg-white p-4 shadow-2xl dark:bg-[#1B211D]">
+            <View className="flex-row items-start gap-3">
+              <View className="h-10 w-10 items-center justify-center rounded-full bg-[#FFF7E6] dark:bg-[#3D3322]">
+                <Ionicons name="location" size={20} color="#D97706" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-sm font-black text-[#191C1D] dark:text-[#F1F5F2]">
+                  위치가 선택되었습니다
+                </Text>
+                <Text className="mt-1 text-xs leading-5 text-[#6B756D] dark:text-[#AAB5AD]">
+                  이 위치에서 위험을 신고할 수 있어요. 다른 위치는 지도를 다시
+                  길게 눌러 선택하세요.
+                </Text>
+              </View>
+              <Button
+                variant="ghost"
+                size="icon"
+                accessibilityLabel="선택 위치 해제"
+                className="h-9 w-9 rounded-full"
+                onPress={clearHazardSelection}
+              >
+                <Ionicons name="close" size={20} color="#6B756D" />
+              </Button>
+            </View>
+            <Button
+              className="mt-4 h-12 w-full rounded-2xl bg-[#DC2626] active:bg-[#B91C1C]"
+              onPress={openHazardReportSheet}
+            >
+              <Ionicons name="warning-outline" size={19} color="white" />
+              <Text className="font-black text-white">이 위치 위험 신고</Text>
+            </Button>
+          </View>
+        </SafeAreaView>
+      )}
+      <HazardReportSheet
+        open={hazardSheetOpen}
+        coordinate={hazardCoordinate}
+        isSubmitting={hazardCreateMutation.isPending}
+        errorMessage={hazardCreateMutation.error?.message}
+        onSubmit={submitHazardReport}
+        onChangeLocation={() => {
+          hazardCreateMutation.reset();
+          setHazardSheetOpen(false);
+        }}
+        onClose={clearHazardSelection}
+      />
+      <HazardDeleteConfirmModal
+        open={deleteConfirmOpen}
+        isDeleting={hazardDeleteMutation.isPending}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => {
+          if (selectedId === null || selectedHazard === null) return;
+          hazardDeleteMutation.mutate({
+            courseId: selectedId,
+            hazardId: selectedHazard.hazardId,
+          });
+        }}
+      />
       <LoginRequiredModal
         visible={loginRequiredOpen}
         onClose={() => setLoginRequiredOpen(false)}
@@ -647,3 +1029,29 @@ export default function CourseScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  hazardMarker: {
+    width: 34,
+    height: 34,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 17,
+    borderWidth: 3,
+    borderColor: "white",
+    backgroundColor: "#DC2626",
+  },
+  pendingHazardMarker: {
+    backgroundColor: "#D97706",
+  },
+  hazardCallout: {
+    width: 210,
+    borderRadius: 18,
+    padding: 14,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+});

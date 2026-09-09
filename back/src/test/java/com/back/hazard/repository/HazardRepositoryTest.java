@@ -7,6 +7,7 @@ import com.back.hazard.domain.Hazard;
 import com.back.hazard.domain.HazardConfirmation;
 import com.back.hazard.domain.HazardReport;
 import com.back.hazard.domain.HazardStatus;
+import com.back.hazard.dto.HazardResponse;
 import com.back.user.domain.User;
 import com.back.user.repository.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +18,9 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -101,6 +104,109 @@ class HazardRepositoryTest {
 
         assertThat(result).extracting(Hazard::getHazardType).containsExactly("ACTIVE_TYPE");
         assertThat(result).doesNotContain(pending);
+    }
+
+    @Test
+    @DisplayName("ACTIVE Hazard 조회는 createdAt과 id가 가장 앞선 최초 신고 좌표를 반환한다")
+    void findsActiveHazardWithFirstReportCoordinates() {
+        Course course = courseRepository.save(new Course("테스트 코스", "11500", 3000));
+        User firstReporter = userRepository.save(User.createLocal("first-location@test.com", "hash", "첫째"));
+        User secondReporter = userRepository.save(User.createLocal("second-location@test.com", "hash", "둘째"));
+        User thirdReporter = userRepository.save(User.createLocal("third-location@test.com", "hash", "셋째"));
+        User pendingReporter = userRepository.save(User.createLocal("pending-location@test.com", "hash", "대기"));
+
+        Hazard active = hazardRepository.save(new Hazard(course, "빙판"));
+        LocalDateTime sameCreatedAt = LocalDateTime.of(2026, 9, 8, 10, 0);
+        HazardReport firstReport = new HazardReport(
+                active, firstReporter, "상", "최초 신고", 37.5219, 126.8575);
+        ReflectionTestUtils.setField(firstReport, "createdAt", sameCreatedAt);
+        hazardReportRepository.saveAndFlush(firstReport);
+        HazardReport secondReport = new HazardReport(
+                active, secondReporter, "중", "동일 시각 후속 신고", 37.5225, 126.8581);
+        ReflectionTestUtils.setField(secondReport, "createdAt", sameCreatedAt);
+        hazardReportRepository.saveAndFlush(secondReport);
+        hazardReportRepository.saveAndFlush(new HazardReport(
+                active, thirdReporter, "하", "나중 신고", 37.5230, 126.8586));
+        active.updateStatusByReporterCount(3, 3);
+        hazardConfirmationRepository.saveAndFlush(new HazardConfirmation(active, firstReporter));
+
+        Hazard pending = hazardRepository.save(new Hazard(course, "침수"));
+        hazardReportRepository.saveAndFlush(new HazardReport(
+                pending, pendingReporter, "상", "대기 신고", 37.5300, 126.8600));
+
+        var result = hazardReportRepository.findVisibleHazardResponsesByCourseId(
+                course.getId(), HazardStatus.ACTIVE, HazardStatus.PENDING, null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().hazardId()).isEqualTo(active.getId());
+        assertThat(result.getFirst().latitude()).isEqualTo(37.5219);
+        assertThat(result.getFirst().longitude()).isEqualTo(126.8575);
+        assertThat(result.getFirst().status()).isEqualTo(HazardStatus.ACTIVE);
+        assertThat(result.getFirst().reportCount()).isEqualTo(3L);
+        assertThat(result.getFirst().confirmationCount()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("신고가 없는 비정상 ACTIVE Hazard는 공개 좌표 조회에서 제외한다")
+    void excludesActiveHazardWithoutReportFromPublicLocationQuery() {
+        Course course = courseRepository.save(new Course("테스트 코스", "11500", 3000));
+        Hazard activeWithoutReport = new Hazard(course, "빙판");
+        activeWithoutReport.updateStatusByReporterCount(3, 3);
+        hazardRepository.saveAndFlush(activeWithoutReport);
+
+        var result = hazardReportRepository.findVisibleHazardResponsesByCourseId(
+                course.getId(), HazardStatus.ACTIVE, HazardStatus.PENDING, null);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("로그인 사용자는 ACTIVE 전체와 자신이 신고한 PENDING만 조회한다")
+    void findsActiveAndOnlyOwnPendingHazards() {
+        Course course = courseRepository.save(new Course("테스트 코스", "11500", 3000));
+        User me = userRepository.save(User.createLocal("pending-me@test.com", "hash", "나"));
+        User other = userRepository.save(User.createLocal("pending-other@test.com", "hash", "타인"));
+        User activeReporter = userRepository.save(User.createLocal("active@test.com", "hash", "활성"));
+
+        Hazard active = hazardRepository.save(new Hazard(course, "공사"));
+        hazardReportRepository.saveAndFlush(new HazardReport(
+                active, activeReporter, "상", "활성 신고", 37.51, 126.85));
+        active.updateStatusByReporterCount(3, 3);
+
+        Hazard ownPending = hazardRepository.save(new Hazard(course, "빙판"));
+        hazardReportRepository.saveAndFlush(new HazardReport(
+                ownPending, me, "중", "내 대기 신고", 37.52, 126.86));
+
+        Hazard otherPending = hazardRepository.save(new Hazard(course, "침수"));
+        hazardReportRepository.saveAndFlush(new HazardReport(
+                otherPending, other, "하", "타인 대기 신고", 37.53, 126.87));
+
+        var result = hazardReportRepository.findVisibleHazardResponsesByCourseId(
+                course.getId(), HazardStatus.ACTIVE, HazardStatus.PENDING, me.getId());
+
+        assertThat(result).extracting(HazardResponse::hazardId)
+                .containsExactlyInAnyOrder(active.getId(), ownPending.getId());
+        HazardResponse pending = result.stream()
+                .filter(item -> item.hazardId().equals(ownPending.getId()))
+                .findFirst().orElseThrow();
+        assertThat(pending.status()).isEqualTo(HazardStatus.PENDING);
+        assertThat(pending.reportedByMe()).isTrue();
+        assertThat(pending.reportCount()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("비회원은 다른 사용자의 PENDING 없이 ACTIVE만 조회한다")
+    void anonymousFindsOnlyActiveHazards() {
+        Course course = courseRepository.save(new Course("테스트 코스", "11500", 3000));
+        User reporter = userRepository.save(User.createLocal("anonymous-filter@test.com", "hash", "신고자"));
+        Hazard pending = hazardRepository.save(new Hazard(course, "빙판"));
+        hazardReportRepository.saveAndFlush(new HazardReport(
+                pending, reporter, "상", "대기 신고", 37.52, 126.86));
+
+        var result = hazardReportRepository.findVisibleHazardResponsesByCourseId(
+                course.getId(), HazardStatus.ACTIVE, HazardStatus.PENDING, null);
+
+        assertThat(result).isEmpty();
     }
 
     @Test
