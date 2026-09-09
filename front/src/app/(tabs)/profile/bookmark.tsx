@@ -29,6 +29,7 @@ import {
   recordBookmarkedCourseUsage,
   unbookmarkCourse,
 } from "@/api/course-api";
+import { resolveApiHostUrl } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
@@ -74,10 +75,13 @@ export default function ProfileBookmarkScreen() {
     queryKey: ["course", selectedId],
     queryFn: () => getCourseDetail(selectedId!),
     enabled: selectedId !== null,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
   const usageLogsQuery = useQuery({
     queryKey: ["bookmark-usage-logs", selectedId],
-    queryFn: () => getBookmarkedCourseUsageLogs(selectedId!, { page: 0, size: 10 }),
+    queryFn: () =>
+      getBookmarkedCourseUsageLogs(selectedId!, { page: 0, size: 10 }),
     enabled: selectedId !== null && isAuthenticated,
   });
   const courses =
@@ -134,7 +138,8 @@ export default function ProfileBookmarkScreen() {
   const ratingMutation = useMutation({
     mutationFn: ({ courseId, rating }: { courseId: number; rating: number }) =>
       rateBookmarkedCourse(courseId, rating),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
   });
   const usageMutation = useMutation({
     mutationFn: (courseId: number) => recordBookmarkedCourseUsage(courseId),
@@ -146,7 +151,9 @@ export default function ProfileBookmarkScreen() {
     },
   });
   const selected = detailQuery.data;
-  const selectedBookmark = courses.find((course) => course.courseId === selectedId);
+  const selectedBookmark = courses.find(
+    (course) => course.courseId === selectedId,
+  );
   const activityError = usageMutation.error ?? ratingMutation.error;
   useEffect(() => {
     if (selectedId === null) return;
@@ -281,7 +288,13 @@ export default function ProfileBookmarkScreen() {
                 showsVerticalScrollIndicator
               >
                 <Image
-                  source={{ uri: selected.imageUrl || FALLBACK_IMAGE }}
+                  source={{
+                    uri: resolveApiHostUrl(
+                      selected.mapImageUrl ||
+                        selected.imageUrl ||
+                        FALLBACK_IMAGE,
+                    ),
+                  }}
                   className="h-[170px] w-full rounded-xl"
                 />
                 <View className="mt-4 flex-row items-center">
@@ -344,7 +357,11 @@ export default function ProfileBookmarkScreen() {
                       disabled={usageMutation.isPending}
                       onPress={() => usageMutation.mutate(selected.courseId)}
                     >
-                      <Ionicons name="checkmark-circle-outline" size={16} color="white" />
+                      <Ionicons
+                        name="checkmark-circle-outline"
+                        size={16}
+                        color="white"
+                      />
                       <Text className="text-xs font-extrabold text-white">
                         다녀왔어요
                       </Text>
@@ -365,7 +382,8 @@ export default function ProfileBookmarkScreen() {
                           key={log.usageLogId}
                           className="mt-1 text-xs text-[#526056] dark:text-[#AAB5AD]"
                         >
-                          {new Date(log.usedAt).toLocaleDateString("ko-KR")}에 다녀왔어요
+                          {new Date(log.usedAt).toLocaleDateString("ko-KR")}에
+                          다녀왔어요
                         </Text>
                       ))}
                     </View>
@@ -409,7 +427,11 @@ function CourseCard({
     <Pressable className="w-full" onPress={onPress}>
       <View>
         <Image
-          source={{ uri: item.imageUrl || FALLBACK_IMAGE }}
+          source={{
+            uri: resolveApiHostUrl(
+              item.mapImageUrl || item.imageUrl || FALLBACK_IMAGE,
+            ),
+          }}
           className="h-40 w-full rounded-2xl bg-slate-200"
           resizeMode="cover"
         />
@@ -459,7 +481,9 @@ function CourseCard({
           compact
         />
         <Text className="text-xs text-slate-500 dark:text-[#AAB5AD]">
-          {item.usageCount ? `${item.usageCount}회 다녀옴` : "아직 안 다녀왔어요"}
+          {item.usageCount
+            ? `${item.usageCount}회 다녀옴`
+            : "아직 안 다녀왔어요"}
         </Text>
       </View>
     </Pressable>

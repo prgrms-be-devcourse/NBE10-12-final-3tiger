@@ -71,6 +71,7 @@ export type Course = {
   personaBadges?: string[];
   myFavorite?: boolean;
   isBookmarked?: boolean;
+  mapImageUrl?: string | null;
   imageUrl?: string;
   summary?: string;
   bookmarkedAt?: string;

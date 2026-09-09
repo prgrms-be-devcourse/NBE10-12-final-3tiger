@@ -44,6 +44,7 @@ class CourseControllerTest {
                         "LineString",
                         List.of(List.of(127.037, 37.544), List.of(127.038, 37.545))
                 ),
+                "https://cdn.example.com/course-maps/101.png",
                 2500,
                 35,
                 12,
@@ -68,6 +69,8 @@ class CourseControllerTest {
                 .andExpect(jsonPath("$.data.path.type").value("LineString"))
                 .andExpect(jsonPath("$.data.path.coordinates[0][0]").value(127.037))
                 .andExpect(jsonPath("$.data.path.coordinates[0][1]").value(37.544))
+                .andExpect(jsonPath("$.data.mapImageUrl")
+                        .value("https://cdn.example.com/course-maps/101.png"))
                 .andExpect(jsonPath("$.data.scoreWalker").value(0.91))
                 .andExpect(jsonPath("$.data.scoreSenior").value(0.87))
                 .andExpect(jsonPath("$.data.scoreStroller").value(0.83))

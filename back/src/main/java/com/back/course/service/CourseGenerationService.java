@@ -5,7 +5,9 @@ import com.back.course.dto.GenerateCandidate;
 import com.back.course.dto.GenerateRequest;
 import com.back.course.dto.GenerateResponse;
 import com.back.course.dto.SaveCourseRequest;
+import com.back.course.map.event.CourseMapImageRequested;
 import com.back.course.repository.CourseGenerationRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +25,16 @@ public class CourseGenerationService {
 
     private final CourseGenerationRepository repo;
     private final BookmarkService bookmarkService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public CourseGenerationService(CourseGenerationRepository repo, BookmarkService bookmarkService) {
+    public CourseGenerationService(
+            CourseGenerationRepository repo,
+            BookmarkService bookmarkService,
+            ApplicationEventPublisher eventPublisher
+    ) {
         this.repo = repo;
         this.bookmarkService = bookmarkService;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -88,6 +96,7 @@ public class CourseGenerationService {
                 req.path(), req.regionCode(), isLoop, req.endLng(), req.endLat(), req.name()
         );
         bookmarkService.add(userId, courseId);
+        eventPublisher.publishEvent(new CourseMapImageRequested(courseId, req.path()));
         return courseId;
     }
 }

@@ -14,6 +14,8 @@ public class Course {
     private String regionCode;
     @Column(name = "distance_m", nullable = false)
     private int distanceM;
+    @Column(name = "map_image_url", length = 2048)
+    private String mapImageUrl;
 
     protected Course() {}
     public Course(String name, String regionCode, int distanceM) {
@@ -23,4 +25,5 @@ public class Course {
     public String getName() { return name; }
     public String getRegionCode() { return regionCode; }
     public int getDistanceM() { return distanceM; }
+    public String getMapImageUrl() { return mapImageUrl; }
 }

@@ -14,6 +14,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             SELECT c.course_id                         AS courseId,
                    c.name                              AS name,
                    ST_AsGeoJSON(c.path)                AS pathGeoJson,
+                   c.map_image_url                     AS mapImageUrl,
                    c.distance_m                        AS distanceM,
                    c.estimated_minutes                 AS estimatedMinutes,
                    c.elevation_gain_m                  AS elevationGainM,

@@ -2,10 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
-import { ScrollView, View } from "react-native";
+import { Image, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getCourseDetail } from "@/api/course-api";
+import { resolveApiHostUrl } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
@@ -19,6 +20,15 @@ export default function CourseDetailScreen() {
     queryKey: ["course", courseId],
     queryFn: () => getCourseDetail(courseId),
     enabled: Number.isFinite(courseId),
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchInterval: (query) => {
+      const detail = query.state.data;
+      if (!detail || detail.mapImageUrl || query.state.dataUpdateCount >= 8) {
+        return false;
+      }
+      return 1_500;
+    },
   });
   const stats = useMemo(() => {
     const detail = detailQuery.data;
@@ -70,6 +80,14 @@ export default function CourseDetailScreen() {
       </View>
       <ScrollView contentContainerClassName="p-5 pb-10">
         <View className="rounded-3xl bg-white p-5 dark:bg-[#1B211D]">
+          {detail.mapImageUrl && (
+            <Image
+              source={{ uri: resolveApiHostUrl(detail.mapImageUrl) }}
+              className="mb-5 h-[190px] w-full rounded-2xl bg-[#E5EBE5] dark:bg-[#303632]"
+              resizeMode="cover"
+              accessibilityLabel={`${detail.name} 코스 지도`}
+            />
+          )}
           <Text className="text-[11px] font-black text-[#087A3F]">
             추천 산책 코스
           </Text>
