@@ -22,6 +22,7 @@ import MapView, { PROVIDER_GOOGLE, type Region as MapRegion } from "react-native
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getRegions } from "@/api/course-api";
 import {
+  getPlaceSearchErrorMessage,
   reverseGeocode,
   searchPlaces,
   type PlaceSearchItem,
@@ -313,10 +314,9 @@ export default function MapScreen() {
           );
           return;
         }
-      } catch {
+      } catch (error) {
         if (requestId !== placeSearchRequestRef.current) return;
-        setPlaceResults([]);
-        setMessage("장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.");
+        setMessage(getPlaceSearchErrorMessage(error));
       } finally {
         if (requestId === placeSearchRequestRef.current) setSearching(false);
       }

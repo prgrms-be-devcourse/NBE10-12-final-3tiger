@@ -31,6 +31,7 @@ import {
   saveGeneratedCourse,
 } from "@/api/course-api";
 import {
+  getPlaceSearchErrorMessage,
   reverseGeocode,
   searchPlaces,
   type PlaceSearchItem,
@@ -294,12 +295,9 @@ export default function CourseGenerateScreen() {
       }
       if (results.length === 0)
         setPlaceSearchError("검색 결과가 없어요. 장소명을 다시 입력해 주세요.");
-    } catch {
+    } catch (error) {
       if (requestId !== placeSearchRequestRef.current) return;
-      setPlaceResults([]);
-      setPlaceSearchError(
-        "장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.",
-      );
+      setPlaceSearchError(getPlaceSearchErrorMessage(error));
     } finally {
       if (requestId === placeSearchRequestRef.current) setPlaceSearching(false);
     }

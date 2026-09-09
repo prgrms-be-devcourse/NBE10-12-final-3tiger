@@ -3,6 +3,7 @@ package com.back.map.naver;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.map.naver.dto.NaverReverseGeocodeResponse;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -17,6 +18,7 @@ public class NaverMapClient {
         this.restClient = restClient;
     }
 
+    @CircuitBreaker(name = "naverReverseGeocode")
     public NaverReverseGeocodeResponse reverseGeocode(double latitude, double longitude) {
         try {
             NaverReverseGeocodeResponse response = restClient.get()

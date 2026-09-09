@@ -11,6 +11,12 @@ public enum ErrorCode {
             "서버 내부 오류가 발생했습니다."
     ),
 
+    EXTERNAL_API_TEMPORARILY_UNAVAILABLE(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "EXTERNAL_503_1",
+            "외부 서비스에 일시적인 장애가 발생했습니다. 잠시 후 다시 시도해 주세요."
+    ),
+
     USER_NOT_FOUND(
             HttpStatus.NOT_FOUND,
             "USER_404",

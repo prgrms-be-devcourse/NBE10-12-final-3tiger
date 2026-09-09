@@ -4,7 +4,9 @@ import com.back.auth.kakao.dto.KakaoTokenResponse;
 import com.back.auth.kakao.dto.KakaoUserInfoResponse;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -21,9 +23,15 @@ public class KakaoClient {
 
     public KakaoClient(KakaoProperties props) {
         this.props = props;
-        this.restClient = RestClient.create();
+        var requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(props.getConnectTimeout());
+        requestFactory.setReadTimeout(props.getReadTimeout());
+        this.restClient = RestClient.builder()
+                .requestFactory(requestFactory)
+                .build();
     }
 
+    @CircuitBreaker(name = "kakaoAuth")
     public KakaoTokenResponse exchangeToken(String code) {
         MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
         params.add("grant_type", "authorization_code");
@@ -52,6 +60,7 @@ public class KakaoClient {
         }
     }
 
+    @CircuitBreaker(name = "kakaoAuth")
     public KakaoUserInfoResponse getUserInfo(String accessToken) {
         try {
             KakaoUserInfoResponse response = restClient.get()
