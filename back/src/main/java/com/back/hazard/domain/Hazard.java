@@ -52,6 +52,9 @@ public class Hazard {
     }
 
     public void updateStatusByReporterCount(long distinctReporterCount, long threshold) {
+        if (status == HazardStatus.RESOLVED) {
+            return;
+        }
         if (distinctReporterCount >= threshold) {
             if (status == HazardStatus.PENDING) {
                 status = HazardStatus.ACTIVE;
@@ -62,6 +65,13 @@ public class Hazard {
 
         status = HazardStatus.PENDING;
         activatedAt = null;
+    }
+
+    public void resolve() {
+        if (status != HazardStatus.ACTIVE) {
+            throw new IllegalStateException("ACTIVE 위험만 해결할 수 있습니다.");
+        }
+        status = HazardStatus.RESOLVED;
     }
 
     public Long getId() {

@@ -121,8 +121,19 @@ class HazardControllerTest {
     void returnsActiveHazards() throws Exception {
         LocalDateTime createdAt = LocalDateTime.of(2026, 9, 3, 12, 0);
         LocalDateTime activatedAt = LocalDateTime.of(2026, 9, 3, 12, 30);
-        given(hazardService.getActiveHazards(10L)).willReturn(List.of(
-                new HazardResponse(30L, "빙판", HazardStatus.ACTIVE, 4L, createdAt, activatedAt)
+        given(hazardService.getActiveHazards(10L, null)).willReturn(List.of(
+                new HazardResponse(
+                        30L,
+                        "빙판",
+                        HazardStatus.ACTIVE,
+                        37.5219,
+                        126.8575,
+                        3L,
+                        4L,
+                        false,
+                        createdAt,
+                        activatedAt
+                )
         ));
 
         mockMvc.perform(get("/api/v1/courses/{courseId}/hazards", 10L))
@@ -130,9 +141,22 @@ class HazardControllerTest {
                 .andExpect(jsonPath("$.data[0].hazardId").value(30))
                 .andExpect(jsonPath("$.data[0].hazardType").value("빙판"))
                 .andExpect(jsonPath("$.data[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data[0].latitude").value(37.5219))
+                .andExpect(jsonPath("$.data[0].longitude").value(126.8575))
+                .andExpect(jsonPath("$.data[0].reportCount").value(3))
                 .andExpect(jsonPath("$.data[0].confirmationCount").value(4))
                 .andExpect(jsonPath("$.data[0].expiresAt").doesNotExist())
                 .andExpect(jsonPath("$.data[0].upvoteCount").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("인증된 공개 조회는 선택적 사용자 ID를 서비스에 전달한다")
+    void passesOptionalUserIdWhenAuthenticated() throws Exception {
+        mockMvc.perform(get("/api/v1/courses/{courseId}/hazards", 10L)
+                        .with(authenticatedAs(1L)))
+                .andExpect(status().isOk());
+
+        verify(hazardService).getActiveHazards(10L, 1L);
     }
 
     @Test
