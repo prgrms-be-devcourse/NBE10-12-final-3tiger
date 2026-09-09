@@ -12,6 +12,8 @@
       "bundleIdentifier": "com.anonymous.front"
     },
     "android": {
+      "package": "com.anonymous.front",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#208AEF",
         "foregroundImage": "./assets/logo-transparent.png"
@@ -29,6 +31,13 @@
     },
     "plugins": [
       "expo-router",
+      "expo-dev-client",
+      [
+        "expo-notifications",
+        {
+          "color": "#208AEF"
+        }
+      ],
       [
         "expo-splash-screen",
         {
