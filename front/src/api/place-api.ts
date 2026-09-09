@@ -11,6 +11,13 @@ export type PlaceSearchItem = {
   supportedRegion: boolean;
 };
 
+export type PlaceSearchResult = {
+  originalQuery: string;
+  correctedQuery: string | null;
+  correctionApplied: boolean;
+  items: PlaceSearchItem[];
+};
+
 export type ReverseGeocodeResult = {
   latitude: number;
   longitude: number;
@@ -23,7 +30,7 @@ export type ReverseGeocodeResult = {
 };
 
 export const searchPlaces = (query: string) =>
-  apiRequest<PlaceSearchItem[]>({
+  apiRequest<PlaceSearchResult>({
     url: "/api/v1/places/search",
     params: { query },
   });

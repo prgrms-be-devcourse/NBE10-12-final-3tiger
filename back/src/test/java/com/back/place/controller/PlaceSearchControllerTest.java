@@ -1,4 +1,4 @@
-package com.back.place.kakao;
+package com.back.place.controller;
 
 import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.SecurityConfig;
@@ -7,9 +7,11 @@ import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
+import com.back.place.dto.PlaceSearchResult;
 import com.back.place.kakao.dto.PlaceSearchItem;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimitInterceptor;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
+import com.back.place.service.PlaceSearchService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -27,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(KakaoPlaceController.class)
+@WebMvcTest(PlaceSearchController.class)
 @Import({
         SecurityConfig.class,
         WebConfig.class,
@@ -35,13 +37,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         GlobalExceptionHandler.class,
         PlaceSearchRateLimitInterceptor.class
 })
-class KakaoPlaceControllerTest {
+class PlaceSearchControllerTest {
 
     @Autowired
     private MockMvc mvc;
 
     @MockitoBean
-    private KakaoPlaceService service;
+    private PlaceSearchService service;
 
     @MockitoBean
     private JwtProvider jwtProvider;
@@ -51,8 +53,11 @@ class KakaoPlaceControllerTest {
 
     @Test
     void allowsAnonymousSearchAndReturnsSupportedRegionFlag() throws Exception {
-        given(service.search("서울식물원")).willReturn(List.of(
-                new PlaceSearchItem(
+        given(service.search("서울식물원")).willReturn(new PlaceSearchResult(
+                "서울식물원",
+                null,
+                false,
+                List.of(new PlaceSearchItem(
                         "서울식물원",
                         "서울 강서구 마곡동 161",
                         "서울 강서구 마곡동로 161",
@@ -61,14 +66,16 @@ class KakaoPlaceControllerTest {
                         "여행 > 공원",
                         "https://place.map.kakao.com/1",
                         true
-                )
+                ))
         ));
 
         mvc.perform(get("/api/v1/places/search")
                         .param("query", "서울식물원"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].name").value("서울식물원"))
-                .andExpect(jsonPath("$.data[0].supportedRegion").value(true));
+                .andExpect(jsonPath("$.data.originalQuery").value("서울식물원"))
+                .andExpect(jsonPath("$.data.correctionApplied").value(false))
+                .andExpect(jsonPath("$.data.items[0].name").value("서울식물원"))
+                .andExpect(jsonPath("$.data.items[0].supportedRegion").value(true));
     }
 
     @Test

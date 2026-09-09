@@ -289,8 +289,12 @@ export default function MapScreen() {
     setMessage(null);
 
     try {
-      const results = await searchPlaces(keyword);
+      const response = await searchPlaces(keyword);
+      const results = response.items;
       setPlaceResults(results);
+      if (response.correctionApplied && response.correctedQuery) {
+        setMessage(`‘${response.correctedQuery}’(으)로 검색한 결과예요.`);
+      }
       if (results.length === 0) {
         setMessage(
           "검색 결과가 없어요. 다른 동네나 공원 이름을 입력해 주세요.",

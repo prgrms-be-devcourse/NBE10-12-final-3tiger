@@ -47,6 +47,12 @@ app:
       rest-api-key: ${KAKAO_PLACE_REST_API_KEY}
       connect-timeout: 2s
       read-timeout: 3s
+    naver-api-hub:
+      base-url: ${NAVER_API_HUB_BASE_URL:https://naverapihub.apigw.ntruss.com}
+      client-id: ${NAVER_API_HUB_CLIENT_ID:}
+      client-secret: ${NAVER_API_HUB_CLIENT_SECRET:}
+      connect-timeout: 2s
+      read-timeout: 2s
     rate-limit:
       limit: ${PLACE_SEARCH_RATE_LIMIT:30}
       window: ${PLACE_SEARCH_RATE_LIMIT_WINDOW:60s}

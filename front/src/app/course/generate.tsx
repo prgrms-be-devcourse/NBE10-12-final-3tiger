@@ -129,6 +129,7 @@ export default function CourseGenerateScreen() {
   const [placeResults, setPlaceResults] = useState<PlaceSearchItem[]>([]);
   const [placeSearching, setPlaceSearching] = useState(false);
   const [placeSearchError, setPlaceSearchError] = useState<string | null>(null);
+  const [placeSearchNotice, setPlaceSearchNotice] = useState<string | null>(null);
   const [locatingTarget, setLocatingTarget] =
     useState<PlaceSearchTarget | null>(null);
   const [distanceM, setDistanceM] = useState(3000);
@@ -268,9 +269,16 @@ export default function CourseGenerateScreen() {
     if (!keyword || placeSearching) return;
     setPlaceSearching(true);
     setPlaceSearchError(null);
+    setPlaceSearchNotice(null);
     try {
-      const results = await searchPlaces(keyword);
+      const response = await searchPlaces(keyword);
+      const results = response.items;
       setPlaceResults(results);
+      if (response.correctionApplied && response.correctedQuery) {
+        setPlaceSearchNotice(
+          `‘${response.correctedQuery}’(으)로 검색한 결과예요.`,
+        );
+      }
       if (results.length === 0)
         setPlaceSearchError("검색 결과가 없어요. 장소명을 다시 입력해 주세요.");
     } catch {
@@ -806,6 +814,11 @@ export default function CourseGenerateScreen() {
                 {placeSearchError && (
                   <Text className="mt-3 text-xs font-bold text-[#B91C1C]">
                     {placeSearchError}
+                  </Text>
+                )}
+                {placeSearchNotice && (
+                  <Text className="mt-3 text-xs font-bold text-[#087A3F]">
+                    {placeSearchNotice}
                   </Text>
                 )}
                 <ScrollView
