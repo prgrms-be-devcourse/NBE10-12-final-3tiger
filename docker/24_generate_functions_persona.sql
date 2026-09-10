@@ -29,6 +29,8 @@ DECLARE
     v_start_pt         public.geometry;
     v_start_node       bigint;
     v_radius_m         double precision;
+    v_radius_mult      double precision;
+    v_slot             integer;
     v_base_bearing     double precision;
     v_wp_nodes         bigint[];
     v_i                integer;
@@ -80,9 +82,18 @@ BEGIN
       FROM routing.walk_edges_vertices_pgr
      ORDER BY the_geom <-> v_start_pt LIMIT 1;
 
-    -- 웨이포인트
-    v_radius_m := p_target_m / (2 * pi());
-    v_base_bearing := p_candidate_idx * 40.0;
+    -- 웨이포인트: 재시도마다 bearing과 radius를 함께 변조
+    -- (grid sparse 지역에서 고정 반경만 회전하면 6번 다 실패하는 문제 해소)
+    v_slot         := p_candidate_idx % 8;
+    v_base_bearing := v_slot * 45.0;   -- 0, 45, 90, 135, 180, 225, 270, 315
+    v_radius_mult  := CASE v_slot
+                        WHEN 2 THEN 0.85
+                        WHEN 5 THEN 0.85
+                        WHEN 3 THEN 1.15
+                        WHEN 6 THEN 1.15
+                        ELSE 1.00
+                      END;
+    v_radius_m     := (p_target_m / (2 * pi())) * v_radius_mult;
 
     v_wp_nodes := ARRAY[]::bigint[];
     FOR v_i IN 0..2 LOOP
@@ -119,7 +130,7 @@ BEGIN
                  + COALESCE(g.bench_density,0)       * %8$L
                  + COALESCE(g.restroom_proximity,0)  * %9$L
                  + COALESCE(g.water_facility,0)      * %10$L
-                 + COALESCE(g.pavement_quality,0)    * %11$L
+                 + COALESCE(g.pavement_quality,0.5)  * %11$L
                )) AS cost,
                e.length_m / (0.1 + (
                    COALESCE(g.flatness,0)            * %3$L
@@ -130,7 +141,7 @@ BEGIN
                  + COALESCE(g.bench_density,0)       * %8$L
                  + COALESCE(g.restroom_proximity,0)  * %9$L
                  + COALESCE(g.water_facility,0)      * %10$L
-                 + COALESCE(g.pavement_quality,0)    * %11$L
+                 + COALESCE(g.pavement_quality,0.5)  * %11$L
                )) AS reverse_cost
           FROM routing.walk_edges e
           LEFT JOIN public.grid_score g ON g.grid_id = e.grid_id

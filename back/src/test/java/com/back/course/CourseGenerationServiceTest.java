@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 
@@ -90,6 +91,67 @@ class CourseGenerationServiceTest {
 
         assertThat(resp.candidates()).isEmpty();
         assertThat(resp.returnedCount()).isZero();
+    }
+
+    @Test void generate_uses15PercentToleranceForMidDistance3km() {
+        // 3km 요청 시 12% 오차는 통과 (임계값 15%)
+        var at = LocalDateTime.of(2026, 8, 27, 14, 0);
+        var req = new GenerateRequest(37.55, 126.844, 3000, null, null, at, null);
+        var path = new GeoJsonLineString("LineString",
+                List.of(List.of(126.844, 37.55), List.of(126.845, 37.551)));
+        var row = new CourseGenerationRepository.GenerateRow(
+                path, 3360, new BigDecimal("0.75"), new BigDecimal("12.0"), "11500");
+        given(repo.generateOnly(anyDouble(), anyDouble(), anyInt(), any(), anyInt(), any()))
+                .willReturn(Optional.of(row));
+
+        var resp = service.generate(req);
+
+        assertThat(resp.candidates()).isNotEmpty();
+        assertThat(resp.candidates().get(0).errorPct()).isEqualByComparingTo("12.0");
+    }
+
+    @Test void generate_uses25PercentToleranceForShortDistance1km() {
+        // 1km 요청 시 22% 오차는 통과 (임계값 25%). 15% flat 임계값이면 rejected.
+        var at = LocalDateTime.of(2026, 8, 27, 14, 0);
+        var req = new GenerateRequest(37.55, 126.844, 1000, null, null, at, null);
+        var path = new GeoJsonLineString("LineString",
+                List.of(List.of(126.844, 37.55), List.of(126.845, 37.551)));
+        var row = new CourseGenerationRepository.GenerateRow(
+                path, 1220, new BigDecimal("0.75"), new BigDecimal("22.0"), "11500");
+        given(repo.generateOnly(anyDouble(), anyDouble(), anyInt(), any(), anyInt(), any()))
+                .willReturn(Optional.of(row));
+
+        var resp = service.generate(req);
+
+        assertThat(resp.candidates()).isNotEmpty();
+    }
+
+    @Test void generate_uses10PercentToleranceForLongDistance5km() {
+        // 5km 요청 시 12% 오차는 rejected (임계값 10%). 15% flat 임계값이면 accepted.
+        var at = LocalDateTime.of(2026, 8, 27, 14, 0);
+        var req = new GenerateRequest(37.55, 126.844, 5000, null, null, at, null);
+        var path = new GeoJsonLineString("LineString",
+                List.of(List.of(126.844, 37.55), List.of(126.845, 37.551)));
+        var row = new CourseGenerationRepository.GenerateRow(
+                path, 5600, new BigDecimal("0.75"), new BigDecimal("12.0"), "11500");
+        given(repo.generateOnly(anyDouble(), anyDouble(), anyInt(), any(), anyInt(), any()))
+                .willReturn(Optional.of(row));
+
+        var resp = service.generate(req);
+
+        assertThat(resp.candidates()).isEmpty();
+    }
+
+    @Test void generate_retriesUpTo8CandidatesWhenNothingSatisfies() {
+        var at = LocalDateTime.of(2026, 8, 27, 14, 0);
+        var req = new GenerateRequest(37.55, 126.844, 1000, null, null, at, null);
+        given(repo.generateOnly(anyDouble(), anyDouble(), anyInt(), any(), anyInt(), any()))
+                .willReturn(Optional.empty());
+
+        service.generate(req);
+
+        verify(repo, times(8)).generateOnly(
+                anyDouble(), anyDouble(), anyInt(), any(), anyInt(), any());
     }
 
     @Test void generate_loopWithoutDistanceThrows() {

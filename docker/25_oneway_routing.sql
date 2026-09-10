@@ -112,7 +112,7 @@ BEGIN
                  + COALESCE(g.bench_density,0)       * %8$L
                  + COALESCE(g.restroom_proximity,0)  * %9$L
                  + COALESCE(g.water_facility,0)      * %10$L
-                 + COALESCE(g.pavement_quality,0)    * %11$L
+                 + COALESCE(g.pavement_quality,0.5)  * %11$L
                )) AS cost,
                e.length_m / (0.1 + (
                    COALESCE(g.flatness,0)            * %3$L
@@ -123,7 +123,7 @@ BEGIN
                  + COALESCE(g.bench_density,0)       * %8$L
                  + COALESCE(g.restroom_proximity,0)  * %9$L
                  + COALESCE(g.water_facility,0)      * %10$L
-                 + COALESCE(g.pavement_quality,0)    * %11$L
+                 + COALESCE(g.pavement_quality,0.5)  * %11$L
                )) AS reverse_cost
           FROM routing.walk_edges e
           LEFT JOIN public.grid_score g ON g.grid_id = e.grid_id
