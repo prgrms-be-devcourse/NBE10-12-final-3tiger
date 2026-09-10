@@ -9,6 +9,7 @@ import {
   Easing,
   Keyboard,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,7 +18,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import MapView, { type Region as MapRegion } from "react-native-maps";
+import MapView, { PROVIDER_GOOGLE, type Region as MapRegion } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getRegions } from "@/api/course-api";
 import {
@@ -426,6 +427,7 @@ export default function MapScreen() {
     <View className="flex-1 bg-[#E8F0E5] dark:bg-[#111411]">
       <MapView
         ref={mapRef}
+        provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
         style={StyleSheet.absoluteFill}
         initialRegion={DEFAULT_REGION}
         showsUserLocation
