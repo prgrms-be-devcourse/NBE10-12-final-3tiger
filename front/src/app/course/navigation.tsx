@@ -2,7 +2,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import * as Location from "expo-location";
 import { router, useLocalSearchParams } from "expo-router";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +30,7 @@ import {
   getCourseStartDirections,
 } from "@/api/course-api";
 import { Button } from "@/components/ui/button";
+import { CurrentLocationMarker } from "@/components/map/current-location-marker";
 import {
   BottomSheetHandle,
   dismissBottomSheet,
@@ -838,6 +846,7 @@ export default function CourseNavigationScreen() {
   const courseId = Number(id);
   const isDark = useThemeStore((state) => state.isDark);
   const mapRef = useRef<MapView>(null);
+  const mapHeadingFrameRef = useRef<number | null>(null);
   const previousProgressRef = useRef<RouteProgress | null>(null);
   const offRouteSamplesRef = useRef(0);
   const hasFitRouteRef = useRef(false);
@@ -846,6 +855,8 @@ export default function CourseNavigationScreen() {
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
+  const [mapHeading, setMapHeading] = useState(0);
   const [navigationStarted, setNavigationStarted] = useState(false);
   const [followUser, setFollowUser] = useState(true);
   const [progress, setProgress] = useState<RouteProgress | null>(null);
@@ -856,6 +867,33 @@ export default function CourseNavigationScreen() {
   const [directionsOrigin, setDirectionsOrigin] = useState<LatLng | null>(null);
   const [selectedDirectionsRoute, setSelectedDirectionsRoute] =
     useState<DirectionRoute | null>(null);
+
+  const syncMapHeading = useCallback(() => {
+    if (mapHeadingFrameRef.current !== null) return;
+
+    mapHeadingFrameRef.current = requestAnimationFrame(() => {
+      mapHeadingFrameRef.current = null;
+      void mapRef.current
+        ?.getCamera()
+        .then((camera) =>
+          setMapHeading((previous) =>
+            Math.abs(previous - (camera.heading ?? 0)) < 0.1
+              ? previous
+              : (camera.heading ?? 0),
+          ),
+        )
+        .catch(() => undefined);
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (mapHeadingFrameRef.current !== null) {
+        cancelAnimationFrame(mapHeadingFrameRef.current);
+      }
+    },
+    [],
+  );
 
   const navigationQuery = useQuery({
     queryKey: ["course-navigation", courseId],
@@ -977,6 +1015,7 @@ export default function CourseNavigationScreen() {
 
   useEffect(() => {
     let subscription: Location.LocationSubscription | undefined;
+    let headingSubscription: Location.LocationSubscription | undefined;
     let active = true;
 
     const watchLocation = async () => {
@@ -1007,6 +1046,13 @@ export default function CourseNavigationScreen() {
           setIsLocating(false);
         },
       );
+
+      headingSubscription = await Location.watchHeadingAsync((heading) => {
+        if (!active) return;
+        const nextHeading =
+          heading.trueHeading >= 0 ? heading.trueHeading : heading.magHeading;
+        if (Number.isFinite(nextHeading)) setDeviceHeading(nextHeading);
+      });
     };
 
     void watchLocation().catch(() => {
@@ -1017,6 +1063,7 @@ export default function CourseNavigationScreen() {
     return () => {
       active = false;
       subscription?.remove();
+      headingSubscription?.remove();
     };
   }, []);
 
@@ -1250,14 +1297,15 @@ export default function CourseNavigationScreen() {
           latitudeDelta: 0.012,
           longitudeDelta: 0.01,
         }}
-        showsUserLocation
         showsMyLocationButton={false}
         toolbarEnabled={false}
         userInterfaceStyle={isDark ? "dark" : "light"}
         onMapReady={() => setMapReady(true)}
         onPanDrag={() => setFollowUser(false)}
+        onRegionChange={syncMapHeading}
         onRegionChangeComplete={(region) => {
           setShowDirectionsMarkers(region.latitudeDelta <= 0.035);
+          syncMapHeading();
         }}
       >
         {routeParts.completed.length > 1 && (
@@ -1384,6 +1432,13 @@ export default function CourseNavigationScreen() {
         <Marker coordinate={startPoint} title="출발점" pinColor="#087A3F" />
         {!navigationQuery.data.isLoop && (
           <Marker coordinate={endPoint} title="도착점" pinColor="#E66B3D" />
+        )}
+        {userLocation && (
+          <CurrentLocationMarker
+            coordinate={userLocation}
+            heading={deviceHeading ?? userLocation.heading}
+            mapHeading={mapHeading}
+          />
         )}
       </MapView>
 
