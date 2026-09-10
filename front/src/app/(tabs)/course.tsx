@@ -18,7 +18,6 @@ import MapView, {
   Callout,
   Circle,
   Marker,
-  Polyline,
   type LatLng,
   type LongPressEvent,
 } from "react-native-maps";
@@ -43,6 +42,7 @@ import { LoginRequiredModal } from "@/components/auth/login-required-modal";
 import { HazardDeleteConfirmModal } from "@/components/hazard/hazard-delete-confirm-modal";
 import { HazardReportSheet } from "@/components/hazard/hazard-report-sheet";
 import { Button } from "@/components/ui/button";
+import { CourseRouteOverlay } from "@/components/map/course-route-overlay";
 import { ErrorState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
 import {
@@ -63,6 +63,52 @@ const COURSE_MAP_VIEW = {
   latitudeDelta: 0.014,
   longitudeDelta: 0.012,
 } as const;
+
+const getRouteMapRegion = (
+  route: LatLng[],
+  distanceM: number | undefined,
+  fallback: LatLng,
+) => {
+  if (route.length < 2) return { ...fallback, ...COURSE_MAP_VIEW };
+
+  const bounds = route.reduce(
+    (result, point) => ({
+      minLatitude: Math.min(result.minLatitude, point.latitude),
+      maxLatitude: Math.max(result.maxLatitude, point.latitude),
+      minLongitude: Math.min(result.minLongitude, point.longitude),
+      maxLongitude: Math.max(result.maxLongitude, point.longitude),
+    }),
+    {
+      minLatitude: route[0].latitude,
+      maxLatitude: route[0].latitude,
+      minLongitude: route[0].longitude,
+      maxLongitude: route[0].longitude,
+    },
+  );
+  const distance = distanceM ?? 0;
+  const minimumLatitudeDelta =
+    distance <= 1000
+      ? 0.006
+      : distance <= 3000
+        ? 0.012
+        : distance <= 5000
+          ? 0.02
+          : 0.035;
+  const padding = distance <= 1000 ? 1.18 : distance <= 3000 ? 1.14 : 1.1;
+
+  return {
+    latitude: (bounds.minLatitude + bounds.maxLatitude) / 2,
+    longitude: (bounds.minLongitude + bounds.maxLongitude) / 2,
+    latitudeDelta: Math.max(
+      (bounds.maxLatitude - bounds.minLatitude) * padding,
+      minimumLatitudeDelta,
+    ),
+    longitudeDelta: Math.max(
+      (bounds.maxLongitude - bounds.minLongitude) * padding,
+      minimumLatitudeDelta * 0.86,
+    ),
+  };
+};
 
 type GridLayer = "shade" | "flatness" | "amenity";
 
@@ -159,11 +205,13 @@ export default function CourseScreen() {
     return { latitude, longitude };
   }, [lat, lng, regionCode]);
   const queryClient = useQueryClient();
+  const mapRef = useRef<MapView>(null);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDark = useThemeStore((state) => state.isDark);
   const [loginRequiredOpen, setLoginRequiredOpen] = useState(false);
   const [coords, setCoords] = useState(serviceCoords ?? DEFAULT_COORDS);
   const [mapCenter, setMapCenter] = useState(serviceCoords ?? DEFAULT_COORDS);
+  const [mapHeading, setMapHeading] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showDetails, setShowDetails] = useState(true);
   const [persona, setPersona] = useState<string | null | undefined>(undefined);
@@ -417,6 +465,10 @@ export default function CourseScreen() {
       values?.map(([lng, lat]) => ({ latitude: lat, longitude: lng })) ?? []
     );
   }, [detail]);
+  const courseMapRegion = useMemo(
+    () => getRouteMapRegion(route, detail?.distanceM, mapCenter),
+    [detail?.distanceM, mapCenter, route],
+  );
 
   useEffect(() => {
     if (!detail) return;
@@ -491,11 +543,18 @@ export default function CourseScreen() {
   return (
     <View className="flex-1 bg-[#E8F0E5] dark:bg-[#111411]">
       <MapView
+        ref={mapRef}
         style={StyleSheet.absoluteFill}
         onPress={dismissDetails}
         onLongPress={handleMapLongPress}
-        region={{ ...mapCenter, ...COURSE_MAP_VIEW }}
+        region={courseMapRegion}
         userInterfaceStyle={isDark ? "dark" : "light"}
+        onRegionChangeComplete={() => {
+          void mapRef.current
+            ?.getCamera()
+            .then((camera) => setMapHeading(camera.heading ?? 0))
+            .catch(() => undefined);
+        }}
       >
         {gridLayer !== null &&
           gridsQuery.data?.map((grid) => {
@@ -516,7 +575,7 @@ export default function CourseScreen() {
             );
           })}
         {route.length > 1 && (
-          <Polyline coordinates={route} strokeColor="#087A3F" strokeWidth={7} />
+          <CourseRouteOverlay coordinates={route} mapHeading={mapHeading} />
         )}
         {courses.map(
           (course) =>

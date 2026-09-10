@@ -39,6 +39,7 @@ import {
 } from "@/api/place-api";
 import { getWeatherSnapshot } from "@/api/weather-api";
 import { LoginRequiredModal } from "@/components/auth/login-required-modal";
+import { CourseRouteOverlay } from "@/components/map/course-route-overlay";
 import { getMyProfile } from "@/api/user-api";
 import {
   BottomSheetHandle,
@@ -145,6 +146,7 @@ export default function CourseGenerateScreen() {
   const [personaSelected, setPersonaSelected] = useState(false);
   const [candidates, setCandidates] = useState<GenerateCandidate[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [mapHeading, setMapHeading] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const profileQuery = useQuery({
     queryKey: ["my-profile"],
@@ -533,6 +535,12 @@ export default function CourseGenerateScreen() {
             region={mapRegion}
             userInterfaceStyle={isDark ? "dark" : "light"}
             onPress={handleMapPress}
+            onRegionChangeComplete={() => {
+              void mapRef.current
+                ?.getCamera()
+                .then((camera) => setMapHeading(camera.heading ?? 0))
+                .catch(() => undefined);
+            }}
           >
             <Marker
               coordinate={coords}
@@ -551,10 +559,21 @@ export default function CourseGenerateScreen() {
               const hasSelection = selectedIndex !== null;
               const isSelected = selectedIndex === index;
               const isDimmed = hasSelection && !isSelected;
+              const coordinates = toPolyline(candidate);
+              if (isSelected) {
+                return (
+                  <CourseRouteOverlay
+                    key={index}
+                    coordinates={coordinates}
+                    color={baseColor}
+                    mapHeading={mapHeading}
+                  />
+                );
+              }
               return (
                 <Polyline
                   key={index}
-                  coordinates={toPolyline(candidate)}
+                  coordinates={coordinates}
                   strokeColor={isDimmed ? `${baseColor}40` : baseColor}
                   strokeWidth={isSelected ? 7 : isDimmed ? 2 : 4}
                   zIndex={isSelected ? 10 : 1}
@@ -673,7 +692,8 @@ export default function CourseGenerateScreen() {
             </View>
             {distanceM === 1000 && (
               <Text className="mt-2 text-xs leading-4 text-[#B45309] dark:text-[#FBBF24]">
-                1km 코스는 이 지역 도로망 특성상 생성이 자주 실패할 수 있어요. 실패 시 3km 이상을 선택해 주세요.
+                1km 코스는 이 지역 도로망 특성상 생성이 자주 실패할 수 있어요.
+                실패 시 3km 이상을 선택해 주세요.
               </Text>
             )}
           </View>

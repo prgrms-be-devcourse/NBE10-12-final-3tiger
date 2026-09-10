@@ -24,6 +24,7 @@ import {
 } from "react-native";
 import MapView, { Marker, Polyline, type LatLng } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
 
 import {
   getCourseNavigation,
@@ -211,31 +212,88 @@ const getPolylineLength = (coordinates: LatLng[]) =>
       0,
     );
 
-const getDirectionPoint = (coordinates: LatLng[], targetDistance: number) => {
-  if (coordinates.length < 2) return null;
-  const legLengths = coordinates
-    .slice(1)
-    .map((coordinate, index) => distanceMeters(coordinates[index], coordinate));
+const getCoordinateAtDistance = (
+  coordinates: LatLng[],
+  targetDistance: number,
+) => {
   let traveled = 0;
-  for (let legIndex = 0; legIndex < legLengths.length; legIndex += 1) {
-    const legLength = legLengths[legIndex];
+  for (let legIndex = 0; legIndex < coordinates.length - 1; legIndex += 1) {
+    const start = coordinates[legIndex];
+    const end = coordinates[legIndex + 1];
+    const legLength = distanceMeters(start, end);
     if (traveled + legLength >= targetDistance) {
-      const start = coordinates[legIndex];
-      const end = coordinates[legIndex + 1];
       const ratio = legLength > 0 ? (targetDistance - traveled) / legLength : 0;
       return {
-        coordinate: {
-          latitude: start.latitude + (end.latitude - start.latitude) * ratio,
-          longitude:
-            start.longitude + (end.longitude - start.longitude) * ratio,
-        },
-        bearing: bearingDegrees(start, end),
+        latitude: start.latitude + (end.latitude - start.latitude) * ratio,
+        longitude: start.longitude + (end.longitude - start.longitude) * ratio,
       };
     }
     traveled += legLength;
   }
   return null;
 };
+
+const getDirectionPoint = (
+  coordinates: LatLng[],
+  targetDistance: number,
+  totalLength: number,
+) => {
+  if (coordinates.length < 2) return null;
+
+  const coordinate = getCoordinateAtDistance(coordinates, targetDistance);
+  if (!coordinate) return null;
+
+  // 한 선분의 각도 대신 화살표 앞뒤의 경로를 함께 보고 중심 접선을 구한다.
+  // 따라서 굽은 구간에서도 화살표 중심은 경로 단면의 가운데에 놓인다.
+  const tangentRadius = Math.min(12, Math.max(2, totalLength / 100));
+  const before = getCoordinateAtDistance(
+    coordinates,
+    Math.max(0, targetDistance - tangentRadius),
+  );
+  const after = getCoordinateAtDistance(
+    coordinates,
+    Math.min(totalLength, targetDistance + tangentRadius),
+  );
+  if (!before || !after) return null;
+
+  return {
+    coordinate,
+    bearing: bearingDegrees(before, after),
+  };
+};
+
+function RouteDirectionArrow({
+  bearing,
+  mapHeading,
+  size = 20,
+}: {
+  bearing: number;
+  mapHeading: number;
+  size?: number;
+}) {
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        alignItems: "center",
+        justifyContent: "center",
+        transform: [{ rotate: `${bearing - 90 - mapHeading}deg` }],
+      }}
+    >
+      <Svg width={size} height={size} viewBox="0 0 20 20">
+        <Path
+          d="M6 4 L14 10 L6 16"
+          fill="none"
+          stroke="white"
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    </View>
+  );
+}
 
 function RouteProcessBar({ route }: { route: DirectionRoute }) {
   const segments = getVisualRouteSegments(route);
@@ -938,6 +996,21 @@ export default function CourseNavigationScreen() {
     () => splitRouteAtProgress(route, progress),
     [progress, route],
   );
+  const courseDirectionArrows = useMemo(() => {
+    const routeLength = cumulativeDistances.at(-1) ?? 0;
+    if (routeLength <= 0) return [];
+
+    const arrowCount = 12;
+    return Array.from({ length: arrowCount }, (_, index) => {
+      const targetDistance = (routeLength * (index + 1)) / (arrowCount + 1);
+      const point = getDirectionPoint(route, targetDistance, routeLength);
+      if (!point) return null;
+      return {
+        ...point,
+        key: index,
+      };
+    }).filter((arrow): arrow is NonNullable<typeof arrow> => arrow !== null);
+  }, [cumulativeDistances, route]);
   const selectedMapSegments = useMemo(
     () =>
       (selectedDirectionsRoute?.segments ?? [])
@@ -972,11 +1045,11 @@ export default function CourseNavigationScreen() {
           const point = getDirectionPoint(
             item.coordinates,
             targetDistance - traveled,
+            item.length,
           );
           if (!point) break;
           return {
             ...point,
-            color: segmentColor(item.segment),
             key: `${item.segment.segmentIndex}-${index}`,
           };
         }
@@ -1286,6 +1359,14 @@ export default function CourseNavigationScreen() {
           : canStartWalk
             ? "산책을 시작할 수 있어요"
             : "출발점 근처로 이동해주세요";
+  const completedRouteColor = isDark ? "#64748B" : "#94A3B8";
+  const remainingRouteColor = selectedDirectionsRoute
+    ? isDark
+      ? "#475569"
+      : "#94A3B8"
+    : isOffRoute
+      ? "#E66B3D"
+      : "#087A3F";
 
   return (
     <View className="flex-1 bg-[#E8F0E5] dark:bg-[#111411]">
@@ -1309,31 +1390,72 @@ export default function CourseNavigationScreen() {
         }}
       >
         {routeParts.completed.length > 1 && (
-          <Polyline
-            coordinates={routeParts.completed}
-            strokeColor={isDark ? "#637069" : "#A4ADA7"}
-            strokeWidth={7}
-            lineCap="round"
-            lineJoin="round"
-          />
+          <Fragment>
+            <Polyline
+              coordinates={routeParts.completed}
+              strokeColor={`${completedRouteColor}42`}
+              strokeWidth={13}
+              lineCap="round"
+              lineJoin="round"
+            />
+            <Polyline
+              coordinates={routeParts.completed}
+              strokeColor={completedRouteColor}
+              strokeWidth={9}
+              lineCap="round"
+              lineJoin="round"
+            />
+            <Polyline
+              coordinates={routeParts.completed}
+              strokeColor={lightenColor(completedRouteColor, 0.52)}
+              strokeWidth={5}
+              lineCap="round"
+              lineJoin="round"
+            />
+          </Fragment>
         )}
         {routeParts.remaining.length > 1 && (
-          <Polyline
-            coordinates={routeParts.remaining}
-            strokeColor={
-              selectedDirectionsRoute
-                ? isDark
-                  ? "#475569"
-                  : "#CBD5E1"
-                : isOffRoute
-                  ? "#E66B3D"
-                  : "#087A3F"
-            }
-            strokeWidth={7}
-            lineCap="round"
-            lineJoin="round"
-          />
+          <Fragment>
+            <Polyline
+              coordinates={routeParts.remaining}
+              strokeColor={`${remainingRouteColor}42`}
+              strokeWidth={13}
+              lineCap="round"
+              lineJoin="round"
+            />
+            <Polyline
+              coordinates={routeParts.remaining}
+              strokeColor={remainingRouteColor}
+              strokeWidth={9}
+              lineCap="round"
+              lineJoin="round"
+            />
+            <Polyline
+              coordinates={routeParts.remaining}
+              strokeColor={lightenColor(remainingRouteColor, 0.58)}
+              strokeWidth={5}
+              lineCap="round"
+              lineJoin="round"
+            />
+          </Fragment>
         )}
+        {!selectedDirectionsRoute &&
+          courseDirectionArrows.map((arrow) => (
+            <Marker
+              key={`course-direction-arrow-${arrow.key}`}
+              coordinate={arrow.coordinate}
+              anchor={{ x: 0.5, y: 0.5 }}
+              centerOffset={{ x: 0, y: 0 }}
+              tracksViewChanges
+              pointerEvents="none"
+              zIndex={20}
+            >
+              <RouteDirectionArrow
+                bearing={arrow.bearing}
+                mapHeading={mapHeading}
+              />
+            </Marker>
+          ))}
         {selectedMapSegments.map(({ segment, coordinates }) => {
           const color = segmentColor(segment);
           return (
@@ -1367,24 +1489,15 @@ export default function CourseNavigationScreen() {
             key={`direction-arrow-${arrow.key}`}
             coordinate={arrow.coordinate}
             anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
+            centerOffset={{ x: 0, y: 0 }}
+            tracksViewChanges
             pointerEvents="none"
+            zIndex={30}
           >
-            <View
-              className="h-5 w-5 items-center justify-center"
-              style={{ transform: [{ rotate: `${arrow.bearing - 90}deg` }] }}
-            >
-              <Ionicons
-                name="chevron-forward"
-                size={16}
-                color="white"
-                style={{
-                  textShadowColor: arrow.color,
-                  textShadowOffset: { width: 0, height: 0 },
-                  textShadowRadius: 2,
-                }}
-              />
-            </View>
+            <RouteDirectionArrow
+              bearing={arrow.bearing}
+              mapHeading={mapHeading}
+            />
           </Marker>
         ))}
         {showDirectionsMarkers &&
