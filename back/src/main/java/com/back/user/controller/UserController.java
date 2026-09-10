@@ -10,9 +10,12 @@ import com.back.user.dto.SignupResponse;
 import com.back.user.dto.UserMemoRequest;
 import com.back.user.dto.UserMemoResponse;
 import com.back.user.service.UserService;
+import com.back.user.validation.EmailValidation;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,7 +46,12 @@ public class UserController {
 
     @GetMapping("/check-email")
     public ApiResponse<Void> checkEmail(
-            @RequestParam @NotBlank @Email String email
+            @RequestParam
+            @NotBlank
+            @Email
+            @Pattern(regexp = EmailValidation.REGEX)
+            @Size(max = EmailValidation.MAX_LENGTH)
+            String email
     ) {
         userService.checkEmailAvailability(email);
         return ApiResponse.ok("사용 가능한 이메일입니다.", null);

@@ -27,6 +27,7 @@ public class SecurityConfig {
                         .requestMatchers("/local-uploads/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/courses/generate", "/api/v1/courses/save").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/users/signup").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users/email-verifications/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/users/check-email").permitAll()
                         .anyRequest().authenticated());
         JwtAuthenticationFilter jwtFilter = jwtFilterProvider.getIfAvailable();
