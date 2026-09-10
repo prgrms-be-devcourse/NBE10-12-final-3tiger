@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'back/**'
+      - 'docker/**/*.sql'
       - '.github/workflows/deploy.yml'
 concurrency:
   group: deploy-ec2-backend
@@ -25,6 +26,32 @@ jobs:
             cd ~/NBE10-12-final-3tiger
             echo "=== Update source ==="
             git pull --ff-only origin main
+
+            echo "=== Detect changed SQL migrations ==="
+            BEFORE_SHA="${{ github.event.before }}"
+            if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              echo "[migrate] No previous SHA (first push or force-push). Skipping SQL diff — apply manually if needed."
+              CHANGED_SQL=""
+            else
+              CHANGED_SQL=$(git diff --name-only "$BEFORE_SHA" HEAD -- 'docker/' | { grep '\.sql$' || true; } | sort)
+            fi
+
+            if [ -n "$CHANGED_SQL" ]; then
+              echo "=== Apply changed SQL migrations ==="
+              echo "$CHANGED_SQL" | sed 's/^/  - /'
+              while IFS= read -r f; do
+                [ -f "$f" ] || { echo "[migrate] Skipping deleted file: $f"; continue; }
+                echo "[migrate] Applying $f"
+                docker cp "$f" walking-mvp-postgres:/tmp/mig.sql
+                docker exec walking-mvp-postgres \
+                  psql -U walking -d walking_mvp \
+                  -v ON_ERROR_STOP=1 -f /tmp/mig.sql
+              done <<< "$CHANGED_SQL"
+              echo "[migrate] All migrations applied successfully."
+            else
+              echo "[migrate] No SQL changes in this push."
+            fi
+
             cd back
             echo "=== Build ==="
             java -version

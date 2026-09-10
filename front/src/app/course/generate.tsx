@@ -673,6 +673,11 @@ export default function CourseGenerateScreen() {
                 );
               })}
             </View>
+            {distanceM === 1000 && (
+              <Text className="mt-2 text-xs leading-4 text-[#B45309] dark:text-[#FBBF24]">
+                1km 코스는 이 지역 도로망 특성상 생성이 자주 실패할 수 있어요. 실패 시 3km 이상을 선택해 주세요.
+              </Text>
+            )}
           </View>
         )}
 
