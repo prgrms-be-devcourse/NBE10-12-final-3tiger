@@ -113,7 +113,8 @@ class CourseStartDirectionsControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON_400"));
 
-        verifyNoInteractions(service, directionsRateLimiter);
+        verify(directionsRateLimiter).check(anyString());
+        verifyNoInteractions(service);
     }
 
     @Test
@@ -125,7 +126,8 @@ class CourseStartDirectionsControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COMMON_400"));
 
-        verifyNoInteractions(service, directionsRateLimiter);
+        verify(directionsRateLimiter).check(anyString());
+        verifyNoInteractions(service);
     }
 
     @Test

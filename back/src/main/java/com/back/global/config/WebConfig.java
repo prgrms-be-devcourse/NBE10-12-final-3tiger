@@ -1,5 +1,6 @@
 package com.back.global.config;
 
+import com.back.course.navigation.ratelimit.CourseDirectionsRateLimitInterceptor;
 import com.back.global.auth.CurrentUserIdResolver;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimitInterceptor;
 import org.springframework.context.annotation.Configuration;
@@ -14,14 +15,17 @@ import java.util.List;
 public class WebConfig implements WebMvcConfigurer {
 
     private final CurrentUserIdResolver resolver;
-    private final PlaceSearchRateLimitInterceptor rateLimitInterceptor;
+    private final PlaceSearchRateLimitInterceptor placeSearchRateLimitInterceptor;
+    private final CourseDirectionsRateLimitInterceptor courseDirectionsRateLimitInterceptor;
 
     public WebConfig(
             CurrentUserIdResolver resolver,
-            PlaceSearchRateLimitInterceptor rateLimitInterceptor
+            PlaceSearchRateLimitInterceptor placeSearchRateLimitInterceptor,
+            CourseDirectionsRateLimitInterceptor courseDirectionsRateLimitInterceptor
     ) {
         this.resolver = resolver;
-        this.rateLimitInterceptor = rateLimitInterceptor;
+        this.placeSearchRateLimitInterceptor = placeSearchRateLimitInterceptor;
+        this.courseDirectionsRateLimitInterceptor = courseDirectionsRateLimitInterceptor;
     }
 
     @Override
@@ -33,8 +37,11 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(rateLimitInterceptor)
+        registry.addInterceptor(placeSearchRateLimitInterceptor)
                 .addPathPatterns("/api/v1/places/search");
+
+        registry.addInterceptor(courseDirectionsRateLimitInterceptor)
+                .addPathPatterns("/api/v1/courses/*/directions-to-start");
     }
 
     @Override
