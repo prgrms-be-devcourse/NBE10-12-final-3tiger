@@ -555,7 +555,7 @@ export default function CourseGenerateScreen() {
               const isDimmed = hasSelection && !isSelected;
               return (
                 <Polyline
-                  key={index}
+                  key={`${index}-sel${selectedIndex}`}
                   coordinates={toPolyline(candidate)}
                   strokeColor={isDimmed ? `${baseColor}40` : baseColor}
                   strokeWidth={isSelected ? 7 : isDimmed ? 2 : 4}
@@ -768,9 +768,7 @@ export default function CourseGenerateScreen() {
                       {(candidate.totalM / 1000).toFixed(2)}km
                     </Text>
                     <Text className="mt-0.5 text-[11px] text-[#6B756D] dark:text-[#AAB5AD]">
-                      {isOneway
-                        ? `점수 ${Number(candidate.avgScore ?? 0).toFixed(2)}`
-                        : `점수 ${Number(candidate.avgScore ?? 0).toFixed(2)} · 오차 ${Number(candidate.errorPct ?? 0).toFixed(1)}%`}
+                      점수 {Math.min(100, Math.round(Number(candidate.avgScore ?? 0) * 150))}점
                     </Text>
                   </View>
                   <Ionicons

@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -82,6 +83,7 @@ public class CourseGenerationService {
             }
         }
 
+        ok.sort(Comparator.comparing(GenerateCandidate::avgScore).reversed());
         return new GenerateResponse(ok, TARGET_COUNT, ok.size());
     }
 

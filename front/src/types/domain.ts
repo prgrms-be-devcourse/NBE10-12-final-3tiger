@@ -55,6 +55,11 @@ export type CourseScoreBars = {
   shade?: number | null;
   surfaceTemp?: number | null;
   amenity?: number | null;
+  surfaceNatural?: number | null;
+  benchDensity?: number | null;
+  restroomProximity?: number | null;
+  waterFacility?: number | null;
+  pavementQuality?: number | null;
 };
 
 export type Course = {

@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -39,15 +40,37 @@ public class CourseService {
         Double flatness = view.getFlatness();
         Double avgSlopeDegree = flatness == null ? null : (1.0 - flatness) * 30.0;
 
+        ScoreBars bars = new ScoreBars(flatness, avgSlopeDegree, view.getShade(), view.getSurfaceTemp(), view.getAmenity(),
+                view.getSurfaceNatural(), view.getBenchDensity(), view.getRestroomProximity(),
+                view.getWaterFacility(), view.getPavementQuality());
+        String summary = buildSummary(bars, useSummer);
         return new CourseDetail(
                 view.getCourseId(), view.getName(), parsePath(view.getPathGeoJson()), view.getMapImageUrl(),
                 view.getDistanceM(), view.getEstimatedMinutes(),
                 view.getElevationGainM(), view.getElevationLossM(),
                 Boolean.TRUE.equals(view.getIsLoop()), view.getSource(),
-                new ScoreBars(flatness, avgSlopeDegree, view.getShade(), view.getSurfaceTemp(), view.getAmenity()),
+                bars,
                 view.getScoreWalker(), view.getScoreSenior(), view.getScoreStroller(), view.getScoreDog(),
-                view.getSurfaceType(), null, List.of(), isBookmarked
+                view.getSurfaceType(), summary, List.of(), isBookmarked
         );
+    }
+
+    // 규칙 기반 요약: 지표 값 상위 특징 2~3개 뽑아 자연어 문장 조립.
+    // 임계값은 실측 grid_score 평균(shade 0.14, flatness 0.87, surface_natural 0.29 등)을 기준으로 정함.
+    static String buildSummary(ScoreBars b, boolean isSummer) {
+        if (b == null) return null;
+        List<String> traits = new ArrayList<>();
+        if (b.flatness() != null && b.flatness() >= 0.85) traits.add("평탄한 노면");
+        if (isSummer && b.shade() != null && b.shade() >= 0.25) traits.add("그늘 확보");
+        if (b.surfaceNatural() != null && b.surfaceNatural() >= 0.40) traits.add("자연 노면 비율 높음");
+        if (b.pavementQuality() != null && b.pavementQuality() >= 0.60) traits.add("보도 포장 양호");
+        if (b.benchDensity() != null && b.benchDensity() >= 0.50) traits.add("벤치 다수");
+        if (b.restroomProximity() != null && b.restroomProximity() >= 0.50) traits.add("화장실 접근 편리");
+        if (b.waterFacility() != null && b.waterFacility() >= 0.50) traits.add("음수대 이용 가능");
+
+        if (traits.isEmpty()) return "일반적인 산책 코스입니다.";
+        List<String> top = traits.subList(0, Math.min(3, traits.size()));
+        return String.join(", ", top) + " 특징의 산책 코스입니다.";
     }
 
     private GeoJsonLineString parsePath(String geoJson) {
@@ -167,6 +190,11 @@ public class CourseService {
             Double avgSlopeDegree,
             Double shade,
             Double surfaceTemp,
-            Double amenity
+            Double amenity,
+            Double surfaceNatural,
+            Double benchDensity,
+            Double restroomProximity,
+            Double waterFacility,
+            Double pavementQuality
     ) {}
 }
