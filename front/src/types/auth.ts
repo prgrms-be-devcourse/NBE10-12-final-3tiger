@@ -11,4 +11,9 @@ export type LoginRequest = {
 
 export type SignupRequest = LoginRequest & {
   nickname: string;
+  emailVerificationToken: string;
+};
+
+export type EmailVerificationResponse = {
+  verificationToken: string;
 };

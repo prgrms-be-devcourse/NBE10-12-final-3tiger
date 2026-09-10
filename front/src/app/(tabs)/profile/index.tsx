@@ -17,6 +17,7 @@ import {
   getNotificationSetting,
   updateNotificationSetting,
 } from "@/api/notification-api";
+import { unregisterPushToken } from "@/api/push-token-api";
 import { getMyProfile, updateMyProfile, withdraw } from "@/api/user-api";
 import { getMyItems } from "@/api/shop-api";
 import {
@@ -27,7 +28,24 @@ import { ErrorState } from "@/components/ui/data-state";
 import { Switch } from "@/components/ui/switch";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
+import { usePushTokenStore } from "@/stores/push-token-store";
 import { useThemeStore } from "@/stores/theme-store";
+
+/**
+ * 로그아웃 시 현재 기기의 푸시 토큰을 서버에서 해제한다.
+ * 토큰이 아직 발급되지 않았으면 스킵하고, 실패해도 로그아웃 흐름을 막지 않는다.
+ */
+async function deregisterPushToken() {
+  const expoPushToken = usePushTokenStore.getState().expoPushToken;
+  if (!expoPushToken) return;
+  try {
+    await unregisterPushToken(expoPushToken);
+    usePushTokenStore.getState().setExpoPushToken(null);
+    console.log("[push-token] 서버에서 푸시 토큰을 해제했습니다.");
+  } catch (error) {
+    console.warn("[push-token] 서버 푸시 토큰 해제에 실패했습니다.", error);
+  }
+}
 const PERSONAS = [
   {
     key: "walker",
@@ -145,6 +163,8 @@ export default function ProfileScreen() {
     mutationFn: () =>
       refreshToken ? logout(refreshToken) : Promise.resolve(null),
     onSettled: async () => {
+      // 세션을 지우기 전에(액세스 토큰이 살아있을 때) 푸시 토큰을 해제한다.
+      await deregisterPushToken();
       await clearSession();
       queryClient.clear();
     },

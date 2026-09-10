@@ -25,7 +25,12 @@ export default function CourseDetailScreen() {
     refetchOnMount: "always",
     refetchInterval: (query) => {
       const detail = query.state.data;
-      if (!detail || detail.mapImageUrl || query.state.dataUpdateCount >= 8) {
+      if (
+        !detail ||
+        detail.mapImageUrl ||
+        detail.mapImageStatus === "FAILED" ||
+        query.state.dataUpdateCount >= 8
+      ) {
         return false;
       }
       return 1_500;

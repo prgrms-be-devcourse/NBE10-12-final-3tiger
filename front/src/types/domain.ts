@@ -77,6 +77,7 @@ export type Course = {
   myFavorite?: boolean;
   isBookmarked?: boolean;
   mapImageUrl?: string | null;
+  mapImageStatus?: "PENDING" | "COMPLETED" | "FAILED" | null;
   imageUrl?: string;
   summary?: string;
   bookmarkedAt?: string;

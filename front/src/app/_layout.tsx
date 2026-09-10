@@ -10,7 +10,18 @@ import { ActivityIndicator, View } from "react-native";
 
 import { useAuthStore } from "@/stores/auth-store";
 import { useNotificationStream } from "@/hooks/use-notification-stream";
+import { usePushToken } from "@/hooks/use-push-token";
 import { useThemeStore } from "@/stores/theme-store";
+import { ApiError } from "@/types/api";
+
+const shouldRetryQuery = (failureCount: number, error: Error) => {
+  if (error instanceof ApiError) {
+    if (error.status === 429 || error.status === 503) return false;
+    if (error.status !== undefined && error.status < 500) return false;
+  }
+
+  return failureCount < 1;
+};
 
 function NotificationStreamConnector() {
   useNotificationStream();
@@ -23,7 +34,7 @@ export default function RootLayout() {
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { retry: 1, staleTime: 30_000 },
+          queries: { retry: shouldRetryQuery, staleTime: 30_000 },
           mutations: { retry: 0 },
         },
       }),
@@ -33,6 +44,8 @@ export default function RootLayout() {
   const isDark = useThemeStore((state) => state.isDark);
   const isThemeInitialized = useThemeStore((state) => state.isInitialized);
   const restoreTheme = useThemeStore((state) => state.restoreTheme);
+
+  usePushToken();
 
   useEffect(() => {
     void restoreSession();

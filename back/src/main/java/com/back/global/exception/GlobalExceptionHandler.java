@@ -2,6 +2,7 @@ package com.back.global.exception;
 
 import com.back.global.api.ApiResponse;
 import com.back.global.error.ApiException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +35,15 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception) {
         ErrorCode errorCode = exception.getErrorCode();
+
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ErrorResponse.from(errorCode));
+    }
+
+    @ExceptionHandler(CallNotPermittedException.class)
+    public ResponseEntity<ErrorResponse> handleCircuitOpen() {
+        ErrorCode errorCode = ErrorCode.EXTERNAL_API_TEMPORARILY_UNAVAILABLE;
 
         return ResponseEntity
                 .status(errorCode.getStatus())

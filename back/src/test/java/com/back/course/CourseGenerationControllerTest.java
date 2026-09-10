@@ -10,6 +10,7 @@ import com.back.global.config.SecurityConfig;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
+import com.back.support.RateLimitWebMvcTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -34,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(CourseGenerationController.class)
 @Import({CurrentUserIdResolver.class, SecurityConfig.class, GlobalExceptionHandler.class})
-class CourseGenerationControllerTest {
+class CourseGenerationControllerTest extends RateLimitWebMvcTestSupport {
 
     @Autowired
     private MockMvc mvc;

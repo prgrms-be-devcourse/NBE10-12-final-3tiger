@@ -61,7 +61,22 @@ type ApiErrorResponse = {
 
 let refreshPromise: Promise<AuthTokens> | null = null;
 
-const isAuthRequest = (url?: string) => Boolean(url?.includes("/api/v1/auth/"));
+const PUBLIC_USER_AUTH_PATHS = [
+  "/api/v1/users/signup",
+  "/api/v1/users/check-email",
+  "/api/v1/users/email-verifications/send",
+  "/api/v1/users/email-verifications/verify",
+];
+
+const isPublicAuthRequest = (url?: string) => {
+  if (!url) return false;
+
+  const path = url.split("?", 1)[0];
+  return (
+    path.includes("/api/v1/auth/") ||
+    PUBLIC_USER_AUTH_PATHS.some((publicPath) => path.endsWith(publicPath))
+  );
+};
 
 async function requestTokenRefresh() {
   const refreshToken = useAuthStore.getState().refreshToken;
@@ -99,6 +114,11 @@ const toApiError = (error: AxiosError<ApiErrorResponse>) =>
   );
 
 apiClient.interceptors.request.use((config) => {
+  if (isPublicAuthRequest(config.url)) {
+    delete config.headers.Authorization;
+    return config;
+  }
+
   const accessToken = useAuthStore.getState().accessToken;
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
   return config;
@@ -119,7 +139,7 @@ apiClient.interceptors.response.use(
       error.response?.status === 401 &&
       originalRequest !== undefined &&
       !originalRequest._retry &&
-      !isAuthRequest(originalRequest.url);
+      !isPublicAuthRequest(originalRequest.url);
 
     if (shouldRefresh) {
       originalRequest._retry = true;

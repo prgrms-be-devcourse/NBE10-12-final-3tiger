@@ -1,5 +1,10 @@
 import { apiRequest } from "./client";
-import type { AuthTokens, LoginRequest, SignupRequest } from "@/types/auth";
+import type {
+  AuthTokens,
+  EmailVerificationResponse,
+  LoginRequest,
+  SignupRequest,
+} from "@/types/auth";
 
 export const login = (data: LoginRequest) =>
   apiRequest<AuthTokens>({ url: "/api/v1/auth/login", method: "POST", data });
@@ -26,3 +31,15 @@ export const signup = (data: SignupRequest) =>
   });
 export const checkEmail = (email: string) =>
   apiRequest<null>({ url: "/api/v1/users/check-email", params: { email } });
+export const sendEmailVerification = (email: string) =>
+  apiRequest<null>({
+    url: "/api/v1/users/email-verifications/send",
+    method: "POST",
+    data: { email },
+  });
+export const verifyEmailCode = (email: string, code: string) =>
+  apiRequest<EmailVerificationResponse>({
+    url: "/api/v1/users/email-verifications/verify",
+    method: "POST",
+    data: { email, code },
+  });

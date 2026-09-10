@@ -13,6 +13,7 @@ import com.back.hazard.dto.HazardCreateResponse;
 import com.back.hazard.dto.HazardResponse;
 import com.back.hazard.service.HazardService;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
+import com.back.support.RateLimitWebMvcTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(HazardController.class)
 @Import({SecurityConfig.class, WebConfig.class, CurrentUserIdResolver.class, GlobalExceptionHandler.class})
-class HazardControllerTest {
+class HazardControllerTest extends RateLimitWebMvcTestSupport {
 
     @Autowired
     private MockMvc mockMvc;

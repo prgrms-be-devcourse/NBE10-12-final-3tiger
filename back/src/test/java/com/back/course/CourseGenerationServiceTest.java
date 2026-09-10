@@ -193,6 +193,7 @@ class CourseGenerationServiceTest {
         service.save(1L, req);
 
         verify(repo).saveFromPath(eq(path), eq("11500"), eq(true), eq(null), eq(null), eq("서울숲"));
+        verify(repo).markMapImagePending(42L);
         verify(bookmarkService).add(1L, 42L);
         verify(eventPublisher).publishEvent(new CourseMapImageRequested(42L, path));
     }
@@ -206,6 +207,7 @@ class CourseGenerationServiceTest {
         service.save(1L, req);
 
         verify(repo).saveFromPath(eq(path), eq("11500"), eq(false), eq(126.852), eq(37.556), eq("서울숲"));
+        verify(repo).markMapImagePending(7L);
         verify(bookmarkService).add(1L, 7L);
     }
 

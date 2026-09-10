@@ -30,7 +30,7 @@ public class CourseMapImageService {
         try {
             generate(event.courseId(), event.path());
         } catch (RuntimeException ignored) {
-            // 대표 이미지 생성 실패가 이미 완료된 코스 저장을 실패로 바꾸지 않는다.
+            courseRepository.markMapImageFailed(event.courseId());
         }
     }
 
@@ -48,6 +48,6 @@ public class CourseMapImageService {
         );
         byte[] renderedImage = renderer.render(baseMap, coordinates, viewport);
         String imageUrl = storage.upload(courseId, renderedImage);
-        courseRepository.updateMapImageUrl(courseId, imageUrl);
+        courseRepository.markMapImageCompleted(courseId, imageUrl);
     }
 }

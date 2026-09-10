@@ -20,6 +20,17 @@ spring:
     redis:
       host: localhost
       port: 6379
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
   datasource:
     url: jdbc:postgresql://localhost:5433/walking_mvp
     username: walking
@@ -33,6 +44,8 @@ spring:
       hibernate.jdbc.time_zone: Asia/Seoul
 
 app:
+  email-verification:
+    from: ${MAIL_FROM:no-reply@todaywalk.local}
   jwt:
     secret: ${JWT_SECRET}
     access-token-expiry: 1800      # 30분
@@ -41,6 +54,8 @@ app:
     client-id: ${KAKAO_CLIENT_ID}
     client-secret: ${KAKAO_CLIENT_SECRET:}
     redirect-uri: ${KAKAO_REDIRECT_URI}
+    connect-timeout: 2s
+    read-timeout: 3s
   place:
     kakao:
       base-url: ${KAKAO_PLACE_BASE_URL:https://dapi.kakao.com}
@@ -61,14 +76,25 @@ app:
       rest-api-key: ${KAKAO_PLACE_REST_API_KEY}
       connect-timeout: 2s
       read-timeout: 5s
+      directions-rate-limit:
+        limit: ${DIRECTIONS_RATE_LIMIT:10}
+        window: ${DIRECTIONS_RATE_LIMIT_WINDOW:60s}
     naver:
       base-url: ${NAVER_MAP_BASE_URL:https://maps.apigw.ntruss.com}
       client-id: ${NAVER_MAP_CLIENT_ID:}
       client-secret: ${NAVER_MAP_CLIENT_SECRET:}
       connect-timeout: 2s
       read-timeout: 3s
+      reverse-geocode-rate-limit:
+        limit: ${REVERSE_GEOCODE_RATE_LIMIT:20}
+        window: ${REVERSE_GEOCODE_RATE_LIMIT_WINDOW:60s}
   report:
     hide-threshold: 5   # 신고 누적 시 자동 숨김 임계치
+  push:
+    expo:
+      api-url: ${EXPO_PUSH_API_URL:https://exp.host/--/api/v2/push/send}
+      connect-timeout: 2s
+      read-timeout: 5s
   storage:
     type: ${STORAGE_TYPE:local}
     public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080/local-uploads}
@@ -83,3 +109,41 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
     tags-sorter: alpha
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 15s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        record-exception-predicate: com.back.global.resilience.ExternalApiFailurePredicate
+    instances:
+      kakaoAuth:
+        base-config: default
+        slow-call-duration-threshold: 2s
+        slow-call-rate-threshold: 50
+      kakaoPlace:
+        base-config: default
+        slow-call-duration-threshold: 2s
+        slow-call-rate-threshold: 50
+      kakaoDirections:
+        base-config: default
+        slow-call-duration-threshold: 4s
+        slow-call-rate-threshold: 50
+      naverReverseGeocode:
+        base-config: default
+        slow-call-duration-threshold: 2s
+        slow-call-rate-threshold: 50
+      naverStaticMap:
+        base-config: default
+        slow-call-duration-threshold: 2s
+        slow-call-rate-threshold: 50
+      naverTypoCorrection:
+        base-config: default
+        slow-call-duration-threshold: 1500ms
+        slow-call-rate-threshold: 50

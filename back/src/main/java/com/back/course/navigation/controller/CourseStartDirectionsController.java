@@ -2,13 +2,10 @@ package com.back.course.navigation.controller;
 
 import com.back.course.navigation.dto.CourseStartDirectionsResponse;
 import com.back.course.navigation.dto.DirectionsMode;
-import com.back.course.navigation.ratelimit.CourseDirectionsRateLimiter;
 import com.back.course.navigation.service.CourseStartDirectionsService;
 import com.back.global.api.ApiResponse;
-import com.back.global.auth.CurrentUserId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import org.springframework.validation.annotation.Validated;
@@ -25,14 +22,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class CourseStartDirectionsController {
 
     private final CourseStartDirectionsService service;
-    private final CourseDirectionsRateLimiter rateLimiter;
 
-    public CourseStartDirectionsController(
-            CourseStartDirectionsService service,
-            CourseDirectionsRateLimiter rateLimiter
-    ) {
+    public CourseStartDirectionsController(CourseStartDirectionsService service) {
         this.service = service;
-        this.rateLimiter = rateLimiter;
     }
 
     @GetMapping("/{courseId}/directions-to-start")
@@ -50,15 +42,8 @@ public class CourseStartDirectionsController {
             @DecimalMin("-90.0") @DecimalMax("90.0") double latitude,
             @RequestParam
             @DecimalMin("-180.0") @DecimalMax("180.0") double longitude,
-            @RequestParam DirectionsMode mode,
-            @CurrentUserId(required = false) Long userId,
-            HttpServletRequest request
+            @RequestParam DirectionsMode mode
     ) {
-        String clientId = userId != null
-                ? "USER:" + userId
-                : "IP:" + request.getRemoteAddr();
-        rateLimiter.check(clientId);
-
         return ApiResponse.ok(
                 "코스 출발점 길찾기 조회 성공",
                 service.getDirectionsToStart(courseId, latitude, longitude, mode)

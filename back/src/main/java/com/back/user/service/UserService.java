@@ -17,13 +17,16 @@ import com.back.user.dto.UserMemoRequest;
 import com.back.user.dto.UserMemoResponse;
 import com.back.global.error.ApiException;
 import com.back.user.storage.ProfileImageStorage;
+import com.back.user.email.EmailVerificationService;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.HttpStatus;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 @Service
@@ -31,6 +34,7 @@ import java.util.Set;
 public class UserService {
 
     private static final long MAX_PROFILE_IMAGE_SIZE = 10L * 1024 * 1024;
+    private static final String EMAIL_UNIQUE_CONSTRAINT = "uk_user_email";
     private static final Set<String> SUPPORTED_PROFILE_IMAGE_TYPES = Set.of(
             "image/jpeg",
             "image/png",
@@ -42,19 +46,22 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
     private final ProfileImageStorage profileImageStorage;
+    private final EmailVerificationService emailVerificationService;
 
     public UserService(
             UserRepository userRepository,
             UserMemoRepository userMemoRepository,
             PasswordEncoder passwordEncoder,
             AuthService authService,
-            ProfileImageStorage profileImageStorage
+            ProfileImageStorage profileImageStorage,
+            EmailVerificationService emailVerificationService
     ) {
         this.userRepository = userRepository;
         this.userMemoRepository = userMemoRepository;
         this.passwordEncoder = passwordEncoder;
         this.authService = authService;
         this.profileImageStorage = profileImageStorage;
+        this.emailVerificationService = emailVerificationService;
     }
 
     @Transactional
@@ -63,9 +70,22 @@ public class UserService {
             throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
+        emailVerificationService.consumeVerificationTicket(
+                request.email(),
+                request.emailVerificationToken()
+        );
+
         String passwordHash = passwordEncoder.encode(request.password());
         User user = User.createLocal(request.email(), passwordHash, request.nickname());
-        User savedUser = userRepository.save(user);
+        User savedUser;
+        try {
+            savedUser = userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException exception) {
+            if (isEmailUniqueConstraintViolation(exception)) {
+                throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
+            }
+            throw exception;
+        }
 
         return SignupResponse.from(savedUser);
     }
@@ -172,6 +192,19 @@ public class UserService {
 
     private UserMemoResponse toUserMemoResponse(Long targetUserId, UserMemo memo) {
         return new UserMemoResponse(targetUserId, memo.getTags(), memo.getMemo(), memo.getUpdatedAt());
+    }
+
+    private boolean isEmailUniqueConstraintViolation(Throwable exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            String message = cause.getMessage();
+            if (message != null
+                    && message.toLowerCase(Locale.ROOT).contains(EMAIL_UNIQUE_CONSTRAINT)) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private void validateProfileImage(MultipartFile file) {

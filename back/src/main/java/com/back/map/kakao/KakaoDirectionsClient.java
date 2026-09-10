@@ -4,6 +4,7 @@ import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.map.kakao.dto.KakaoRouteDirectionsResponse;
 import com.back.map.kakao.dto.KakaoTransitDirectionsResponse;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,7 @@ public class KakaoDirectionsClient {
         this.restClient = restClient;
     }
 
+    @CircuitBreaker(name = "kakaoDirections")
     public KakaoRouteDirectionsResponse getWalk(
             double startLat, double startLng,
             double endLat, double endLng,
@@ -35,6 +37,7 @@ public class KakaoDirectionsClient {
         );
     }
 
+    @CircuitBreaker(name = "kakaoDirections")
     public KakaoRouteDirectionsResponse getBicycle(
             double startLat, double startLng,
             double endLat, double endLng,
@@ -46,6 +49,7 @@ public class KakaoDirectionsClient {
         );
     }
 
+    @CircuitBreaker(name = "kakaoDirections")
     public KakaoTransitDirectionsResponse getPublicTransit(
             double startLat, double startLng,
             double endLat, double endLng,

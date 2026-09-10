@@ -1,5 +1,6 @@
 package com.back.user.dto;
 
+import com.back.user.validation.EmailValidation;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -8,8 +9,8 @@ import jakarta.validation.constraints.Size;
 public record SignupRequest(
         @NotBlank
         @Email
-        @Pattern(regexp = "^[^@\\s]+@(?:[^@\\s.]+\\.)+[^@\\s.]+$")
-        @Size(max = 255)
+        @Pattern(regexp = EmailValidation.REGEX)
+        @Size(max = EmailValidation.MAX_LENGTH)
         String email,
 
         @NotBlank
@@ -18,6 +19,8 @@ public record SignupRequest(
 
         @NotBlank
         @Size(max = 50)
-        String nickname
+        String nickname,
+
+        String emailVerificationToken
 ) {
 }
