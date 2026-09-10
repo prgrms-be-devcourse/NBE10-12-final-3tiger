@@ -25,3 +25,7 @@ drafts/
 final-2026-08-gs-yc-v1/
 final-2026-08-gs-yc-v1.zip
 front/google-services.json
+
+# 로컬 기획 노트 / 로컬 백업
+docs/navigation-feature-plan.md
+front/app.config.js.local-bak
