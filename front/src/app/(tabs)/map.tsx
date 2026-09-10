@@ -54,6 +54,33 @@ const DEFAULT_REGION: MapRegion = {
 
 const CURRENT_LOCATION_TIMEOUT_MS = 3_000;
 const PLACE_SEARCH_DEBOUNCE_MS = 500;
+const REVERSE_GEOCODE_DEBOUNCE_MS = 750;
+const REVERSE_GEOCODE_MIN_DISTANCE_METERS = 20;
+
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+const distanceMeters = (from: Coordinates, to: Coordinates) => {
+  const earthRadiusMeters = 6_371_000;
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitudeDelta = toRadians(to.latitude - from.latitude);
+  const longitudeDelta = toRadians(to.longitude - from.longitude);
+  const fromLatitude = toRadians(from.latitude);
+  const toLatitude = toRadians(to.latitude);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(fromLatitude) *
+      Math.cos(toLatitude) *
+      Math.sin(longitudeDelta / 2) ** 2;
+
+  return (
+    2 *
+    earthRadiusMeters *
+    Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+  );
+};
 
 const isValidCoordinate = (latitude?: number, longitude?: number) =>
   Number.isFinite(latitude) && Number.isFinite(longitude);
@@ -123,6 +150,7 @@ export default function MapScreen() {
   );
   const placeSearchRequestRef = useRef(0);
   const lastViewedRegionRef = useRef<MapRegion | null>(null);
+  const lastReverseGeocodeCoordinatesRef = useRef<Coordinates | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const regionsSheetTranslateY = useRef(
     new Animated.Value(windowHeight),
@@ -138,6 +166,8 @@ export default function MapScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [reverseGeocodeCoordinates, setReverseGeocodeCoordinates] =
+    useState<Coordinates | null>(null);
   const [mapCenter, setMapCenter] = useState<{
     latitude: number;
     longitude: number;
@@ -153,19 +183,43 @@ export default function MapScreen() {
   const currentAddressQuery = useQuery({
     queryKey: [
       "current-location-address",
-      currentCoordinates?.latitude,
-      currentCoordinates?.longitude,
+      reverseGeocodeCoordinates?.latitude,
+      reverseGeocodeCoordinates?.longitude,
     ],
     queryFn: () => {
-      if (!currentCoordinates) throw new Error("현재 위치가 없습니다.");
+      if (!reverseGeocodeCoordinates) throw new Error("현재 위치가 없습니다.");
       return reverseGeocode(
-        currentCoordinates.latitude,
-        currentCoordinates.longitude,
+        reverseGeocodeCoordinates.latitude,
+        reverseGeocodeCoordinates.longitude,
       );
     },
-    enabled: currentCoordinates !== null,
+    enabled: reverseGeocodeCoordinates !== null,
     staleTime: 5 * 60 * 1000,
   });
+
+  useEffect(() => {
+    if (!currentCoordinates) {
+      lastReverseGeocodeCoordinatesRef.current = null;
+      setReverseGeocodeCoordinates(null);
+      return;
+    }
+
+    const previous = lastReverseGeocodeCoordinatesRef.current;
+    if (
+      previous &&
+      distanceMeters(previous, currentCoordinates) <
+        REVERSE_GEOCODE_MIN_DISTANCE_METERS
+    ) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      lastReverseGeocodeCoordinatesRef.current = currentCoordinates;
+      setReverseGeocodeCoordinates(currentCoordinates);
+    }, REVERSE_GEOCODE_DEBOUNCE_MS);
+
+    return () => clearTimeout(timeoutId);
+  }, [currentCoordinates]);
   const regionsQuery = useQuery({
     queryKey: ["regions"],
     queryFn: getRegions,
@@ -371,16 +425,56 @@ export default function MapScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const lastViewedRegion = lastViewedRegionRef.current;
-      if (!lastViewedRegion) {
-        void locate();
-        return;
-      }
+      let active = true;
+      let animationFrame: number | undefined;
+      let locationSubscription: Location.LocationSubscription | undefined;
 
-      const animationFrame = requestAnimationFrame(() => {
-        mapRef.current?.animateToRegion(lastViewedRegion, 0);
+      const startLocationTracking = async () => {
+        const lastViewedRegion = lastViewedRegionRef.current;
+        if (!lastViewedRegion) {
+          await locate();
+        } else {
+          animationFrame = requestAnimationFrame(() => {
+            mapRef.current?.animateToRegion(lastViewedRegion, 0);
+          });
+        }
+
+        if (!active) return;
+        const permission = await Location.getForegroundPermissionsAsync();
+        if (permission.status !== Location.PermissionStatus.GRANTED) return;
+
+        const subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 5_000,
+            distanceInterval: REVERSE_GEOCODE_MIN_DISTANCE_METERS,
+          },
+          (position) => {
+            if (!active) return;
+            setCurrentCoordinates({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          },
+        );
+        if (!active) {
+          subscription.remove();
+          return;
+        }
+        locationSubscription = subscription;
+      };
+
+      void startLocationTracking().catch(() => {
+        // The one-time location result remains available if background tracking fails.
       });
-      return () => cancelAnimationFrame(animationFrame);
+
+      return () => {
+        active = false;
+        if (animationFrame !== undefined) {
+          cancelAnimationFrame(animationFrame);
+        }
+        locationSubscription?.remove();
+      };
     }, [locate]),
   );
 

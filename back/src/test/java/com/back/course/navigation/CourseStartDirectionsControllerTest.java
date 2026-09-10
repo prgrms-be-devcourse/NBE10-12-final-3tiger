@@ -12,6 +12,7 @@ import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
+import com.back.location.ratelimit.ReverseGeocodeRateLimiter;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,9 @@ class CourseStartDirectionsControllerTest {
 
     @MockitoBean
     private PlaceSearchRateLimiter placeSearchRateLimiter;
+
+    @MockitoBean
+    private ReverseGeocodeRateLimiter reverseGeocodeRateLimiter;
 
     @MockitoBean
     private JwtProvider jwtProvider;

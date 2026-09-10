@@ -149,6 +149,12 @@ public enum ErrorCode {
             "주소 변환 서비스에 일시적인 오류가 발생했습니다."
     ),
 
+    REVERSE_GEOCODE_RATE_LIMIT_EXCEEDED(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "LOCATION_429_1",
+            "현재 위치 주소 조회 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
+    ),
+
     KAKAO_DIRECTIONS_FAILED(
             HttpStatus.BAD_GATEWAY,
             "DIRECTIONS_502_1",

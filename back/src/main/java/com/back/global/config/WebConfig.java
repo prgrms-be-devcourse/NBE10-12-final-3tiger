@@ -2,6 +2,7 @@ package com.back.global.config;
 
 import com.back.course.navigation.ratelimit.CourseDirectionsRateLimitInterceptor;
 import com.back.global.auth.CurrentUserIdResolver;
+import com.back.location.ratelimit.ReverseGeocodeRateLimitInterceptor;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimitInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
@@ -17,15 +18,18 @@ public class WebConfig implements WebMvcConfigurer {
     private final CurrentUserIdResolver resolver;
     private final PlaceSearchRateLimitInterceptor placeSearchRateLimitInterceptor;
     private final CourseDirectionsRateLimitInterceptor courseDirectionsRateLimitInterceptor;
+    private final ReverseGeocodeRateLimitInterceptor reverseGeocodeRateLimitInterceptor;
 
     public WebConfig(
             CurrentUserIdResolver resolver,
             PlaceSearchRateLimitInterceptor placeSearchRateLimitInterceptor,
-            CourseDirectionsRateLimitInterceptor courseDirectionsRateLimitInterceptor
+            CourseDirectionsRateLimitInterceptor courseDirectionsRateLimitInterceptor,
+            ReverseGeocodeRateLimitInterceptor reverseGeocodeRateLimitInterceptor
     ) {
         this.resolver = resolver;
         this.placeSearchRateLimitInterceptor = placeSearchRateLimitInterceptor;
         this.courseDirectionsRateLimitInterceptor = courseDirectionsRateLimitInterceptor;
+        this.reverseGeocodeRateLimitInterceptor = reverseGeocodeRateLimitInterceptor;
     }
 
     @Override
@@ -42,6 +46,9 @@ public class WebConfig implements WebMvcConfigurer {
 
         registry.addInterceptor(courseDirectionsRateLimitInterceptor)
                 .addPathPatterns("/api/v1/courses/*/directions-to-start");
+
+        registry.addInterceptor(reverseGeocodeRateLimitInterceptor)
+                .addPathPatterns("/api/v1/locations/reverse-geocode");
     }
 
     @Override
