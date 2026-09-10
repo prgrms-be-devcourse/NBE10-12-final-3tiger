@@ -20,6 +20,17 @@ spring:
     redis:
       host: localhost
       port: 6379
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
   datasource:
     url: jdbc:postgresql://localhost:5433/walking_mvp
     username: walking
@@ -33,6 +44,8 @@ spring:
       hibernate.jdbc.time_zone: Asia/Seoul
 
 app:
+  email-verification:
+    from: ${MAIL_FROM:no-reply@todaywalk.local}
   jwt:
     secret: ${JWT_SECRET}
     access-token-expiry: 1800      # 30분

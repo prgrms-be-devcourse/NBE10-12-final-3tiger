@@ -70,7 +70,8 @@ class UserControllerTest {
                                 {
                                   "email": "walker@example.com",
                                   "password": "plain-password",
-                                  "nickname": "산책러"
+                                  "nickname": "산책러",
+                                  "emailVerificationToken": "verification-token"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -110,7 +111,8 @@ class UserControllerTest {
                                 {
                                   "email": "%s",
                                   "password": "plain-password",
-                                  "nickname": "산책러"
+                                  "nickname": "산책러",
+                                  "emailVerificationToken": "verification-token"
                                 }
                                 """.formatted(email)))
                 .andExpect(status().isOk());
@@ -129,7 +131,8 @@ class UserControllerTest {
                                 {
                                   "email": "walker@example.com",
                                   "password": "plain-password",
-                                  "nickname": "산책러"
+                                  "nickname": "산책러",
+                                  "emailVerificationToken": "verification-token"
                                 }
                                 """))
                 .andExpect(status().isConflict())
@@ -152,7 +155,7 @@ class UserControllerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"", "invalid-email"})
+    @ValueSource(strings = {"", "invalid-email", "test@adb"})
     void checkEmailRejectsInvalidEmail(String email) throws Exception {
         mvc.perform(get("/api/v1/users/check-email")
                         .param("email", email))

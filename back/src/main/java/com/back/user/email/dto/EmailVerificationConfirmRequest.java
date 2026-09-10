@@ -1,4 +1,4 @@
-package com.back.user.dto;
+package com.back.user.email.dto;
 
 import com.back.user.validation.EmailValidation;
 import jakarta.validation.constraints.Email;
@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-public record SignupRequest(
+public record EmailVerificationConfirmRequest(
         @NotBlank
         @Email
         @Pattern(regexp = EmailValidation.REGEX)
@@ -14,13 +14,7 @@ public record SignupRequest(
         String email,
 
         @NotBlank
-        @Size(min =8)
-        String password,
-
-        @NotBlank
-        @Size(max = 50)
-        String nickname,
-
-        String emailVerificationToken
+        @Pattern(regexp = "\\d{6}")
+        String code
 ) {
 }

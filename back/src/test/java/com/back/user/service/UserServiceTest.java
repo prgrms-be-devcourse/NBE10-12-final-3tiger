@@ -11,6 +11,7 @@ import com.back.user.dto.MyPageResponse;
 import com.back.user.dto.ProfileImageResponse;
 import com.back.user.dto.SignupRequest;
 import com.back.user.dto.SignupResponse;
+import com.back.user.email.EmailVerificationService;
 import com.back.user.repository.UserRepository;
 import com.back.user.storage.ProfileImageStorage;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -49,6 +52,9 @@ class UserServiceTest {
     @Mock
     private ProfileImageStorage profileImageStorage;
 
+    @Mock
+    private EmailVerificationService emailVerificationService;
+
     @InjectMocks
     private UserService userService;
 
@@ -57,20 +63,21 @@ class UserServiceTest {
         SignupRequest request = new SignupRequest(
                 "walker@example.com",
                 "plain-password",
-                "산책러"
+                "산책러",
+                "verification-token"
         );
         User savedUser = org.mockito.Mockito.mock(User.class);
 
         given(userRepository.existsByEmail(request.email())).willReturn(false);
         given(passwordEncoder.encode(request.password())).willReturn("encoded-password");
-        given(userRepository.save(any(User.class))).willReturn(savedUser);
+        given(userRepository.saveAndFlush(any(User.class))).willReturn(savedUser);
         given(savedUser.getId()).willReturn(1L);
         given(savedUser.getProvider()).willReturn(Provider.LOCAL);
 
         SignupResponse response = userService.signup(request);
 
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(userRepository).save(userCaptor.capture());
+        verify(userRepository).saveAndFlush(userCaptor.capture());
         User userToSave = userCaptor.getValue();
 
         assertThat(userToSave.getEmail()).isEqualTo(request.email());
@@ -79,6 +86,8 @@ class UserServiceTest {
         assertThat(userToSave.getProvider()).isEqualTo(Provider.LOCAL);
         assertThat(userToSave.getProviderUid()).isNull();
         assertThat(response).isEqualTo(new SignupResponse(1L, "NORMAL"));
+        verify(emailVerificationService).consumeVerificationTicket(
+                request.email(), request.emailVerificationToken());
     }
 
     @Test
@@ -86,7 +95,8 @@ class UserServiceTest {
         SignupRequest request = new SignupRequest(
                 "walker@example.com",
                 "plain-password",
-                "산책러"
+                "산책러",
+                "verification-token"
         );
         given(userRepository.existsByEmail(request.email())).willReturn(true);
 
@@ -94,6 +104,65 @@ class UserServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS);
+
+        verify(passwordEncoder, never()).encode(any());
+        verify(userRepository, never()).save(any());
+        verifyNoInteractions(emailVerificationService);
+    }
+
+    @Test
+    void signupMapsEmailUniqueConstraintViolationToConflict() {
+        SignupRequest request = new SignupRequest(
+                "walker@example.com",
+                "plain-password",
+                "산책러",
+                "verification-token"
+        );
+        given(userRepository.existsByEmail(request.email())).willReturn(false);
+        given(passwordEncoder.encode(request.password())).willReturn("encoded-password");
+        given(userRepository.saveAndFlush(any(User.class))).willThrow(new DataIntegrityViolationException(
+                "duplicate key value violates unique constraint \"uk_user_email\""
+        ));
+
+        assertThatThrownBy(() -> userService.signup(request))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS));
+    }
+
+    @Test
+    void signupDoesNotMapOtherIntegrityViolationsToEmailConflict() {
+        SignupRequest request = new SignupRequest(
+                "walker@example.com",
+                "plain-password",
+                "산책러",
+                "verification-token"
+        );
+        DataIntegrityViolationException failure = new DataIntegrityViolationException(
+                "violates check constraint \"other_constraint\""
+        );
+        given(userRepository.existsByEmail(request.email())).willReturn(false);
+        given(passwordEncoder.encode(request.password())).willReturn("encoded-password");
+        given(userRepository.saveAndFlush(any(User.class))).willThrow(failure);
+
+        assertThatThrownBy(() -> userService.signup(request)).isSameAs(failure);
+    }
+
+    @Test
+    void signupRejectsMissingOrMismatchedVerificationTicketBeforeEncoding() {
+        SignupRequest request = new SignupRequest(
+                "walker@example.com",
+                "plain-password",
+                "산책러",
+                "invalid-token"
+        );
+        given(userRepository.existsByEmail(request.email())).willReturn(false);
+        willThrow(new BusinessException(ErrorCode.EMAIL_VERIFICATION_REQUIRED))
+                .given(emailVerificationService)
+                .consumeVerificationTicket(request.email(), request.emailVerificationToken());
+
+        assertThatThrownBy(() -> userService.signup(request))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EMAIL_VERIFICATION_REQUIRED));
 
         verify(passwordEncoder, never()).encode(any());
         verify(userRepository, never()).save(any());
