@@ -10,6 +10,7 @@ import { ActivityIndicator, View } from "react-native";
 
 import { useAuthStore } from "@/stores/auth-store";
 import { useNotificationStream } from "@/hooks/use-notification-stream";
+import { usePushToken } from "@/hooks/use-push-token";
 import { useThemeStore } from "@/stores/theme-store";
 
 function NotificationStreamConnector() {
@@ -33,6 +34,8 @@ export default function RootLayout() {
   const isDark = useThemeStore((state) => state.isDark);
   const isThemeInitialized = useThemeStore((state) => state.isInitialized);
   const restoreTheme = useThemeStore((state) => state.restoreTheme);
+
+  usePushToken();
 
   useEffect(() => {
     void restoreSession();
