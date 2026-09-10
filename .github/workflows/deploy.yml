@@ -22,7 +22,9 @@ jobs:
           command_timeout: 20m
           script: |
             set -eu
+            set -a
             source /etc/environment
+            set +a
             cd ~/NBE10-12-final-3tiger
             echo "=== Update source ==="
             git pull --ff-only origin main
