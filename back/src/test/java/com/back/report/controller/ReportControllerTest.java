@@ -7,6 +7,7 @@ import com.back.global.error.ApiException;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
+import com.back.support.RateLimitWebMvcTestSupport;
 import com.back.report.domain.ReportReason;
 import com.back.report.domain.ReportTargetType;
 import com.back.report.service.ReportService;
@@ -31,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ReportController.class)
 @Import({SecurityConfig.class, WebConfig.class, CurrentUserIdResolver.class, GlobalExceptionHandler.class})
-class ReportControllerTest {
+class ReportControllerTest extends RateLimitWebMvcTestSupport {
 
     @Autowired
     private MockMvc mockMvc;

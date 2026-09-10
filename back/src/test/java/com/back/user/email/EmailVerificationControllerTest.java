@@ -6,6 +6,7 @@ import com.back.global.exception.ErrorCode;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
+import com.back.support.RateLimitWebMvcTestSupport;
 import com.back.user.email.controller.EmailVerificationController;
 import com.back.user.email.dto.EmailVerificationResponse;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(EmailVerificationController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class})
-class EmailVerificationControllerTest {
+class EmailVerificationControllerTest extends RateLimitWebMvcTestSupport {
 
     @Autowired
     private MockMvc mvc;

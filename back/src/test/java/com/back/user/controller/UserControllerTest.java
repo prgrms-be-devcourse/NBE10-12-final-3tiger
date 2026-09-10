@@ -7,6 +7,7 @@ import com.back.global.exception.ErrorCode;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
+import com.back.support.RateLimitWebMvcTestSupport;
 import com.back.course.domain.Persona;
 import com.back.user.dto.MyPageUpdateRequest;
 import com.back.user.dto.MyPageResponse;
@@ -44,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(UserController.class)
 @Import({CurrentUserIdResolver.class, SecurityConfig.class, GlobalExceptionHandler.class})
-class UserControllerTest {
+class UserControllerTest extends RateLimitWebMvcTestSupport {
 
     @Autowired
     private MockMvc mvc;

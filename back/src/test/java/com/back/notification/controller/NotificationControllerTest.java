@@ -11,6 +11,7 @@ import com.back.notification.domain.NotificationType;
 import com.back.notification.service.NotificationService;
 import com.back.notification.service.NotificationSettingService;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
+import com.back.support.RateLimitWebMvcTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +38,7 @@ import static com.back.TestAuthentication.authenticatedAs;
 
 @WebMvcTest(NotificationController.class)
 @Import({SecurityConfig.class, WebConfig.class, CurrentUserIdResolver.class, GlobalExceptionHandler.class})
-class NotificationControllerTest {
+class NotificationControllerTest extends RateLimitWebMvcTestSupport {
 
     @Autowired
     private MockMvc mockMvc;

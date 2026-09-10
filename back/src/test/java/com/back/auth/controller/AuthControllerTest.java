@@ -13,6 +13,7 @@ import com.back.global.exception.ErrorCode;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
+import com.back.support.RateLimitWebMvcTestSupport;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -40,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "app.kakao.client-id=test-client-id",
         "app.kakao.redirect-uri=http://localhost/kakao"
 })
-class AuthControllerTest {
+class AuthControllerTest extends RateLimitWebMvcTestSupport {
 
     @Autowired MockMvc mvc;
     @MockitoBean AuthService authService;
