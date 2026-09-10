@@ -9,6 +9,22 @@ export type UserProfile = {
   pointBalance: number;
 };
 
+export type DailyWalkRecord = {
+  date: string;
+  walkCount: number;
+  distanceMeters: number;
+  minutes: number;
+};
+
+export type WeeklyWalkRecord = {
+  weekStart: string;
+  weekEnd: string;
+  totalWalkCount: number;
+  totalDistanceMeters: number;
+  totalMinutes: number;
+  dailyRecords: DailyWalkRecord[];
+};
+
 export type ShopItemType = "PROFILE_BORDER" | "POST_BORDER" | "PROFILE_BADGE";
 
 export type ShopItem = {
