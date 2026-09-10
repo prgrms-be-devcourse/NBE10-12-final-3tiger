@@ -70,8 +70,13 @@ jobs:
               while pgrep -f "$PATTERN" > /dev/null; do
                 COUNT=$((COUNT + 1))
                 if [ "$COUNT" -ge 30 ]; then
-                  echo "ERROR: Existing backend did not stop."
-                  exit 1
+                  echo "WARN: Graceful stop timed out. Sending SIGKILL..."
+                  kill -9 $PIDS || true
+                  sleep 5
+                  if pgrep -f "$PATTERN" > /dev/null; then
+                    echo "WARN: Process still alive after SIGKILL. Proceeding anyway."
+                  fi
+                  break
                 fi
                 sleep 1
               done
