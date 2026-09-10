@@ -53,7 +53,7 @@ class CourseControllerTest extends RateLimitWebMvcTestSupport {
                 12,
                 true,
                 "auto_discovered",
-                new CourseService.ScoreBars(0.82, 5.4, 0.78, null, 0.73),
+                new CourseService.ScoreBars(0.82, 5.4, 0.78, null, 0.73, 0.6, 0.5, 0.4, 0.3, 0.55),
                 0.91,
                 0.87,
                 0.83,

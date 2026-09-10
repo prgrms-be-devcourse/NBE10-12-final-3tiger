@@ -21,4 +21,9 @@ public interface CourseDetailView {
     Double getScoreStroller();
     Double getScoreDog();
     String getSurfaceType();
+    Double getSurfaceNatural();
+    Double getBenchDensity();
+    Double getRestroomProximity();
+    Double getWaterFacility();
+    Double getPavementQuality();
 }

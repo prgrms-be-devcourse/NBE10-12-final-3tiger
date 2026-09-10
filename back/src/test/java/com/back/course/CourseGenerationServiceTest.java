@@ -126,6 +126,30 @@ class CourseGenerationServiceTest {
         assertThat(resp.candidates()).isNotEmpty();
     }
 
+    @Test void generate_returnsCandidatesSortedByScoreDesc() {
+        // 재시도 순서(0,1,2)와 점수(0.5, 0.8, 0.3)가 다르면 응답은 점수 내림차순(0.8, 0.5, 0.3)이어야 함
+        var at = LocalDateTime.of(2026, 8, 27, 14, 0);
+        var req = new GenerateRequest(37.55, 126.844, 1000, null, null, at, null);
+        var path = new GeoJsonLineString("LineString",
+                List.of(List.of(126.844, 37.55), List.of(126.845, 37.551)));
+        given(repo.generateOnly(anyDouble(), anyDouble(), anyInt(), any(), eq(0), any()))
+                .willReturn(Optional.of(new CourseGenerationRepository.GenerateRow(
+                        path, 1000, new BigDecimal("0.5"), new BigDecimal("0.0"), "11500")));
+        given(repo.generateOnly(anyDouble(), anyDouble(), anyInt(), any(), eq(1), any()))
+                .willReturn(Optional.of(new CourseGenerationRepository.GenerateRow(
+                        path, 1000, new BigDecimal("0.8"), new BigDecimal("0.0"), "11500")));
+        given(repo.generateOnly(anyDouble(), anyDouble(), anyInt(), any(), eq(2), any()))
+                .willReturn(Optional.of(new CourseGenerationRepository.GenerateRow(
+                        path, 1000, new BigDecimal("0.3"), new BigDecimal("0.0"), "11500")));
+
+        var resp = service.generate(req);
+
+        assertThat(resp.candidates()).hasSize(3);
+        assertThat(resp.candidates().get(0).avgScore()).isEqualByComparingTo("0.8");
+        assertThat(resp.candidates().get(1).avgScore()).isEqualByComparingTo("0.5");
+        assertThat(resp.candidates().get(2).avgScore()).isEqualByComparingTo("0.3");
+    }
+
     @Test void generate_uses10PercentToleranceForLongDistance5km() {
         // 5km 요청 시 12% 오차는 rejected (임계값 10%). 15% flat 임계값이면 accepted.
         var at = LocalDateTime.of(2026, 8, 27, 14, 0);

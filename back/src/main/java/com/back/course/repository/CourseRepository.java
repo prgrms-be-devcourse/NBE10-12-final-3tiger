@@ -35,7 +35,12 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
                    cs.score_senior                     AS scoreSenior,
                    cs.score_stroller                   AS scoreStroller,
                    cs.score_dog                        AS scoreDog,
-                   NULL::varchar                       AS surfaceType
+                   NULL::varchar                       AS surfaceType,
+                   cs.surface_natural                  AS surfaceNatural,
+                   cs.bench_density                    AS benchDensity,
+                   cs.restroom_proximity               AS restroomProximity,
+                   cs.water_facility                   AS waterFacility,
+                   cs.pavement_quality                 AS pavementQuality
               FROM course c
               LEFT JOIN course_score cs ON cs.course_id = c.course_id
              WHERE c.course_id = :courseId
