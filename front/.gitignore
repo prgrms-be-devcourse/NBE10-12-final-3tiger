@@ -45,5 +45,6 @@ example
 
 # custom
 /docs
+.env
 .env.local
 /.codex

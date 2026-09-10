@@ -2,42 +2,46 @@ package com.back.course.navigation.ratelimit;
 
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.RedisScript;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import io.github.bucket4j.Bucket;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import java.time.Duration;
 
 @Component
-@RequiredArgsConstructor
 public class CourseDirectionsRateLimiter {
 
-    private static final long LIMIT = 10;
-    private static final long WINDOW_SECONDS = 60;
+    private static final long MAX_CLIENTS = 100_000;
 
-    private static final RedisScript<Long> RATE_LIMIT_SCRIPT = RedisScript.of("""
-            local count = redis.call("INCR", KEYS[1])
-            if count == 1 then
-                redis.call("EXPIRE", KEYS[1], tonumber(ARGV[1]))
-            end
-            return count
-            """, Long.class);
+    private final Cache<String, Bucket> buckets;
+    private final long capacity;
+    private final Duration refillPeriod;
 
-    private final StringRedisTemplate redisTemplate;
+    public CourseDirectionsRateLimiter(
+            CourseDirectionsRateLimitProperties properties
+    ) {
+        this.capacity = properties.getLimit();
+        this.refillPeriod = properties.getWindow();
+        this.buckets = Caffeine.newBuilder()
+                .maximumSize(MAX_CLIENTS)
+                .expireAfterAccess(refillPeriod.multipliedBy(2))
+                .build();
+    }
 
     public void check(String clientId) {
-        Long count = redisTemplate.execute(
-                RATE_LIMIT_SCRIPT,
-                List.of("RATE_LIMIT:DIRECTIONS:" + clientId),
-                String.valueOf(WINDOW_SECONDS)
-        );
+        Bucket bucket = buckets.get(clientId, ignored -> newBucket());
 
-        if (count == null) {
-            throw new IllegalStateException("길찾기 요청 횟수를 확인할 수 없습니다.");
-        }
-        if (count > LIMIT) {
+        if (!bucket.tryConsume(1)) {
             throw new BusinessException(ErrorCode.DIRECTIONS_RATE_LIMIT_EXCEEDED);
         }
+    }
+
+    private Bucket newBucket() {
+        return Bucket.builder()
+                .addLimit(limit -> limit
+                        .capacity(capacity)
+                        .refillGreedy(capacity, refillPeriod))
+                .build();
     }
 }

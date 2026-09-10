@@ -76,6 +76,9 @@ app:
       rest-api-key: ${KAKAO_PLACE_REST_API_KEY}
       connect-timeout: 2s
       read-timeout: 5s
+      directions-rate-limit:
+        limit: ${DIRECTIONS_RATE_LIMIT:10}
+        window: ${DIRECTIONS_RATE_LIMIT_WINDOW:60s}
     naver:
       base-url: ${NAVER_MAP_BASE_URL:https://maps.apigw.ntruss.com}
       client-id: ${NAVER_MAP_CLIENT_ID:}
