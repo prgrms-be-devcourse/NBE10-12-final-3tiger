@@ -1,6 +1,7 @@
 package com.back.course.repository;
 
 import com.back.course.dto.GeoJsonLineString;
+import com.back.course.map.domain.CourseMapImageStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -127,10 +128,39 @@ public class CourseGenerationRepository {
         return courseId;
     }
 
-    public void updateMapImageUrl(Long courseId, String mapImageUrl) {
+    public void markMapImagePending(Long courseId) {
+        updateMapImageStatus(courseId, CourseMapImageStatus.PENDING);
+    }
+
+    public void markMapImageCompleted(Long courseId, String mapImageUrl) {
         jdbc.update(
-                "UPDATE public.course SET map_image_url = ? WHERE course_id = ?",
+                """
+                UPDATE public.course
+                   SET map_image_url = ?, map_image_status = ?
+                 WHERE course_id = ?
+                """,
                 mapImageUrl,
+                CourseMapImageStatus.COMPLETED.name(),
+                courseId
+        );
+    }
+
+    public void markMapImageFailed(Long courseId) {
+        jdbc.update(
+                """
+                UPDATE public.course
+                   SET map_image_url = NULL, map_image_status = ?
+                 WHERE course_id = ?
+                """,
+                CourseMapImageStatus.FAILED.name(),
+                courseId
+        );
+    }
+
+    private void updateMapImageStatus(Long courseId, CourseMapImageStatus status) {
+        jdbc.update(
+                "UPDATE public.course SET map_image_status = ? WHERE course_id = ?",
+                status.name(),
                 courseId
         );
     }

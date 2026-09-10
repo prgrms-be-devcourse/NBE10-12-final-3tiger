@@ -12,6 +12,7 @@ import com.back.place.kakao.dto.PlaceSearchItem;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimitInterceptor;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
 import com.back.place.service.PlaceSearchService;
+import com.back.support.RateLimitWebMvcTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -37,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         GlobalExceptionHandler.class,
         PlaceSearchRateLimitInterceptor.class
 })
-class PlaceSearchControllerTest {
+class PlaceSearchControllerTest extends RateLimitWebMvcTestSupport {
 
     @Autowired
     private MockMvc mvc;

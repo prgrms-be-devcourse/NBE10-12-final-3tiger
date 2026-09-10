@@ -1,5 +1,6 @@
 package com.back.map.naver;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -17,6 +18,7 @@ public class NaverStaticMapClient {
         this.restClient = restClient;
     }
 
+    @CircuitBreaker(name = "naverStaticMap")
     public byte[] getMapImage(double centerLatitude, double centerLongitude, int level) {
         try {
             byte[] image = restClient.get()

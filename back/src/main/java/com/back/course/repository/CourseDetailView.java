@@ -5,6 +5,7 @@ public interface CourseDetailView {
     String getName();
     String getPathGeoJson();
     String getMapImageUrl();
+    String getMapImageStatus();
     Integer getDistanceM();
     Integer getEstimatedMinutes();
     Integer getElevationGainM();

@@ -3,6 +3,7 @@ package com.back.place.kakao;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import com.back.place.kakao.dto.KakaoPlaceSearchResponse;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -20,6 +21,7 @@ public class KakaoPlaceClient {
         this.restClient = restClient;
     }
 
+    @CircuitBreaker(name = "kakaoPlace")
     public KakaoPlaceSearchResponse search(String query, int size) {
         try {
             KakaoPlaceSearchResponse response = restClient.get()

@@ -9,6 +9,7 @@ import com.back.post.service.PostService;
 import com.back.post.storage.PhotoStorage;
 import com.back.global.jwt.JwtProvider;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
+import com.back.support.RateLimitWebMvcTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(PostController.class)
 @Import({SecurityConfig.class, WebConfig.class, CurrentUserIdResolver.class, GlobalExceptionHandler.class})
-class PostControllerTest {
+class PostControllerTest extends RateLimitWebMvcTestSupport {
 
     @Autowired MockMvc mvc;
     @MockitoBean PostService postService;

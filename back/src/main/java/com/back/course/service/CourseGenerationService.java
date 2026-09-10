@@ -106,6 +106,7 @@ public class CourseGenerationService {
         Long courseId = repo.saveFromPath(
                 req.path(), req.regionCode(), isLoop, req.endLng(), req.endLat(), req.name()
         );
+        repo.markMapImagePending(courseId);
         bookmarkService.add(userId, courseId);
         eventPublisher.publishEvent(new CourseMapImageRequested(courseId, req.path()));
         return courseId;

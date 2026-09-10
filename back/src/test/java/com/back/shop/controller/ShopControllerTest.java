@@ -7,6 +7,7 @@ import com.back.global.error.ApiException;
 import com.back.global.exception.GlobalExceptionHandler;
 import com.back.global.jwt.JwtProvider;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
+import com.back.support.RateLimitWebMvcTestSupport;
 import com.back.shop.domain.ShopItemType;
 import com.back.shop.dto.MyItemResponse;
 import com.back.shop.dto.ShopItemResponse;
@@ -35,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ShopController.class)
 @Import({SecurityConfig.class, WebConfig.class, CurrentUserIdResolver.class, GlobalExceptionHandler.class})
-class ShopControllerTest {
+class ShopControllerTest extends RateLimitWebMvcTestSupport {
 
     @Autowired MockMvc mvc;
     @MockitoBean ShopService shopService;

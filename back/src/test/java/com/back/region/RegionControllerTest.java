@@ -8,6 +8,7 @@ import com.back.region.controller.RegionController;
 import com.back.region.service.RegionService;
 import com.back.global.jwt.JwtProvider;
 import com.back.place.kakao.ratelimit.PlaceSearchRateLimiter;
+import com.back.support.RateLimitWebMvcTestSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(RegionController.class)
 @Import({CurrentUserIdResolver.class, SecurityConfig.class, GlobalExceptionHandler.class})
-class RegionControllerTest {
+class RegionControllerTest extends RateLimitWebMvcTestSupport {
 
     @Autowired MockMvc mvc;
     @MockitoBean RegionService regionService;

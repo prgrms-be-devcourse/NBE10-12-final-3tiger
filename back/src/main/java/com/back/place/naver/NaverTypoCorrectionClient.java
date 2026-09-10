@@ -1,5 +1,6 @@
 package com.back.place.naver;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -21,6 +22,10 @@ public class NaverTypoCorrectionClient {
         this.objectMapper = objectMapper;
     }
 
+    @CircuitBreaker(
+            name = "naverTypoCorrection",
+            fallbackMethod = "fallbackCorrection"
+    )
     public String correct(String query) {
         try {
             String responseBody = restClient.get()
@@ -44,5 +49,9 @@ public class NaverTypoCorrectionClient {
         } catch (RestClientException | JacksonException exception) {
             throw new NaverTypoCorrectionException(exception);
         }
+    }
+
+    private String fallbackCorrection(String query, Throwable throwable) {
+        return "";
     }
 }

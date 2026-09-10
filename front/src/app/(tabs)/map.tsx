@@ -18,10 +18,14 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import MapView, { PROVIDER_GOOGLE, type Region as MapRegion } from "react-native-maps";
+import MapView, {
+  PROVIDER_GOOGLE,
+  type Region as MapRegion,
+} from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getRegions } from "@/api/course-api";
 import {
+  getPlaceSearchErrorMessage,
   reverseGeocode,
   searchPlaces,
   type PlaceSearchItem,
@@ -29,6 +33,7 @@ import {
 import { getMyProfile } from "@/api/user-api";
 import { getWeatherSnapshot } from "@/api/weather-api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { CurrentLocationMarker } from "@/components/map/current-location-marker";
 import {
   BottomSheetHandle,
   dismissBottomSheet,
@@ -53,6 +58,40 @@ const DEFAULT_REGION: MapRegion = {
 
 const CURRENT_LOCATION_TIMEOUT_MS = 3_000;
 const PLACE_SEARCH_DEBOUNCE_MS = 500;
+const REVERSE_GEOCODE_DEBOUNCE_MS = 750;
+const REVERSE_GEOCODE_MIN_DISTANCE_METERS = 20;
+
+const smoothHeading = (previous: number | null, next: number) => {
+  if (previous === null) return next;
+  const delta = ((next - previous + 540) % 360) - 180;
+  if (Math.abs(delta) < 1.5) return previous;
+  return (previous + delta * 0.3 + 360) % 360;
+};
+
+type Coordinates = {
+  latitude: number;
+  longitude: number;
+};
+
+const distanceMeters = (from: Coordinates, to: Coordinates) => {
+  const earthRadiusMeters = 6_371_000;
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitudeDelta = toRadians(to.latitude - from.latitude);
+  const longitudeDelta = toRadians(to.longitude - from.longitude);
+  const fromLatitude = toRadians(from.latitude);
+  const toLatitude = toRadians(to.latitude);
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(fromLatitude) *
+      Math.cos(toLatitude) *
+      Math.sin(longitudeDelta / 2) ** 2;
+
+  return (
+    2 *
+    earthRadiusMeters *
+    Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine))
+  );
+};
 
 const isValidCoordinate = (latitude?: number, longitude?: number) =>
   Number.isFinite(latitude) && Number.isFinite(longitude);
@@ -117,11 +156,17 @@ export default function MapScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDark = useThemeStore((state) => state.isDark);
   const mapRef = useRef<MapView>(null);
+  const mapHeadingFrameRef = useRef<number | null>(null);
+  const isAligningHeadingRef = useRef(false);
+  const headingAlignmentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const placeSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
   const placeSearchRequestRef = useRef(0);
   const lastViewedRegionRef = useRef<MapRegion | null>(null);
+  const lastReverseGeocodeCoordinatesRef = useRef<Coordinates | null>(null);
   const { height: windowHeight } = useWindowDimensions();
   const regionsSheetTranslateY = useRef(
     new Animated.Value(windowHeight),
@@ -137,6 +182,12 @@ export default function MapScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
+  const [mapHeading, setMapHeading] = useState(0);
+  const [isLocationButtonPrimed, setIsLocationButtonPrimed] = useState(false);
+  const [isAligningHeading, setIsAligningHeading] = useState(false);
+  const [reverseGeocodeCoordinates, setReverseGeocodeCoordinates] =
+    useState<Coordinates | null>(null);
   const [mapCenter, setMapCenter] = useState<{
     latitude: number;
     longitude: number;
@@ -152,19 +203,43 @@ export default function MapScreen() {
   const currentAddressQuery = useQuery({
     queryKey: [
       "current-location-address",
-      currentCoordinates?.latitude,
-      currentCoordinates?.longitude,
+      reverseGeocodeCoordinates?.latitude,
+      reverseGeocodeCoordinates?.longitude,
     ],
     queryFn: () => {
-      if (!currentCoordinates) throw new Error("현재 위치가 없습니다.");
+      if (!reverseGeocodeCoordinates) throw new Error("현재 위치가 없습니다.");
       return reverseGeocode(
-        currentCoordinates.latitude,
-        currentCoordinates.longitude,
+        reverseGeocodeCoordinates.latitude,
+        reverseGeocodeCoordinates.longitude,
       );
     },
-    enabled: currentCoordinates !== null,
+    enabled: reverseGeocodeCoordinates !== null,
     staleTime: 5 * 60 * 1000,
   });
+
+  useEffect(() => {
+    if (!currentCoordinates) {
+      lastReverseGeocodeCoordinatesRef.current = null;
+      setReverseGeocodeCoordinates(null);
+      return;
+    }
+
+    const previous = lastReverseGeocodeCoordinatesRef.current;
+    if (
+      previous &&
+      distanceMeters(previous, currentCoordinates) <
+        REVERSE_GEOCODE_MIN_DISTANCE_METERS
+    ) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      lastReverseGeocodeCoordinatesRef.current = currentCoordinates;
+      setReverseGeocodeCoordinates(currentCoordinates);
+    }, REVERSE_GEOCODE_DEBOUNCE_MS);
+
+    return () => clearTimeout(timeoutId);
+  }, [currentCoordinates]);
   const regionsQuery = useQuery({
     queryKey: ["regions"],
     queryFn: getRegions,
@@ -222,9 +297,47 @@ export default function MapScreen() {
       : null;
   const moveTo = useCallback((next: MapRegion) => {
     if (!isValidCoordinate(next.latitude, next.longitude)) return;
+    setIsLocationButtonPrimed(false);
+    isAligningHeadingRef.current = false;
+    setIsAligningHeading(false);
+    if (headingAlignmentTimerRef.current !== null) {
+      clearTimeout(headingAlignmentTimerRef.current);
+      headingAlignmentTimerRef.current = null;
+    }
     lastViewedRegionRef.current = next;
     mapRef.current?.animateToRegion(next, 500);
   }, []);
+
+  const syncMapHeading = useCallback(() => {
+    if (mapHeadingFrameRef.current !== null) return;
+
+    mapHeadingFrameRef.current = requestAnimationFrame(() => {
+      mapHeadingFrameRef.current = null;
+      if (isAligningHeadingRef.current) return;
+      void mapRef.current
+        ?.getCamera()
+        .then((camera) =>
+          setMapHeading((previous) =>
+            Math.abs(previous - (camera.heading ?? 0)) < 0.1
+              ? previous
+              : (camera.heading ?? 0),
+          ),
+        )
+        .catch(() => undefined);
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (mapHeadingFrameRef.current !== null) {
+        cancelAnimationFrame(mapHeadingFrameRef.current);
+      }
+      if (headingAlignmentTimerRef.current !== null) {
+        clearTimeout(headingAlignmentTimerRef.current);
+      }
+    },
+    [],
+  );
 
   const locate = useCallback(async () => {
     setLocating(true);
@@ -286,6 +399,61 @@ export default function MapScreen() {
     }
   }, [moveTo]);
 
+  const handleLocationButtonPress = useCallback(async () => {
+    if (!isLocationButtonPrimed) {
+      await locate();
+      setIsLocationButtonPrimed(true);
+      return;
+    }
+
+    if (!currentCoordinates) {
+      await locate();
+      return;
+    }
+
+    if (deviceHeading === null) {
+      setMessage("휴대폰 방향을 확인하고 있어요. 잠시 후 다시 눌러 주세요.");
+      return;
+    }
+
+    try {
+      const camera = await mapRef.current?.getCamera();
+      isAligningHeadingRef.current = true;
+      setIsAligningHeading(true);
+      mapRef.current?.animateCamera(
+        {
+          ...camera,
+          center: currentCoordinates,
+          heading: deviceHeading,
+          pitch: 0,
+        },
+        { duration: 500 },
+      );
+      if (headingAlignmentTimerRef.current !== null) {
+        clearTimeout(headingAlignmentTimerRef.current);
+      }
+      headingAlignmentTimerRef.current = setTimeout(() => {
+        headingAlignmentTimerRef.current = null;
+        void mapRef.current
+          ?.getCamera()
+          .then((finalCamera) => {
+            setMapHeading(finalCamera.heading ?? deviceHeading);
+            isAligningHeadingRef.current = false;
+            setIsAligningHeading(false);
+          })
+          .catch(() => {
+            setMapHeading(deviceHeading);
+            isAligningHeadingRef.current = false;
+            setIsAligningHeading(false);
+          });
+      }, 600);
+    } catch {
+      isAligningHeadingRef.current = false;
+      setIsAligningHeading(false);
+      setMessage("지도 방향을 맞추지 못했어요. 다시 시도해 주세요.");
+    }
+  }, [currentCoordinates, deviceHeading, isLocationButtonPrimed, locate]);
+
   const searchPlace = useCallback(
     async (keyword: string, shouldDismissKeyboard = false) => {
       if (placeSearchTimerRef.current) {
@@ -313,10 +481,9 @@ export default function MapScreen() {
           );
           return;
         }
-      } catch {
+      } catch (error) {
         if (requestId !== placeSearchRequestRef.current) return;
-        setPlaceResults([]);
-        setMessage("장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.");
+        setMessage(getPlaceSearchErrorMessage(error));
       } finally {
         if (requestId === placeSearchRequestRef.current) setSearching(false);
       }
@@ -371,16 +538,69 @@ export default function MapScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const lastViewedRegion = lastViewedRegionRef.current;
-      if (!lastViewedRegion) {
-        void locate();
-        return;
-      }
+      let active = true;
+      let animationFrame: number | undefined;
+      let locationSubscription: Location.LocationSubscription | undefined;
+      let headingSubscription: Location.LocationSubscription | undefined;
 
-      const animationFrame = requestAnimationFrame(() => {
-        mapRef.current?.animateToRegion(lastViewedRegion, 0);
+      const startLocationTracking = async () => {
+        const lastViewedRegion = lastViewedRegionRef.current;
+        if (!lastViewedRegion) {
+          await locate();
+        } else {
+          animationFrame = requestAnimationFrame(() => {
+            mapRef.current?.animateToRegion(lastViewedRegion, 0);
+          });
+        }
+
+        if (!active) return;
+        const permission = await Location.getForegroundPermissionsAsync();
+        if (permission.status !== Location.PermissionStatus.GRANTED) return;
+
+        const subscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 5_000,
+            distanceInterval: REVERSE_GEOCODE_MIN_DISTANCE_METERS,
+          },
+          (position) => {
+            if (!active) return;
+            setCurrentCoordinates({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          },
+        );
+        if (!active) {
+          subscription.remove();
+          return;
+        }
+        locationSubscription = subscription;
+
+        headingSubscription = await Location.watchHeadingAsync((heading) => {
+          if (!active) return;
+          const nextHeading =
+            heading.trueHeading >= 0 ? heading.trueHeading : heading.magHeading;
+          if (Number.isFinite(nextHeading)) {
+            setDeviceHeading((previous) =>
+              smoothHeading(previous, nextHeading),
+            );
+          }
+        });
+      };
+
+      void startLocationTracking().catch(() => {
+        // The one-time location result remains available if background tracking fails.
       });
-      return () => cancelAnimationFrame(animationFrame);
+
+      return () => {
+        active = false;
+        if (animationFrame !== undefined) {
+          cancelAnimationFrame(animationFrame);
+        }
+        locationSubscription?.remove();
+        headingSubscription?.remove();
+      };
     }, [locate]),
   );
 
@@ -430,14 +650,35 @@ export default function MapScreen() {
         provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
         style={StyleSheet.absoluteFill}
         initialRegion={DEFAULT_REGION}
-        showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
         mapType="standard"
         userInterfaceStyle={isDark ? "dark" : "light"}
         mapPadding={{ top: 120, right: 16, bottom: 170, left: 16 }}
-        onRegionChangeComplete={updateRegion}
-      />
+        onPanDrag={() => {
+          setIsLocationButtonPrimed(false);
+          isAligningHeadingRef.current = false;
+          setIsAligningHeading(false);
+          if (headingAlignmentTimerRef.current !== null) {
+            clearTimeout(headingAlignmentTimerRef.current);
+            headingAlignmentTimerRef.current = null;
+          }
+        }}
+        onRegionChange={syncMapHeading}
+        onRegionChangeComplete={(region) => {
+          updateRegion(region);
+          syncMapHeading();
+        }}
+      >
+        {currentCoordinates && (
+          <CurrentLocationMarker
+            coordinate={currentCoordinates}
+            heading={deviceHeading}
+            mapHeading={mapHeading}
+            alignToTop={isAligningHeading}
+          />
+        )}
+      </MapView>
 
       {showLocationLoading && (
         <View
@@ -658,7 +899,7 @@ export default function MapScreen() {
           accessibilityLabel="현재 위치로 이동"
           className="h-[52px] w-[52px] rounded-[18px] bg-[#22C55E] shadow-md"
           disabled={locating}
-          onPress={() => void locate()}
+          onPress={() => void handleLocationButtonPress()}
         >
           {locating ? (
             <ActivityIndicator color="white" />

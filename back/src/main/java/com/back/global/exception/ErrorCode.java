@@ -11,6 +11,12 @@ public enum ErrorCode {
             "서버 내부 오류가 발생했습니다."
     ),
 
+    EXTERNAL_API_TEMPORARILY_UNAVAILABLE(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "EXTERNAL_503_1",
+            "외부 서비스에 일시적인 장애가 발생했습니다. 잠시 후 다시 시도해 주세요."
+    ),
+
     USER_NOT_FOUND(
             HttpStatus.NOT_FOUND,
             "USER_404",
@@ -141,6 +147,12 @@ public enum ErrorCode {
             HttpStatus.BAD_GATEWAY,
             "LOCATION_502_1",
             "주소 변환 서비스에 일시적인 오류가 발생했습니다."
+    ),
+
+    REVERSE_GEOCODE_RATE_LIMIT_EXCEEDED(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "LOCATION_429_1",
+            "현재 위치 주소 조회 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."
     ),
 
     KAKAO_DIRECTIONS_FAILED(
