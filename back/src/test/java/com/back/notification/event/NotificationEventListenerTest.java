@@ -6,6 +6,7 @@ import com.back.notification.service.NotificationCommandService;
 import com.back.notification.service.NotificationService;
 import com.back.notification.service.NotificationSettingService;
 import com.back.notification.sse.NotificationSseEmitterRegistry;
+import com.back.pushtoken.service.PushSendService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +32,8 @@ class NotificationEventListenerTest {
     private NotificationSettingService notificationSettingService;
     @Mock
     private NotificationSseEmitterRegistry sseRegistry;
+    @Mock
+    private PushSendService pushSendService;
 
     @InjectMocks
     private NotificationEventListener listener;
@@ -60,6 +63,7 @@ class NotificationEventListenerTest {
         assertThat(captor.getValue().type()).isEqualTo(NotificationType.LIKE);
         assertThat(captor.getValue().postId()).isEqualTo(10L);
         assertThat(captor.getValue().commentId()).isNull();
+        verify(pushSendService).sendToUser(1L, "새 좋아요", "액터닉네임님이 회원님의 게시글을 좋아합니다.");
     }
 
     @Test
@@ -80,6 +84,7 @@ class NotificationEventListenerTest {
         verify(sseRegistry).send(eq(1L), captor.capture());
         assertThat(captor.getValue().type()).isEqualTo(NotificationType.COMMENT);
         assertThat(captor.getValue().commentId()).isEqualTo(20L);
+        verify(pushSendService).sendToUser(1L, "새 댓글", "액터닉네임님이 회원님의 게시글에 댓글을 남겼습니다.");
     }
 
     @Test
@@ -99,6 +104,7 @@ class NotificationEventListenerTest {
         ArgumentCaptor<NotificationService.NotificationResponse> captor = ArgumentCaptor.forClass(NotificationService.NotificationResponse.class);
         verify(sseRegistry).send(eq(1L), captor.capture());
         assertThat(captor.getValue().type()).isEqualTo(NotificationType.COMMENT_UPVOTE);
+        verify(pushSendService).sendToUser(1L, "새 공감", "액터닉네임님이 회원님의 댓글에 공감했습니다.");
     }
 
     @Test
@@ -113,6 +119,7 @@ class NotificationEventListenerTest {
         // then
         verify(notificationCommandService, never()).save(any(), any(), any(), any(), any(), any(), any());
         verify(sseRegistry, never()).send(any(), any());
+        verify(pushSendService, never()).sendToUser(any(), any(), any());
     }
 
     @Test
@@ -127,6 +134,7 @@ class NotificationEventListenerTest {
         // then
         verify(notificationCommandService, never()).save(any(), any(), any(), any(), any(), any(), any());
         verify(sseRegistry, never()).send(any(), any());
+        verify(pushSendService, never()).sendToUser(any(), any(), any());
     }
 
     @Test
@@ -141,6 +149,7 @@ class NotificationEventListenerTest {
         // then
         verify(notificationCommandService, never()).save(any(), any(), any(), any(), any(), any(), any());
         verify(sseRegistry, never()).send(any(), any());
+        verify(pushSendService, never()).sendToUser(any(), any(), any());
     }
 
     @Test
@@ -159,5 +168,6 @@ class NotificationEventListenerTest {
         // then
         verify(notificationCommandService).save(1L, 2L, "액터닉네임", "https://example.com/actor.jpg", NotificationType.LIKE, 10L, null);
         verify(sseRegistry, never()).send(any(), any());
+        verify(pushSendService, never()).sendToUser(any(), any(), any());
     }
 }

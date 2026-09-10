@@ -3,6 +3,7 @@ package com.back.pushtoken.repository;
 import com.back.pushtoken.domain.PushToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface PushTokenRepository extends JpaRepository<PushToken, Long> {
@@ -11,4 +12,6 @@ public interface PushTokenRepository extends JpaRepository<PushToken, Long> {
     Optional<PushToken> findByToken(String token);
 
     long deleteByToken(String token);
+
+    List<PushToken> findByUser_IdOrderByUpdatedAtDesc(Long userId);
 }
