@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   View,
@@ -59,6 +60,7 @@ export default function ReservationScreen() {
   const [selectedMinute, setSelectedMinute] = useState(0);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const bookmarksQuery = useQuery({
     queryKey: ["bookmarks", "reservation"],
@@ -115,6 +117,22 @@ export default function ReservationScreen() {
     setSelectedHour(value.getHours());
     setSelectedMinute(value.getMinutes());
   };
+  const refreshReservations = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    const startedAt = Date.now();
+    try {
+      await Promise.all([
+        reservationsQuery.refetch(),
+        bookmarksQuery.refetch(),
+      ]);
+    } finally {
+      const remaining = Math.max(0, 1_000 - (Date.now() - startedAt));
+      if (remaining > 0)
+        await new Promise((resolve) => setTimeout(resolve, remaining));
+      setIsRefreshing(false);
+    }
+  };
 
   if (reservationsQuery.isError)
     return (
@@ -131,7 +149,17 @@ export default function ReservationScreen() {
       className="flex-1 bg-[#F3FCF0] dark:bg-[#111411]"
       edges={["top"]}
     >
-      <ScrollView contentContainerClassName="px-5 pb-10 pt-4">
+      <ScrollView
+        contentContainerClassName="px-5 pb-10 pt-4"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => void refreshReservations()}
+            tintColor="transparent"
+            colors={["transparent"]}
+          />
+        }
+      >
         <View className="mb-5 flex-row items-center justify-between">
           <View>
             <Text className="text-2xl font-black text-[#161D17] dark:text-[#F1F5F2]">
@@ -344,6 +372,14 @@ export default function ReservationScreen() {
           </View>
         )}
       </ScrollView>
+      {isRefreshing ? (
+        <View
+          pointerEvents="none"
+          className="absolute inset-x-0 top-[76px] z-50 items-center"
+        >
+          <ActivityIndicator color={isDark ? "#AAB5AD" : "#087A3F"} />
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }

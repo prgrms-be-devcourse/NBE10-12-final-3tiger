@@ -60,8 +60,7 @@ export function MyScheduleCard() {
                 courseName: reservation.courseName,
                 date,
                 status:
-                  reservation.status === "COMPLETED" ||
-                  date.getTime() < now.getTime()
+                  reservation.status === "COMPLETED"
                     ? ("completed" as const)
                     : ("scheduled" as const),
               },
@@ -70,7 +69,7 @@ export function MyScheduleCard() {
       })
       .filter((item) => inMonth(item.date, visibleMonth))
       .sort((left, right) => left.date.getTime() - right.date.getTime());
-  }, [now, reservationsQuery.data, visibleMonth]);
+  }, [reservationsQuery.data, visibleMonth]);
 
   const markers = useMemo(() => {
     const result: Record<string, CalendarMarker> = {};

@@ -57,6 +57,10 @@ public class WalkReservation extends BaseEntity {
         this.status = WalkReservationStatus.CANCELED;
     }
 
+    public void complete() {
+        this.status = WalkReservationStatus.COMPLETED;
+    }
+
     public void markReminderSent(LocalDateTime sentAt) {
         this.reminderSentAt = sentAt;
     }

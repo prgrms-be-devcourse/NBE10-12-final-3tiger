@@ -48,6 +48,7 @@ class WalkReservationReminderServiceTest {
 
         assertThat(count).isEqualTo(1);
         verify(reservation).markReminderSent(any(LocalDateTime.class));
+        verify(reservation).complete();
         ArgumentCaptor<WalkReservationReminderEvent> eventCaptor =
                 ArgumentCaptor.forClass(WalkReservationReminderEvent.class);
         verify(eventPublisher).publishEvent(eventCaptor.capture());

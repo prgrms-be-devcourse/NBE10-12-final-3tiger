@@ -42,6 +42,7 @@ public class WalkReservationReminderService {
 
         for (WalkReservation reservation : reservations) {
             reservation.markReminderSent(now);
+            reservation.complete();
             eventPublisher.publishEvent(new WalkReservationReminderEvent(
                     reservation.getUser().getId(),
                     reservation.getId(),

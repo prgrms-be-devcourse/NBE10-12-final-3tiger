@@ -341,7 +341,7 @@ export default function ProfileScreen() {
       {isRefreshing ? (
         <View
           pointerEvents="none"
-          className="absolute inset-x-0 top-14 items-center"
+          className="absolute inset-x-0 top-[60px] z-50 items-center"
         >
           <ActivityIndicator color={isDark ? "#AAB5AD" : "#087A3F"} />
         </View>
