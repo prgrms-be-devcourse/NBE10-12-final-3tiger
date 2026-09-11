@@ -39,4 +39,11 @@ public interface WalkReservationRepository extends JpaRepository<WalkReservation
             LocalDateTime startInclusive,
             LocalDateTime endExclusive
     );
+
+    @EntityGraph(attributePaths = {"user", "course"})
+    List<WalkReservation> findByStatusAndReminderSentAtIsNullAndScheduledAtLessThanEqualOrderByScheduledAtAsc(
+            WalkReservationStatus status,
+            LocalDateTime now,
+            Pageable pageable
+    );
 }

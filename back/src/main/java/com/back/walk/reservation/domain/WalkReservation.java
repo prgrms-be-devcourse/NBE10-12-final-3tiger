@@ -41,6 +41,9 @@ public class WalkReservation extends BaseEntity {
     @Column(nullable = false, length = 20)
     private WalkReservationStatus status;
 
+    @Column(name = "reminder_sent_at")
+    private LocalDateTime reminderSentAt;
+
     protected WalkReservation() {}
 
     public WalkReservation(User user, Course course, LocalDateTime scheduledAt) {
@@ -54,8 +57,14 @@ public class WalkReservation extends BaseEntity {
         this.status = WalkReservationStatus.CANCELED;
     }
 
+    public void markReminderSent(LocalDateTime sentAt) {
+        this.reminderSentAt = sentAt;
+    }
+
     public Long getId() { return id; }
+    public User getUser() { return user; }
     public Course getCourse() { return course; }
     public LocalDateTime getScheduledAt() { return scheduledAt; }
     public WalkReservationStatus getStatus() { return status; }
+    public LocalDateTime getReminderSentAt() { return reminderSentAt; }
 }
