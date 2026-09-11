@@ -104,6 +104,11 @@ app:
       region: ${AWS_REGION:ap-northeast-2}
       public-base-url: ${S3_PUBLIC_BASE_URL:}
 
+walk:
+  reservation:
+    reminder:
+      poll-interval-ms: ${WALK_RESERVATION_REMINDER_POLL_INTERVAL_MS:10000}
+
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
