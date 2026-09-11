@@ -51,6 +51,16 @@ const formatDate = (value: string) => {
   }).format(date);
 };
 
+const formatCompactDate = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const year = `${date.getFullYear() % 100}`.padStart(2, "0");
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  const weekday = ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
+  return `${year}.${month}.${day} ${weekday}`;
+};
+
 function Stars({ rating }: { rating: number }) {
   return (
     <View className="flex-row gap-0.5" accessibilityLabel={`별점 ${rating}점`}>
@@ -88,49 +98,65 @@ function WalkRecordRow({
         )}
       </View>
       <View className={`ml-2 flex-1 ${last ? "pb-0" : "pb-4"}`}>
-        <Text className="text-[11px] font-bold text-[#6B756D] dark:text-[#AAB5AD]">
-          {formatDate(record.walkedAt)}
-        </Text>
-        <View className="mt-1.5 rounded-xl border border-[#E2EAE2] bg-[#F9FBF9] p-3 dark:border-[#343D36] dark:bg-[#242B26]">
-          <Text
-            numberOfLines={1}
-            className="text-[15px] font-extrabold text-[#191C1D] dark:text-[#F1F5F2]"
-          >
-            {record.courseName}
-          </Text>
-          <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
-            <View className="rounded-full bg-[#E9FBEF] px-2 py-1 dark:bg-[#24382B]">
-              <Text className="text-[10px] font-extrabold text-[#087A3F] dark:text-[#86EFAC]">
-                {PERSONA_LABELS[persona] ?? "일반"}
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-1">
-              <Ionicons name="map-outline" size={13} color="#64748B" />
-              <Text className="text-[11px] font-bold text-slate-600 dark:text-[#AAB5AD]">
-                {formatDistance(record.distanceMeters)}
-              </Text>
-            </View>
-            <View className="flex-row items-center gap-1">
-              <Ionicons name="time-outline" size={13} color="#64748B" />
-              <Text className="text-[11px] font-bold text-slate-600 dark:text-[#AAB5AD]">
-                {formatDuration(record.durationSeconds)}
-              </Text>
-            </View>
+        {compact ? (
+          <View className="min-h-12 justify-center pb-1">
+            <Text
+              numberOfLines={1}
+              className="text-[15px] font-extrabold text-[#191C1D] dark:text-[#F1F5F2]"
+            >
+              {record.courseName}
+            </Text>
+            <Text className="mt-1 text-[11px] font-medium text-[#6B756D] dark:text-[#AAB5AD]">
+              {formatCompactDate(record.walkedAt)}
+            </Text>
           </View>
-          {!compact && record.rating != null && (
-            <View className="mt-3 flex-row items-center justify-between rounded-lg bg-white px-3 py-2.5 dark:bg-[#1B211D]">
-              <View>
-                <Text className="text-[10px] font-semibold text-slate-500 dark:text-[#AAB5AD]">
-                  내가 남긴 코스 별점
-                </Text>
-                <Text className="mt-0.5 text-xs font-extrabold text-[#26372D] dark:text-[#F1F5F2]">
-                  {record.rating}.0
-                </Text>
+        ) : (
+          <>
+            <Text className="text-[11px] font-bold text-[#6B756D] dark:text-[#AAB5AD]">
+              {formatDate(record.walkedAt)}
+            </Text>
+            <View className="mt-1.5 rounded-xl border border-[#E2EAE2] bg-[#F9FBF9] p-3 dark:border-[#343D36] dark:bg-[#242B26]">
+              <Text
+                numberOfLines={1}
+                className="text-[15px] font-extrabold text-[#191C1D] dark:text-[#F1F5F2]"
+              >
+                {record.courseName}
+              </Text>
+              <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
+                <View className="rounded-full bg-[#E9FBEF] px-2 py-1 dark:bg-[#24382B]">
+                  <Text className="text-[10px] font-extrabold text-[#087A3F] dark:text-[#86EFAC]">
+                    {PERSONA_LABELS[persona] ?? "일반"}
+                  </Text>
+                </View>
+                <View className="flex-row items-center gap-1">
+                  <Ionicons name="map-outline" size={13} color="#64748B" />
+                  <Text className="text-[11px] font-bold text-slate-600 dark:text-[#AAB5AD]">
+                    {formatDistance(record.distanceMeters)}
+                  </Text>
+                </View>
+                <View className="flex-row items-center gap-1">
+                  <Ionicons name="time-outline" size={13} color="#64748B" />
+                  <Text className="text-[11px] font-bold text-slate-600 dark:text-[#AAB5AD]">
+                    {formatDuration(record.durationSeconds)}
+                  </Text>
+                </View>
               </View>
-              <Stars rating={record.rating} />
+              {record.rating != null && (
+                <View className="mt-3 flex-row items-center justify-between rounded-lg bg-white px-3 py-2.5 dark:bg-[#1B211D]">
+                  <View>
+                    <Text className="text-[10px] font-semibold text-slate-500 dark:text-[#AAB5AD]">
+                      내가 남긴 코스 별점
+                    </Text>
+                    <Text className="mt-0.5 text-xs font-extrabold text-[#26372D] dark:text-[#F1F5F2]">
+                      {record.rating}.0
+                    </Text>
+                  </View>
+                  <Stars rating={record.rating} />
+                </View>
+              )}
             </View>
-          )}
-        </View>
+          </>
+        )}
       </View>
     </View>
   );
