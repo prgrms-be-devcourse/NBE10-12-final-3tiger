@@ -9,20 +9,14 @@ export type UserProfile = {
   pointBalance: number;
 };
 
-export type DailyWalkRecord = {
-  date: string;
-  walkCount: number;
+export type WalkRecord = {
+  walkId: number;
+  courseId: number;
+  courseName: string;
+  walkedAt: string;
   distanceMeters: number;
-  minutes: number;
-};
-
-export type WeeklyWalkRecord = {
-  weekStart: string;
-  weekEnd: string;
-  totalWalkCount: number;
-  totalDistanceMeters: number;
-  totalMinutes: number;
-  dailyRecords: DailyWalkRecord[];
+  durationSeconds: number | null;
+  rating: number | null;
 };
 
 export type ShopItemType = "PROFILE_BORDER" | "POST_BORDER" | "PROFILE_BADGE";

@@ -1,8 +1,9 @@
 import { apiRequest } from "./client";
-import type { WeeklyWalkRecord } from "@/types/domain";
+import type { PageParams, PageResponse } from "@/types/api";
+import type { WalkRecord } from "@/types/domain";
 
-export const getWeeklyWalks = (weekStart: string) =>
-  apiRequest<WeeklyWalkRecord>({
-    url: "/api/v1/users/me/walks/weekly",
-    params: { weekStart },
+export const getMyWalks = (params: PageParams) =>
+  apiRequest<PageResponse<WalkRecord>>({
+    url: "/api/v1/users/me/walks",
+    params,
   });

@@ -33,18 +33,27 @@ public class CourseUsageLog {
     @Column(name = "used_at", nullable = false)
     private LocalDateTime usedAt;
 
+    @Column(name = "duration_seconds")
+    private Integer durationSeconds;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     protected CourseUsageLog() {}
 
     public CourseUsageLog(User user, Course course, LocalDateTime usedAt) {
+        this(user, course, usedAt, null);
+    }
+
+    public CourseUsageLog(User user, Course course, LocalDateTime usedAt, Integer durationSeconds) {
         this.user = user;
         this.course = course;
         this.usedAt = usedAt;
+        this.durationSeconds = durationSeconds;
         this.createdAt = LocalDateTime.now();
     }
 
     public Long getId() { return id; }
     public LocalDateTime getUsedAt() { return usedAt; }
+    public Integer getDurationSeconds() { return durationSeconds; }
 }

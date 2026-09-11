@@ -26,7 +26,7 @@ import {
 } from "@/components/shop/cosmetics";
 import { ErrorState } from "@/components/ui/data-state";
 import { Switch } from "@/components/ui/switch";
-import { WeeklyWalkCard } from "@/components/profile/weekly-walk-card";
+import { WalkHistoryCard } from "@/components/profile/walk-history-card";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
 import { usePushTokenStore } from "@/stores/push-token-store";
@@ -379,7 +379,7 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
-        <WeeklyWalkCard />
+        <WalkHistoryCard persona={persona} />
         <View className="rounded-xl bg-white p-4 dark:bg-[#1B211D]">
           <View className="flex-row items-center gap-2">
             <Ionicons name="person-circle" size={24} color="#22C55E" />
