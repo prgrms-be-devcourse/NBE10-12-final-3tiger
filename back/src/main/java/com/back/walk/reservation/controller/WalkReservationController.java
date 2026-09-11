@@ -9,6 +9,7 @@ import com.back.walk.reservation.dto.WalkReservationRequest;
 import com.back.walk.reservation.dto.WalkReservationResponse;
 import com.back.walk.reservation.service.WalkReservationService;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -17,6 +18,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.time.YearMonth;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -45,6 +49,18 @@ public class WalkReservationController {
     ) {
         validatePage(page, size);
         return ApiResponse.ok("내 산책 예약 목록 조회 성공", service.getUpcoming(userId, page, size));
+    }
+
+    @GetMapping("/users/me/walk-reservations/monthly")
+    public ApiResponse<List<WalkReservationResponse>> getMonthly(
+            @CurrentUserId Long userId,
+            @RequestParam
+            @DateTimeFormat(pattern = "yyyy-MM") YearMonth yearMonth
+    ) {
+        return ApiResponse.ok(
+                "월별 산책 예약 목록 조회 성공",
+                service.getMonthly(userId, yearMonth)
+        );
     }
 
     @DeleteMapping("/walk-reservations/{reservationId}")

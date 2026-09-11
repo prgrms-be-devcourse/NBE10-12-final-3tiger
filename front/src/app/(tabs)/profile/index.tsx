@@ -20,6 +20,7 @@ import {
 } from "@/components/shop/cosmetics";
 import { ErrorState } from "@/components/ui/data-state";
 import { InterestTagsSheet } from "@/components/profile/interest-tags-sheet";
+import { MyScheduleCard } from "@/components/profile/my-schedule-card";
 import { Separator } from "@/components/ui/separator";
 import { WalkHistoryCard } from "@/components/profile/walk-history-card";
 import { WalkingTypeSheet } from "@/components/profile/walking-type-sheet";
@@ -283,7 +284,11 @@ export default function ProfileScreen() {
                     else setWalkingTypeOpen(true);
                   }}
                 >
-                  <Ionicons name={item.icon} size={13} color="#FFFFFF" />
+                  <Ionicons
+                    name={item.icon}
+                    size={13}
+                    color={isDark ? "#FFFFFF" : "#26372D"}
+                  />
                   <Text
                     numberOfLines={1}
                     adjustsFontSizeToFit
@@ -298,6 +303,9 @@ export default function ProfileScreen() {
         </View>
         <View className="-mx-5 mt-1">
           <WalkHistoryCard persona={persona} />
+        </View>
+        <View className="-mx-5">
+          <MyScheduleCard />
         </View>
       </ScrollView>
       <WalkingTypeSheet

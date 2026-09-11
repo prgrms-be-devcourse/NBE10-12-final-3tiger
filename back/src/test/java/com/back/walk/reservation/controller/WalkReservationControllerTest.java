@@ -76,6 +76,21 @@ class WalkReservationControllerTest extends RateLimitWebMvcTestSupport {
     }
 
     @Test
+    void returnsScheduledAndCompletedReservationsForMonth() throws Exception {
+        given(service.getMonthly(7L, java.time.YearMonth.of(2099, 9)))
+                .willReturn(List.of(response(WalkReservationStatus.SCHEDULED)));
+
+        mvc.perform(get("/api/v1/users/me/walk-reservations/monthly")
+                        .param("yearMonth", "2099-09")
+                        .with(authenticatedAs(7L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].courseName").value("서울숲 코스"))
+                .andExpect(jsonPath("$.data[0].status").value("SCHEDULED"));
+
+        verify(service).getMonthly(7L, java.time.YearMonth.of(2099, 9));
+    }
+
+    @Test
     void cancelsReservation() throws Exception {
         given(service.cancel(7L, 13L)).willReturn(response(WalkReservationStatus.CANCELED));
 

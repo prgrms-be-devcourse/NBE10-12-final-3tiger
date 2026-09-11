@@ -66,6 +66,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="reservation"
+        options={{
+          title: "예약",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "calendar" : "calendar-outline"}
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "저장",

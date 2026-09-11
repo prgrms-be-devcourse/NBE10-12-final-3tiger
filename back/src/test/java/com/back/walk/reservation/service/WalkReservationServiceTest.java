@@ -17,6 +17,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.OffsetDateTime;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -85,5 +88,32 @@ class WalkReservationServiceTest {
 
         verify(reservation).cancel();
         assertThat(response.status()).isEqualTo(WalkReservationStatus.CANCELED);
+    }
+
+    @Test
+    void returnsScheduledAndCompletedReservationsWithinMonth() {
+        WalkReservation scheduled = reservation(WalkReservationStatus.SCHEDULED);
+        WalkReservation completed = reservation(WalkReservationStatus.COMPLETED);
+        given(reservationRepository
+                .findByUser_IdAndStatusInAndScheduledAtGreaterThanEqualAndScheduledAtLessThanOrderByScheduledAtAsc(
+                        1L,
+                        List.of(WalkReservationStatus.SCHEDULED, WalkReservationStatus.COMPLETED),
+                        LocalDateTime.of(2026, 9, 1, 0, 0),
+                        LocalDateTime.of(2026, 10, 1, 0, 0)
+                )).willReturn(List.of(scheduled, completed));
+
+        List<WalkReservationResponse> responses = service.getMonthly(1L, YearMonth.of(2026, 9));
+
+        assertThat(responses).extracting(WalkReservationResponse::status)
+                .containsExactly(WalkReservationStatus.SCHEDULED, WalkReservationStatus.COMPLETED);
+    }
+
+    private WalkReservation reservation(WalkReservationStatus status) {
+        Course course = new Course("서울숲 코스", "11680", 2_500);
+        WalkReservation reservation = mock(WalkReservation.class);
+        given(reservation.getCourse()).willReturn(course);
+        given(reservation.getScheduledAt()).willReturn(LocalDateTime.of(2026, 9, 15, 18, 30));
+        given(reservation.getStatus()).willReturn(status);
+        return reservation;
     }
 }

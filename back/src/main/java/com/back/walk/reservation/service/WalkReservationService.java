@@ -19,7 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
+import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
@@ -83,6 +85,21 @@ public class WalkReservationService {
                         pageable
                 )
                 .map(this::toResponse));
+    }
+
+    public List<WalkReservationResponse> getMonthly(Long userId, YearMonth yearMonth) {
+        LocalDateTime startInclusive = yearMonth.atDay(1).atStartOfDay();
+        LocalDateTime endExclusive = yearMonth.plusMonths(1).atDay(1).atStartOfDay();
+
+        return reservationRepository
+                .findByUser_IdAndStatusInAndScheduledAtGreaterThanEqualAndScheduledAtLessThanOrderByScheduledAtAsc(
+                        userId,
+                        List.of(WalkReservationStatus.SCHEDULED, WalkReservationStatus.COMPLETED),
+                        startInclusive,
+                        endExclusive
+                ).stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional

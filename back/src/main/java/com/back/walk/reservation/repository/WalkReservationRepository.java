@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface WalkReservationRepository extends JpaRepository<WalkReservation, Long> {
@@ -29,4 +31,12 @@ public interface WalkReservationRepository extends JpaRepository<WalkReservation
 
     @EntityGraph(attributePaths = "course")
     Optional<WalkReservation> findByIdAndUser_Id(Long reservationId, Long userId);
+
+    @EntityGraph(attributePaths = "course")
+    List<WalkReservation> findByUser_IdAndStatusInAndScheduledAtGreaterThanEqualAndScheduledAtLessThanOrderByScheduledAtAsc(
+            Long userId,
+            Collection<WalkReservationStatus> statuses,
+            LocalDateTime startInclusive,
+            LocalDateTime endExclusive
+    );
 }

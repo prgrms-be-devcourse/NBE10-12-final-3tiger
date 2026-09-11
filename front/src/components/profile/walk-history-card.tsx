@@ -378,7 +378,9 @@ export function WalkHistoryCard({ persona }: { persona: string }) {
             className="mt-4 h-11 w-full rounded-lg bg-[#EEF6EB] dark:bg-[#2A312C]"
             onPress={() => setSheetOpen(true)}
           >
-            <Text className="text-sm font-extrabold text-white">전체 보기</Text>
+            <Text className="text-sm font-extrabold text-[#191C1D] dark:text-white">
+              전체 보기
+            </Text>
           </Button>
         )}
       </View>
