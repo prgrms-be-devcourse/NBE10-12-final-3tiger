@@ -2,23 +2,17 @@ package com.back.walk.reservation.event;
 
 import com.back.notification.service.NotificationSettingService;
 import com.back.pushtoken.service.PushSendService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
+@RequiredArgsConstructor
 public class WalkReservationReminderEventListener {
 
     private final NotificationSettingService notificationSettingService;
     private final PushSendService pushSendService;
-
-    public WalkReservationReminderEventListener(
-            NotificationSettingService notificationSettingService,
-            PushSendService pushSendService
-    ) {
-        this.notificationSettingService = notificationSettingService;
-        this.pushSendService = pushSendService;
-    }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void on(WalkReservationReminderEvent event) {

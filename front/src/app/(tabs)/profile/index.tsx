@@ -135,7 +135,7 @@ export default function ProfileScreen() {
   if (!isAuthenticated)
     return (
       <SafeAreaView
-        className="flex-1 items-center justify-center bg-[#F2F7F2] px-6 dark:bg-[#111411]"
+        className="flex-1 items-center justify-center bg-[#F8FAFB] px-6 dark:bg-[#111411]"
         edges={["top"]}
       >
         <View className="w-full max-w-md items-center rounded-3xl bg-white px-6 py-9 shadow-sm dark:bg-[#1B211D]">
@@ -170,10 +170,10 @@ export default function ProfileScreen() {
   if (profileQuery.isPending)
     return (
       <SafeAreaView
-        className="flex-1 bg-[#F2F7F2] dark:bg-[#111411]"
+        className="flex-1 bg-[#F8FAFB] dark:bg-[#111411]"
         edges={["top"]}
       >
-        <View className="flex-1 items-center justify-center gap-3 bg-[#F2F7F2] px-6 py-12 dark:bg-[#111411]">
+        <View className="flex-1 items-center justify-center gap-3 bg-[#F8FAFB] px-6 py-12 dark:bg-[#111411]">
           <ActivityIndicator color="#087A3F" />
           <Text className="text-sm text-slate-500 dark:text-[#AAB5AD]">
             프로필을 불러오는 중이에요
@@ -187,7 +187,7 @@ export default function ProfileScreen() {
         message={profileQuery.error.message}
         onRetry={() => void profileQuery.refetch()}
         appearance="light"
-        className="bg-[#F2F7F2] dark:bg-[#111411]"
+        className="bg-[#F8FAFB] dark:bg-[#111411]"
       />
     );
   const profile = profileQuery.data;
@@ -201,7 +201,7 @@ export default function ProfileScreen() {
   );
   return (
     <SafeAreaView
-      className="flex-1 bg-[#F2F7F2] dark:bg-[#111411]"
+      className="flex-1 bg-[#F8FAFB] dark:bg-[#111411]"
       edges={["top"]}
     >
       <View className="h-12 flex-row items-center justify-end px-4">

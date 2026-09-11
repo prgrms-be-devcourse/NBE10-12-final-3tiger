@@ -136,7 +136,7 @@ export default function ReservationScreen() {
 
   if (reservationsQuery.isError)
     return (
-      <SafeAreaView className="flex-1 bg-[#F3FCF0] dark:bg-[#111411]">
+      <SafeAreaView className="flex-1 bg-[#F8FAFB] dark:bg-[#111411]">
         <ErrorState
           message={reservationsQuery.error.message}
           onRetry={() => void reservationsQuery.refetch()}
@@ -146,7 +146,7 @@ export default function ReservationScreen() {
 
   return (
     <SafeAreaView
-      className="flex-1 bg-[#F3FCF0] dark:bg-[#111411]"
+      className="flex-1 bg-[#F8FAFB] dark:bg-[#111411]"
       edges={["top"]}
     >
       <ScrollView
