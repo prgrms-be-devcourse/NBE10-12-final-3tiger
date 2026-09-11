@@ -6,6 +6,7 @@ import {
   Animated,
   Easing,
   FlatList,
+  Image,
   Modal,
   Pressable,
   Text,
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 
 import { getMyWalks } from "@/api/walk-api";
+import { getCourseDetail } from "@/api/course-api";
 import { Button } from "@/components/ui/button";
 import {
   BottomSheetHandle,
@@ -308,37 +310,33 @@ export function WalkHistoryCard({ persona }: { persona: string }) {
     queryFn: () => getMyWalks({ page: 0, size: 5 }),
   });
   const records = recentQuery.data?.content ?? [];
+  const latestCourseId = records[0]?.courseId;
+  const latestCourseQuery = useQuery({
+    queryKey: ["course", latestCourseId],
+    queryFn: () => getCourseDetail(latestCourseId!),
+    enabled: latestCourseId != null,
+  });
+  const latestCourseImage =
+    latestCourseQuery.data?.imageUrl ?? latestCourseQuery.data?.mapImageUrl;
 
   return (
     <>
-      <View className="rounded-xl bg-white p-4 dark:bg-[#1B211D]">
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center gap-2">
-            <View className="h-9 w-9 items-center justify-center rounded-full bg-[#E9FBEF] dark:bg-[#24382B]">
-              <Ionicons name="footsteps" size={18} color="#087A3F" />
-            </View>
-            <View>
-              <Text className="text-[17px] font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
-                나의 산책 기록
-              </Text>
-              <Text className="mt-0.5 text-[11px] text-slate-500 dark:text-[#AAB5AD]">
-                최근 완료한 산책 5개
-              </Text>
-            </View>
-          </View>
-          {(recentQuery.data?.totalElements ?? 0) > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 rounded-full bg-[#EEF6EB] px-3 dark:bg-[#2A312C]"
-              onPress={() => setSheetOpen(true)}
-            >
-              <Text className="text-[11px] font-extrabold text-[#087A3F] dark:text-[#86EFAC]">
-                전체 보기
-              </Text>
-            </Button>
-          )}
+      <View className="bg-white p-4 dark:bg-[#1B211D]">
+        <View>
+          <Text className="text-[17px] font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
+            나의 산책 기록
+          </Text>
         </View>
+
+        {latestCourseImage ? (
+          <Image
+            source={{ uri: latestCourseImage }}
+            accessibilityLabel={`${records[0]?.courseName ?? "최근 산책 코스"} 이미지`}
+            resizeMode="cover"
+            className="mt-4 w-full rounded-lg"
+            style={{ aspectRatio: 8 / 3 }}
+          />
+        ) : null}
 
         {recentQuery.isPending ? (
           <View className="h-28 items-center justify-center">
@@ -374,6 +372,14 @@ export function WalkHistoryCard({ persona }: { persona: string }) {
               />
             ))}
           </View>
+        )}
+        {(recentQuery.data?.totalElements ?? 0) > 0 && (
+          <Button
+            className="mt-4 h-11 w-full rounded-lg bg-[#EEF6EB] dark:bg-[#2A312C]"
+            onPress={() => setSheetOpen(true)}
+          >
+            <Text className="text-sm font-extrabold text-white">전체 보기</Text>
+          </Button>
         )}
       </View>
       <WalkHistorySheet
