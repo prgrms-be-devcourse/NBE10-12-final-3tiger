@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   View,
@@ -76,6 +77,7 @@ export default function ProfileScreen() {
   const [tags, setTags] = useState<string[]>([]);
   const [walkingTypeOpen, setWalkingTypeOpen] = useState(false);
   const [interestTagsOpen, setInterestTagsOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const profileQuery = useQuery({
     queryKey: ["my-profile"],
     queryFn: getMyProfile,
@@ -112,6 +114,24 @@ export default function ProfileScreen() {
       persona,
       tags.includes(tag) ? tags.filter((x) => x !== tag) : [...tags, tag],
     );
+  const refreshProfile = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    const startedAt = Date.now();
+    try {
+      await Promise.all([
+        profileQuery.refetch(),
+        myItemsQuery.refetch(),
+        queryClient.refetchQueries({ queryKey: ["my-walks"] }),
+        queryClient.refetchQueries({ queryKey: ["walk-reservations"] }),
+      ]);
+    } finally {
+      const remaining = Math.max(0, 1_000 - (Date.now() - startedAt));
+      if (remaining > 0)
+        await new Promise((resolve) => setTimeout(resolve, remaining));
+      setIsRefreshing(false);
+    }
+  };
   if (!isAuthenticated)
     return (
       <SafeAreaView
@@ -210,7 +230,17 @@ export default function ProfileScreen() {
           />
         </Pressable>
       </View>
-      <ScrollView contentContainerClassName="gap-3.5 px-5 pb-9 pt-1.5">
+      <ScrollView
+        contentContainerClassName="gap-3.5 px-5 pb-9 pt-1.5"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => void refreshProfile()}
+            tintColor="transparent"
+            colors={["transparent"]}
+          />
+        }
+      >
         <View className="px-1 py-2">
           <View className="flex-row items-center gap-3">
             <View className="relative h-12 w-12 rounded-full">
@@ -308,6 +338,14 @@ export default function ProfileScreen() {
           <MyScheduleCard />
         </View>
       </ScrollView>
+      {isRefreshing ? (
+        <View
+          pointerEvents="none"
+          className="absolute inset-x-0 top-14 items-center"
+        >
+          <ActivityIndicator color={isDark ? "#AAB5AD" : "#087A3F"} />
+        </View>
+      ) : null}
       <WalkingTypeSheet
         open={walkingTypeOpen}
         persona={persona}

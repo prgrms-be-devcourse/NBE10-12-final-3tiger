@@ -2,6 +2,7 @@ import "../global.css";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PortalHost } from "@rn-primitives/portal";
+import * as Notifications from "expo-notifications";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useColorScheme } from "nativewind";
@@ -13,6 +14,15 @@ import { useNotificationStream } from "@/hooks/use-notification-stream";
 import { usePushToken } from "@/hooks/use-push-token";
 import { useThemeStore } from "@/stores/theme-store";
 import { ApiError } from "@/types/api";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const shouldRetryQuery = (failureCount: number, error: Error) => {
   if (error instanceof ApiError) {

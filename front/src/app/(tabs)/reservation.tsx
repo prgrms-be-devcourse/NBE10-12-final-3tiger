@@ -1,10 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from "@react-native-community/datetimepicker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   Text,
@@ -28,7 +32,6 @@ import { localDateKey } from "@/lib/korean-holidays";
 import { useThemeStore } from "@/stores/theme-store";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-const TIME_SLOTS = [7, 9, 12, 15, 18, 20];
 
 const startOfDay = (date: Date) =>
   new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -53,6 +56,8 @@ export default function ReservationScreen() {
   );
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedHour, setSelectedHour] = useState(18);
+  const [selectedMinute, setSelectedMinute] = useState(0);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
 
   const bookmarksQuery = useQuery({
@@ -97,11 +102,19 @@ export default function ReservationScreen() {
     selectedDate.getMonth(),
     selectedDate.getDate(),
     selectedHour,
+    selectedMinute,
   );
   const canReserve =
     selectedCourseId !== null &&
     scheduledAt.getTime() > Date.now() &&
     !reserveMutation.isPending;
+  const selectedTime = new Date(2000, 0, 1, selectedHour, selectedMinute);
+  const handleTimeChange = (event: DateTimePickerEvent, value?: Date) => {
+    if (Platform.OS === "android") setTimePickerOpen(false);
+    if (event.type === "dismissed" || !value) return;
+    setSelectedHour(value.getHours());
+    setSelectedMinute(value.getMinutes());
+  };
 
   if (reservationsQuery.isError)
     return (
@@ -198,23 +211,50 @@ export default function ReservationScreen() {
         <Text className="mb-2 mt-5 text-sm font-extrabold text-[#161D17] dark:text-[#F1F5F2]">
           시작 시간
         </Text>
-        <View className="flex-row flex-wrap gap-2">
-          {TIME_SLOTS.map((hour) => {
-            const selected = selectedHour === hour;
-            return (
-              <Pressable
-                key={hour}
-                className={`h-10 w-[31%] items-center justify-center rounded-full border ${selected ? "border-[#22C55E] bg-[#22C55E]" : "border-[#D4DED5] bg-white dark:border-[#475249] dark:bg-[#1B211D]"}`}
-                onPress={() => setSelectedHour(hour)}
-              >
-                <Text
-                  className={`text-xs font-extrabold ${selected ? "text-white" : "text-[#526056] dark:text-[#D4DDD6]"}`}
+        <View className="rounded-2xl bg-white p-4 dark:bg-[#1B211D]">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="시작 시간 선택"
+            className={`h-14 flex-row items-center rounded-xl border px-4 ${timePickerOpen ? "border-2 border-[#22C55E]" : "border-[#CBD5E1] dark:border-[#475249]"}`}
+            onPress={() => setTimePickerOpen(true)}
+          >
+            <Ionicons name="time-outline" size={21} color="#087A3F" />
+            <View className="ml-3 flex-1">
+              <Text className="text-[10px] font-bold text-[#718075] dark:text-[#AAB5AD]">
+                선택한 시간
+              </Text>
+              <Text className="mt-0.5 text-base font-black text-[#26372D] dark:text-[#F1F5F2]">
+                {String(selectedHour).padStart(2, "0")}:
+                {String(selectedMinute).padStart(2, "0")}
+              </Text>
+            </View>
+            <Text className="text-xs font-extrabold text-[#087A3F] dark:text-[#86EFAC]">
+              변경
+            </Text>
+          </Pressable>
+          {timePickerOpen ? (
+            <View className="mt-3 overflow-hidden rounded-xl bg-[#F8FAF8] dark:bg-[#242B26]">
+              <DateTimePicker
+                value={selectedTime}
+                mode="time"
+                display={Platform.OS === "ios" ? "spinner" : "default"}
+                minuteInterval={1}
+                is24Hour
+                themeVariant={isDark ? "dark" : "light"}
+                onChange={handleTimeChange}
+              />
+              {Platform.OS === "ios" ? (
+                <Pressable
+                  className="mx-3 mb-3 h-11 items-center justify-center rounded-full bg-[#22C55E]"
+                  onPress={() => setTimePickerOpen(false)}
                 >
-                  {String(hour).padStart(2, "0")}:00
-                </Text>
-              </Pressable>
-            );
-          })}
+                  <Text className="text-sm font-extrabold text-white">
+                    완료
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         {reserveMutation.isError ? (

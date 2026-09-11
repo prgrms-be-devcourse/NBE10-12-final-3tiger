@@ -9,7 +9,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { usePushTokenStore } from "@/stores/push-token-store";
 
 const ANDROID_DEFAULT_CHANNEL_ID = "default";
-const PUSH_PLATFORM = "android";
+const PUSH_PLATFORM = Platform.OS;
 
 async function setupAndroidChannel() {
   if (Platform.OS !== "android") return;
@@ -40,7 +40,9 @@ async function registerForPushNotifications() {
 
   const granted = await resolvePermissionGranted();
   if (!granted) {
-    console.warn("[push-token] 알림 권한이 거부되어 푸시 토큰을 발급하지 않습니다.");
+    console.warn(
+      "[push-token] 알림 권한이 거부되어 푸시 토큰을 발급하지 않습니다.",
+    );
     return;
   }
 
