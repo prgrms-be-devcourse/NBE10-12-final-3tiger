@@ -195,6 +195,30 @@ public enum ErrorCode {
             HttpStatus.UNAUTHORIZED,
             "AUTH_401_3",
             "카카오 인증에 실패했습니다."
+    ),
+
+    WALK_RESERVATION_TIME_INVALID(
+            HttpStatus.BAD_REQUEST,
+            "WALK_RESERVATION_400_1",
+            "산책 예약 시간은 현재보다 이후여야 합니다."
+    ),
+
+    WALK_RESERVATION_NOT_FOUND(
+            HttpStatus.NOT_FOUND,
+            "WALK_RESERVATION_404_1",
+            "산책 예약을 찾을 수 없습니다."
+    ),
+
+    WALK_RESERVATION_ALREADY_EXISTS(
+            HttpStatus.CONFLICT,
+            "WALK_RESERVATION_409_1",
+            "동일한 코스와 시간에 이미 산책이 예약되어 있습니다."
+    ),
+
+    WALK_RESERVATION_STATUS_INVALID(
+            HttpStatus.CONFLICT,
+            "WALK_RESERVATION_409_2",
+            "취소할 수 없는 산책 예약입니다."
     );
 
     private final HttpStatus status;
