@@ -7,128 +7,77 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { logout } from "@/api/auth-api";
-import {
-  getNotificationSetting,
-  updateNotificationSetting,
-} from "@/api/notification-api";
-import { unregisterPushToken } from "@/api/push-token-api";
-import { getMyProfile, updateMyProfile, withdraw } from "@/api/user-api";
+import { getMyProfile, updateMyProfile } from "@/api/user-api";
 import { getMyItems } from "@/api/shop-api";
 import {
   badgeAppearance,
   profileBorderStyle,
 } from "@/components/shop/cosmetics";
 import { ErrorState } from "@/components/ui/data-state";
-import { Switch } from "@/components/ui/switch";
+import { InterestTagsSheet } from "@/components/profile/interest-tags-sheet";
+import { MyScheduleCard } from "@/components/profile/my-schedule-card";
+import { Separator } from "@/components/ui/separator";
+import { WalkHistoryCard } from "@/components/profile/walk-history-card";
+import { WalkingTypeSheet } from "@/components/profile/walking-type-sheet";
 import { DEFAULT_PROFILE_IMAGE } from "@/lib/assets";
 import { useAuthStore } from "@/stores/auth-store";
-import { usePushTokenStore } from "@/stores/push-token-store";
 import { useThemeStore } from "@/stores/theme-store";
-
-/**
- * 로그아웃 시 현재 기기의 푸시 토큰을 서버에서 해제한다.
- * 토큰이 아직 발급되지 않았으면 스킵하고, 실패해도 로그아웃 흐름을 막지 않는다.
- */
-async function deregisterPushToken() {
-  const expoPushToken = usePushTokenStore.getState().expoPushToken;
-  if (!expoPushToken) return;
-  try {
-    await unregisterPushToken(expoPushToken);
-    usePushTokenStore.getState().setExpoPushToken(null);
-    console.log("[push-token] 서버에서 푸시 토큰을 해제했습니다.");
-  } catch (error) {
-    console.warn("[push-token] 서버 푸시 토큰 해제에 실패했습니다.", error);
-  }
-}
-const PERSONAS = [
-  {
-    key: "walker",
-    label: "일반",
-    icon: "walk" as const,
-    color: "#087A3F",
-    activeBackground: "#E9FBEF",
-  },
-  {
-    key: "dog",
-    label: "반려견",
-    icon: "paw" as const,
-    color: "#F97316",
-    activeBackground: "#F4F7F4",
-  },
-  {
-    key: "senior",
-    label: "시니어",
-    icon: "accessibility" as const,
-    color: "#A855F7",
-    activeBackground: "#F4F7F4",
-  },
-  {
-    key: "stroller",
-    label: "유모차",
-    icon: "happy" as const,
-    color: "#0EA5E9",
-    activeBackground: "#F4F7F4",
-  },
-];
-const MENUS = [
+const PRIMARY_MENUS = [
   {
     label: "코스 생성",
-    description: "원하는 조건으로 새 코스를 만들어요",
     icon: "sparkles" as const,
-    color: "bg-[#087A3F]",
     route: "/course/generate",
   },
   {
-    label: "꾸미기 상점",
-    description: "포인트로 프로필과 게시글을 꾸며보세요",
-    icon: "color-palette" as const,
-    color: "bg-[#087A3F]",
-    route: "/shop",
-  },
-  {
-    label: "저장한 코스",
-    description: "다시 걷고 싶은 코스를 확인해요",
-    icon: "bookmark" as const,
-    color: "bg-[#22C55E]",
-    route: "/(tabs)/profile/bookmark",
-  },
-  {
     label: "나의 게시글",
-    description: "내가 남긴 산책 기록을 모아봐요",
-    icon: "list" as const,
-    color: "bg-[#22C55E]",
+    icon: "document-text" as const,
     route: "/(tabs)/profile/mypost",
   },
   {
     label: "게시글 작성",
-    description: "새로운 산책 기록을 남겨보세요",
-    icon: "pencil" as const,
-    color: "bg-[#22C55E]",
+    icon: "create" as const,
     route: "/review/write",
   },
   {
     label: "좋아요한 글",
-    description: "공감한 산책 이야기를 확인해요",
     icon: "heart" as const,
-    color: "bg-[#EF4444]",
     route: "/(tabs)/profile/like",
+  },
+];
+
+const SECONDARY_MENUS = [
+  {
+    label: "꾸미기 상점",
+    icon: "color-palette" as const,
+    route: "/shop",
+  },
+  {
+    label: "저장한 코스",
+    icon: "bookmark" as const,
+    route: "/(tabs)/profile/bookmark",
+  },
+  { label: "관심 태그", icon: "pricetag" as const, action: "tags" as const },
+  {
+    label: "나의 걷기 유형",
+    icon: "accessibility" as const,
+    action: "persona" as const,
   },
 ];
 export default function ProfileScreen() {
   const queryClient = useQueryClient();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const refreshToken = useAuthStore((state) => state.refreshToken);
-  const clearSession = useAuthStore((state) => state.clearSession);
   const isDark = useThemeStore((state) => state.isDark);
-  const setDark = useThemeStore((state) => state.setDark);
   const [persona, setPersona] = useState("dog");
   const [tags, setTags] = useState<string[]>([]);
+  const [walkingTypeOpen, setWalkingTypeOpen] = useState(false);
+  const [interestTagsOpen, setInterestTagsOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const profileQuery = useQuery({
     queryKey: ["my-profile"],
     queryFn: getMyProfile,
@@ -143,38 +92,6 @@ export default function ProfileScreen() {
     mutationFn: updateMyProfile,
     onSuccess: () =>
       void queryClient.invalidateQueries({ queryKey: ["my-profile"] }),
-  });
-  const notificationSettingQuery = useQuery({
-    queryKey: ["notification-setting"],
-    queryFn: getNotificationSetting,
-    enabled: isAuthenticated,
-  });
-  const notificationEnabled = notificationSettingQuery.data?.enabled ?? true;
-  const notificationSettingMutation = useMutation({
-    mutationFn: updateNotificationSetting,
-    onMutate: (enabled) =>
-      queryClient.setQueryData(["notification-setting"], { enabled }),
-    onError: () =>
-      void queryClient.invalidateQueries({
-        queryKey: ["notification-setting"],
-      }),
-  });
-  const logoutMutation = useMutation({
-    mutationFn: () =>
-      refreshToken ? logout(refreshToken) : Promise.resolve(null),
-    onSettled: async () => {
-      // 세션을 지우기 전에(액세스 토큰이 살아있을 때) 푸시 토큰을 해제한다.
-      await deregisterPushToken();
-      await clearSession();
-      queryClient.clear();
-    },
-  });
-  const withdrawMutation = useMutation({
-    mutationFn: withdraw,
-    onSuccess: async () => {
-      await clearSession();
-      queryClient.clear();
-    },
   });
   useEffect(() => {
     if (profileQuery.data) {
@@ -197,10 +114,28 @@ export default function ProfileScreen() {
       persona,
       tags.includes(tag) ? tags.filter((x) => x !== tag) : [...tags, tag],
     );
+  const refreshProfile = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    const startedAt = Date.now();
+    try {
+      await Promise.all([
+        profileQuery.refetch(),
+        myItemsQuery.refetch(),
+        queryClient.refetchQueries({ queryKey: ["my-walks"] }),
+        queryClient.refetchQueries({ queryKey: ["walk-reservations"] }),
+      ]);
+    } finally {
+      const remaining = Math.max(0, 1_000 - (Date.now() - startedAt));
+      if (remaining > 0)
+        await new Promise((resolve) => setTimeout(resolve, remaining));
+      setIsRefreshing(false);
+    }
+  };
   if (!isAuthenticated)
     return (
       <SafeAreaView
-        className="flex-1 items-center justify-center bg-[#F2F7F2] px-6 dark:bg-[#111411]"
+        className="flex-1 items-center justify-center bg-[#F8FAFB] px-6 dark:bg-[#111411]"
         edges={["top"]}
       >
         <View className="w-full max-w-md items-center rounded-3xl bg-white px-6 py-9 shadow-sm dark:bg-[#1B211D]">
@@ -235,10 +170,10 @@ export default function ProfileScreen() {
   if (profileQuery.isPending)
     return (
       <SafeAreaView
-        className="flex-1 bg-[#F2F7F2] dark:bg-[#111411]"
+        className="flex-1 bg-[#F8FAFB] dark:bg-[#111411]"
         edges={["top"]}
       >
-        <View className="flex-1 items-center justify-center gap-3 bg-[#F2F7F2] px-6 py-12 dark:bg-[#111411]">
+        <View className="flex-1 items-center justify-center gap-3 bg-[#F8FAFB] px-6 py-12 dark:bg-[#111411]">
           <ActivityIndicator color="#087A3F" />
           <Text className="text-sm text-slate-500 dark:text-[#AAB5AD]">
             프로필을 불러오는 중이에요
@@ -252,7 +187,7 @@ export default function ProfileScreen() {
         message={profileQuery.error.message}
         onRetry={() => void profileQuery.refetch()}
         appearance="light"
-        className="bg-[#F2F7F2] dark:bg-[#111411]"
+        className="bg-[#F8FAFB] dark:bg-[#111411]"
       />
     );
   const profile = profileQuery.data;
@@ -266,62 +201,68 @@ export default function ProfileScreen() {
   );
   return (
     <SafeAreaView
-      className="flex-1 bg-[#F2F7F2] dark:bg-[#111411]"
+      className="flex-1 bg-[#F8FAFB] dark:bg-[#111411]"
       edges={["top"]}
     >
-      <ScrollView contentContainerClassName="gap-3.5 p-5 pb-9">
-        <View className="relative rounded-xl bg-white p-4 dark:bg-[#1B211D]">
-          <View className="absolute right-3 top-3 z-10 items-end gap-2">
-            <View className="flex-row items-center gap-1.5">
-              <Ionicons
-                name={isDark ? "moon" : "sunny-outline"}
-                size={16}
-                color={isDark ? "#86EFAC" : "#526056"}
-              />
-              <Switch
-                accessibilityLabel="다크 모드"
-                value={isDark}
-                onValueChange={(value) => void setDark(value)}
-              />
-            </View>
-            <View className="flex-row items-center gap-1.5">
-              <Ionicons
-                name={
-                  notificationEnabled ? "notifications" : "notifications-off"
-                }
-                size={16}
-                color={notificationEnabled ? "#86EFAC" : "#526056"}
-              />
-              <Switch
-                accessibilityLabel="알림 받기"
-                value={notificationEnabled}
-                onValueChange={(value) =>
-                  notificationSettingMutation.mutate(value)
-                }
-              />
-            </View>
-          </View>
+      <View className="h-12 flex-row items-center justify-end px-4">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="설정"
+          className="h-11 w-11 items-center justify-center"
+          onPress={() => router.push("/settings" as never)}
+        >
+          <Ionicons
+            name="settings-outline"
+            size={23}
+            color={isDark ? "#F1F5F2" : "#33443A"}
+          />
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="홈으로 돌아가기"
+          className="h-11 w-11 items-center justify-center"
+          onPress={() => router.replace("/(tabs)/map" as never)}
+        >
+          <Ionicons
+            name="close"
+            size={27}
+            color={isDark ? "#F1F5F2" : "#33443A"}
+          />
+        </Pressable>
+      </View>
+      <ScrollView
+        contentContainerClassName="gap-3.5 px-5 pb-9 pt-1.5"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => void refreshProfile()}
+            tintColor="transparent"
+            colors={["transparent"]}
+          />
+        }
+      >
+        <View className="px-1 py-2">
           <View className="flex-row items-center gap-3">
-            <View className="relative h-16 w-16 rounded-full">
+            <View className="relative h-12 w-12 rounded-full">
               <Image
                 source={
                   profile?.profileImageUrl
                     ? { uri: profile.profileImageUrl }
                     : DEFAULT_PROFILE_IMAGE
                 }
-                className="h-16 w-16 rounded-full border-2 border-slate-100"
+                className="h-12 w-12 rounded-full border border-slate-100"
                 style={profileBorderStyle(profileBorderCode)}
               />
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="프로필 설정"
-                className="absolute bottom-0 right-0 h-6 w-6 items-center justify-center rounded-full bg-[#22C55E]"
+                className="absolute bottom-0 right-0 h-5 w-5 items-center justify-center rounded-full bg-[#22C55E]"
                 onPress={() => router.push("/settings" as never)}
               >
-                <Ionicons name="pencil" size={11} color="#004B1E" />
+                <Ionicons name="pencil" size={9} color="#004B1E" />
               </Pressable>
             </View>
-            <View className="flex-1 pr-16">
+            <View className="flex-1">
               <View className="flex-row items-center gap-1.5">
                 <Text className="text-[17px] font-semibold text-[#191C1D] dark:text-[#F1F5F2]">
                   {profile?.nickname}
@@ -337,151 +278,88 @@ export default function ProfileScreen() {
               <Text className="mt-0.5 text-xs text-slate-500 dark:text-[#AAB5AD]">
                 {profile?.email}
               </Text>
-              <Pressable
-                className="mt-2 self-start flex-row items-center gap-1 rounded-full bg-[#E9FBEF] px-2.5 py-1 dark:bg-[#24382B]"
-                onPress={() => router.push("/shop" as never)}
-              >
-                <Ionicons name="leaf" size={13} color="#087A3F" />
-                <Text className="text-xs font-extrabold text-[#087A3F] dark:text-[#86EFAC]">
-                  {profile?.pointBalance ?? 0} P
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-          <View className="mt-3.5 border-t border-slate-200 pt-3 dark:border-[#343D36]">
-            <Text className="mb-2 text-[11px] font-medium text-slate-500 dark:text-[#AAB5AD]">
-              계정 관리
-            </Text>
-            <View className="flex-row gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-10 flex-1 rounded-lg border-0 bg-[#EEF0EE] px-3 dark:bg-[#2A312C]"
-                disabled={logoutMutation.isPending}
-                onPress={() => logoutMutation.mutate()}
-              >
-                <Text className="text-xs font-bold text-[#4B5563] dark:text-[#D4DDD6]">
-                  로그아웃
-                </Text>
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="h-10 flex-1 rounded-lg bg-[#FEE2E2] px-3"
-                disabled={withdrawMutation.isPending}
-                onPress={() => withdrawMutation.mutate()}
-              >
-                <Text className="text-xs font-extrabold text-[#B91C1C]">
-                  계정 삭제
-                </Text>
-              </Button>
             </View>
           </View>
         </View>
-        <View className="rounded-xl bg-white p-4 dark:bg-[#1B211D]">
-          <View className="flex-row items-center gap-2">
-            <Ionicons name="person-circle" size={24} color="#22C55E" />
-            <Text className="text-[17px] font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
-              나의 걷기 유형
-            </Text>
-          </View>
-          <Text className="mb-3 mt-1.5 text-xs leading-[19px] text-slate-600 dark:text-[#AAB5AD]">
-            맞춤형 경로를 위해 주된 유형을 선택해주세요.
-          </Text>
-          <View className="flex-row gap-1.5">
-            {PERSONAS.map((item) => {
-              const active = persona === item.key;
-              return (
-                <Pressable
-                  key={item.key}
-                  className={`h-20 flex-1 items-center justify-center gap-1 rounded-lg border-2 ${active ? "" : "border-slate-200 bg-[#F8FAF8] dark:border-[#343D36] dark:bg-[#242B26]"}`}
-                  style={
-                    active
-                      ? {
-                          borderColor: item.color,
-                          backgroundColor: item.activeBackground,
-                        }
-                      : undefined
-                  }
-                  onPress={() => savePreferences(item.key, tags)}
-                >
-                  <Ionicons
-                    name={item.icon}
-                    size={27}
-                    color={active ? item.color : "#64748B"}
-                  />
-                  <Text
-                    style={active ? { color: item.color } : undefined}
-                    className="text-xs font-bold text-slate-600 dark:text-[#AAB5AD]"
-                  >
-                    {item.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-        <View className="rounded-xl bg-white p-4 dark:bg-[#1B211D]">
-          <View className="flex-row items-center gap-2">
-            <Ionicons name="pricetag" size={22} color="#22C55E" />
-            <Text className="text-[17px] font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
-              관심 태그
-            </Text>
-          </View>
-          <Text className="mb-3 mt-1.5 text-xs text-slate-600 dark:text-[#AAB5AD]">
-            선호하는 산책 환경을 알려주세요.
-          </Text>
-          <View className="flex-row gap-1.5">
-            {[
-              ["park", "공원 위주"],
-              ["shade", "그늘 많은 곳"],
-              ["flat", "평탄한 길"],
-              ["water", "식수대 있음"],
-            ].map(([tag, label]) => (
+        <View className="overflow-hidden rounded-xl bg-white dark:bg-[#1B211D]">
+          <View className="flex-row px-1 py-2">
+            {PRIMARY_MENUS.map((item) => (
               <Pressable
-                key={tag}
-                onPress={() => toggle(tag)}
-                className={`h-10 flex-1 items-center justify-center rounded-full border px-1 ${tags.includes(tag) ? "border-[#22C55E] bg-[#22C55E]" : "border-[#BCCBB9] bg-slate-200 dark:border-[#475249] dark:bg-[#2A312C]"}`}
+                key={item.label}
+                accessibilityRole="button"
+                className="h-[70px] flex-1 items-center justify-center gap-1.5"
+                onPress={() => router.push(item.route as never)}
               >
+                <Ionicons name={item.icon} size={27} color="#22C55E" />
                 <Text
                   numberOfLines={1}
-                  className={`text-[11px] font-bold ${tags.includes(tag) ? "text-[#26372D] dark:text-white" : "text-[#26372D] dark:text-[#D4DDD6]"}`}
+                  adjustsFontSizeToFit
+                  className="px-0.5 text-center text-[13px] font-extrabold text-[#26372D] dark:text-[#F1F5F2]"
                 >
-                  {label}
+                  {item.label}
                 </Text>
               </Pressable>
             ))}
           </View>
+          <Separator className="bg-[#DDE7DE] dark:bg-[#343D36]" />
+          <View className="flex-row flex-wrap px-2 py-1.5">
+            {SECONDARY_MENUS.map((item) => (
+              <View key={item.label} className="w-1/2">
+                <Pressable
+                  accessibilityRole="button"
+                  className="h-10 flex-row items-center justify-start gap-1.5 px-3"
+                  onPress={() => {
+                    if ("route" in item) router.push(item.route as never);
+                    else if (item.action === "tags") setInterestTagsOpen(true);
+                    else setWalkingTypeOpen(true);
+                  }}
+                >
+                  <Ionicons
+                    name={item.icon}
+                    size={13}
+                    color={isDark ? "#FFFFFF" : "#26372D"}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    className="text-[13px] font-extrabold text-[#26372D] dark:text-[#F1F5F2]"
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
         </View>
-        <View className="overflow-hidden rounded-xl bg-white px-4 dark:bg-[#1B211D]">
-          {MENUS.map((item, i) => (
-            <Pressable
-              key={item.label}
-              className={`min-h-[66px] flex-row items-center gap-3 ${i < MENUS.length - 1 ? "border-b border-slate-200 dark:border-[#343D36]" : ""}`}
-              onPress={() => router.push(item.route as never)}
-            >
-              <View
-                className={`h-[38px] w-[38px] items-center justify-center rounded-full ${item.color}`}
-              >
-                <Ionicons
-                  name={item.icon}
-                  size={20}
-                  color={item.label === "설정" ? "#475569" : "white"}
-                />
-              </View>
-              <View className="flex-1">
-                <Text className="text-[15px] font-semibold text-[#191C1D] dark:text-[#F1F5F2]">
-                  {item.label}
-                </Text>
-                <Text className="mt-0.5 text-[11px] text-slate-500 dark:text-[#AAB5AD]">
-                  {item.description}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#64748B" />
-            </Pressable>
-          ))}
+        <View className="-mx-5 mt-1">
+          <WalkHistoryCard persona={persona} />
+        </View>
+        <View className="-mx-5">
+          <MyScheduleCard />
         </View>
       </ScrollView>
+      {isRefreshing ? (
+        <View
+          pointerEvents="none"
+          className="absolute inset-x-0 top-[60px] z-50 items-center"
+        >
+          <ActivityIndicator color={isDark ? "#AAB5AD" : "#087A3F"} />
+        </View>
+      ) : null}
+      <WalkingTypeSheet
+        open={walkingTypeOpen}
+        persona={persona}
+        pending={profileMutation.isPending}
+        onSelect={(nextPersona) => savePreferences(nextPersona, tags)}
+        onClose={() => setWalkingTypeOpen(false)}
+      />
+      <InterestTagsSheet
+        open={interestTagsOpen}
+        tags={tags}
+        pending={profileMutation.isPending}
+        onToggle={toggle}
+        onClose={() => setInterestTagsOpen(false)}
+      />
     </SafeAreaView>
   );
 }

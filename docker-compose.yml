@@ -57,6 +57,12 @@ services:
       - ./docker/145-course-map-image-status.sh:/docker-entrypoint-initdb.d/145-course-map-image-status.sh:ro
       - ./docker/146-persona-default.sql:/tmp/146-persona-default.sql:ro
       - ./docker/146-persona-default.sh:/docker-entrypoint-initdb.d/146-persona-default.sh:ro
+      - ./docker/147-walk-history.sql:/tmp/walk-history.sql:ro
+      - ./docker/147-walk-history.sh:/docker-entrypoint-initdb.d/147-walk-history.sh:ro
+      - ./docker/148-walk-reservation.sql:/tmp/walk-reservation.sql:ro
+      - ./docker/148-walk-reservation.sh:/docker-entrypoint-initdb.d/148-walk-reservation.sh:ro
+      - ./docker/149-walk-reservation-reminder.sql:/tmp/walk-reservation-reminder.sql:ro
+      - ./docker/149-walk-reservation-reminder.sh:/docker-entrypoint-initdb.d/149-walk-reservation-reminder.sh:ro
       - ./docker/21_persona_weight.sql:/tmp/persona/21_persona_weight.sql:ro
       - ./docker/22_persona_course_scores.sql:/tmp/persona/22_persona_course_scores.sql:ro
       - ./docker/23_persona_edge_costs.sql:/tmp/persona/23_persona_edge_costs.sql:ro

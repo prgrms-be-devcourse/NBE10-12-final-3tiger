@@ -9,6 +9,24 @@ export type UserProfile = {
   pointBalance: number;
 };
 
+export type WalkRecord = {
+  walkId: number;
+  courseId: number;
+  courseName: string;
+  walkedAt: string;
+  distanceMeters: number;
+  durationSeconds: number | null;
+  rating: number | null;
+};
+
+export type WalkReservation = {
+  reservationId: number;
+  courseId: number;
+  courseName: string;
+  scheduledAt: string;
+  status: "SCHEDULED" | "COMPLETED" | "CANCELED";
+};
+
 export type ShopItemType = "PROFILE_BORDER" | "POST_BORDER" | "PROFILE_BADGE";
 
 export type ShopItem = {

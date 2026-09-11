@@ -66,12 +66,26 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="reservation"
         options={{
-          title: "마이",
+          title: "예약",
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons
-              name={focused ? "person" : "person-outline"}
+              name={focused ? "calendar" : "calendar-outline"}
+              color={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "저장",
+          href: "/(tabs)/profile/bookmark",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={focused ? "bookmark" : "bookmark-outline"}
               color={color}
               size={size}
             />
