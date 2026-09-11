@@ -1,3 +1,6 @@
+import { fetch as expoFetch } from "expo/fetch";
+import { File } from "expo-file-system";
+
 import { apiRequest, resolveApiHostUrl } from "./client";
 import { ApiError, type PageParams, type PageResponse } from "@/types/api";
 import type {
@@ -100,11 +103,10 @@ export const uploadPostPhoto = async (file: PostPhotoFile) => {
     throw new Error("사진은 10MB 이하만 업로드할 수 있습니다.");
   }
 
-  const fileResponse = await fetch(file.uri);
-  if (!fileResponse.ok) {
+  const body = new File(file.uri);
+  if (!body.exists) {
     throw new Error("선택한 사진을 불러오지 못했습니다.");
   }
-  const body = await fileResponse.blob();
   if (body.size === 0) {
     throw new Error("빈 사진 파일은 업로드할 수 없습니다.");
   }
@@ -115,7 +117,7 @@ export const uploadPostPhoto = async (file: PostPhotoFile) => {
   const fileName = file.fileName ?? `walk-${Date.now()}.jpg`;
   const target = await getPhotoUploadUrl(fileName, contentType);
   const photoUrl = resolveApiHostUrl(target.photoUrl);
-  const uploadResponse = await fetch(resolveApiHostUrl(target.uploadUrl), {
+  const uploadResponse = await expoFetch(resolveApiHostUrl(target.uploadUrl), {
     method: "PUT",
     headers: { "Content-Type": contentType },
     body,
