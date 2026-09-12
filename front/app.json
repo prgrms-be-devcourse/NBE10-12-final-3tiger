@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/logo-dark.png",
-      "bundleIdentifier": "com.anonymous.front"
+      "bundleIdentifier": "com.anonymous.front",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio", "location"]
+      }
     },
     "android": {
       "package": "com.anonymous.front",
@@ -22,7 +25,12 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.WAKE_LOCK",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -56,9 +64,14 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "주변 산책 코스와 현재 위치를 지도에 표시하기 위해 위치 권한이 필요합니다."
+          "locationWhenInUsePermission": "주변 산책 코스와 현재 위치를 지도에 표시하기 위해 위치 권한이 필요합니다.",
+          "locationAlwaysAndWhenInUsePermission": "화면을 잠그거나 다른 앱을 사용하는 동안에도 음성 안내가 이어지도록 백그라운드 위치 권한이 필요합니다.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
+      "expo-audio",
       "expo-font",
       "expo-web-browser",
       "expo-image",
