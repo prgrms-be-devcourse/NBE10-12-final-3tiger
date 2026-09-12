@@ -575,7 +575,11 @@ export default function CourseScreen() {
             );
           })}
         {route.length > 1 && (
-          <CourseRouteOverlay coordinates={route} mapHeading={mapHeading} />
+          <CourseRouteOverlay
+            key={`course-route-${selectedId ?? "none"}`}
+            coordinates={route}
+            mapHeading={mapHeading}
+          />
         )}
         {courses.map(
           (course) =>

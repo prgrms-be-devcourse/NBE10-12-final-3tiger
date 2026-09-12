@@ -1,4 +1,5 @@
 import "../global.css";
+import { ensureNoOrphanLocationTask } from "@/tasks/voice-guide-location-task";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PortalHost } from "@rn-primitives/portal";
@@ -13,6 +14,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useNotificationStream } from "@/hooks/use-notification-stream";
 import { usePushToken } from "@/hooks/use-push-token";
 import { useThemeStore } from "@/stores/theme-store";
+import { useVoiceGuideStore } from "@/stores/voice-guide-store";
 import { ApiError } from "@/types/api";
 
 Notifications.setNotificationHandler({
@@ -54,6 +56,7 @@ export default function RootLayout() {
   const isDark = useThemeStore((state) => state.isDark);
   const isThemeInitialized = useThemeStore((state) => state.isInitialized);
   const restoreTheme = useThemeStore((state) => state.restoreTheme);
+  const restoreMute = useVoiceGuideStore((state) => state.restoreMute);
 
   usePushToken();
 
@@ -64,6 +67,11 @@ export default function RootLayout() {
   useEffect(() => {
     void restoreTheme();
   }, [restoreTheme]);
+
+  useEffect(() => {
+    void restoreMute();
+    void ensureNoOrphanLocationTask();
+  }, [restoreMute]);
 
   useEffect(() => {
     if (isThemeInitialized) setColorScheme(isDark ? "dark" : "light");

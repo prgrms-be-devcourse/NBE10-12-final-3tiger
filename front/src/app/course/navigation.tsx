@@ -39,6 +39,10 @@ import {
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
 import {
+  activateGuidanceAudioSession,
+  releaseGuidanceAudioSession,
+} from "@/lib/audio-session";
+import {
   buildCumulativeDistances,
   distanceMeters,
   matchRouteProgress,
@@ -46,7 +50,12 @@ import {
   toMapCoordinates,
   type RouteProgress,
 } from "@/lib/course-navigation";
+import { useGuidancePlanner } from "@/lib/guidance-plan";
+import { detectManeuvers } from "@/lib/maneuver-detection";
+import { useVoiceGuide } from "@/lib/voice-guide";
 import { useThemeStore } from "@/stores/theme-store";
+import { useVoiceGuideStore } from "@/stores/voice-guide-store";
+import { VOICE_GUIDE_LOCATION_TASK } from "@/tasks/voice-guide-location-task";
 import type {
   CourseStartDirections,
   DirectionRoute,
@@ -59,11 +68,6 @@ const OFF_ROUTE_DISTANCE_M = 30;
 const OFF_ROUTE_SAMPLE_COUNT = 3;
 const COMPLETION_REMAINING_M = 20;
 const COMPLETION_END_DISTANCE_M = 30;
-
-type UserLocation = LatLng & {
-  accuracy: number | null;
-  heading: number | null;
-};
 
 const formatDistance = (meters: number) =>
   meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`;
@@ -911,8 +915,10 @@ export default function CourseNavigationScreen() {
   const [mapReady, setMapReady] = useState(false);
   const [showDirectionsMarkers, setShowDirectionsMarkers] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
-  const [isLocating, setIsLocating] = useState(true);
-  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const userLocation = useVoiceGuideStore((state) => state.location);
+  const muted = useVoiceGuideStore((state) => state.muted);
+  const toggleMute = useVoiceGuideStore((state) => state.toggleMute);
+  const isLocating = !permissionDenied && userLocation == null;
   const [deviceHeading, setDeviceHeading] = useState<number | null>(null);
   const [mapHeading, setMapHeading] = useState(0);
   const [navigationStarted, setNavigationStarted] = useState(false);
@@ -992,6 +998,19 @@ export default function CourseNavigationScreen() {
     () => buildCumulativeDistances(route),
     [route],
   );
+  const totalDistanceM = cumulativeDistances.at(-1) ?? 0;
+  const maneuvers = useMemo(() => detectManeuvers(route), [route]);
+  const { speak } = useVoiceGuide({ muted });
+  const { reset: resetPlanner } = useGuidancePlanner({
+    maneuvers,
+    progress,
+    totalDistanceM,
+    navigationStarted,
+    isOffRoute,
+    isCompleted,
+    isLoop: navigationQuery.data?.isLoop ?? false,
+    speak,
+  });
   const routeParts = useMemo(
     () => splitRouteAtProgress(route, progress),
     [progress, route],
@@ -1088,20 +1107,17 @@ export default function CourseNavigationScreen() {
 
   useEffect(() => {
     let subscription: Location.LocationSubscription | undefined;
-    let headingSubscription: Location.LocationSubscription | undefined;
     let active = true;
 
-    const watchLocation = async () => {
-      setIsLocating(true);
+    const start = async () => {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (!active) return;
       if (permission.status !== Location.PermissionStatus.GRANTED) {
         setPermissionDenied(true);
-        setIsLocating(false);
         return;
       }
-
       setPermissionDenied(false);
+      if (navigationStarted) return;
       subscription = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.BestForNavigation,
@@ -1110,33 +1126,40 @@ export default function CourseNavigationScreen() {
         },
         (position) => {
           if (!active) return;
-          setUserLocation({
+          useVoiceGuideStore.getState().setLocation({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            heading: position.coords.heading,
+            accuracy: position.coords.accuracy ?? null,
+            heading: position.coords.heading ?? null,
+            timestamp: position.timestamp,
           });
-          setIsLocating(false);
         },
       );
+    };
 
-      headingSubscription = await Location.watchHeadingAsync((heading) => {
+    void start().catch(() => undefined);
+
+    return () => {
+      active = false;
+      subscription?.remove();
+    };
+  }, [navigationStarted]);
+
+  useEffect(() => {
+    let subscription: Location.LocationSubscription | undefined;
+    let active = true;
+    const start = async () => {
+      subscription = await Location.watchHeadingAsync((heading) => {
         if (!active) return;
         const nextHeading =
           heading.trueHeading >= 0 ? heading.trueHeading : heading.magHeading;
         if (Number.isFinite(nextHeading)) setDeviceHeading(nextHeading);
       });
     };
-
-    void watchLocation().catch(() => {
-      if (!active) return;
-      setIsLocating(false);
-    });
-
+    void start().catch(() => undefined);
     return () => {
       active = false;
       subscription?.remove();
-      headingSubscription?.remove();
     };
   }, []);
 
@@ -1148,6 +1171,27 @@ export default function CourseNavigationScreen() {
       animated: true,
     });
   }, [mapReady, route]);
+
+  const stopGuidanceServices = useCallback(async () => {
+    try {
+      const started = await Location.hasStartedLocationUpdatesAsync(
+        VOICE_GUIDE_LOCATION_TASK,
+      );
+      if (started) {
+        await Location.stopLocationUpdatesAsync(VOICE_GUIDE_LOCATION_TASK);
+      }
+    } catch {
+      // Task 정지 실패는 무시. 앱 종료 시 시스템이 정리한다.
+    }
+    await releaseGuidanceAudioSession();
+  }, []);
+
+  useEffect(
+    () => () => {
+      void stopGuidanceServices();
+    },
+    [stopGuidanceServices],
+  );
 
   useEffect(() => {
     if (!navigationStarted || !userLocation || route.length < 2) return;
@@ -1197,8 +1241,16 @@ export default function CourseNavigationScreen() {
     ) {
       setIsCompleted(true);
       setNavigationStarted(false);
+      void stopGuidanceServices();
     }
-  }, [cumulativeDistances, endPoint, navigationStarted, route, userLocation]);
+  }, [
+    cumulativeDistances,
+    endPoint,
+    navigationStarted,
+    route,
+    stopGuidanceServices,
+    userLocation,
+  ]);
 
   useEffect(() => {
     if (!followUser || !navigationStarted || !userLocation) return;
@@ -1281,7 +1333,14 @@ export default function CourseNavigationScreen() {
   const confirmExit = () => {
     Alert.alert("안내를 종료할까요?", "현재 진행 정보는 저장되지 않아요.", [
       { text: "계속 걷기", style: "cancel" },
-      { text: "안내 종료", style: "destructive", onPress: () => router.back() },
+      {
+        text: "안내 종료",
+        style: "destructive",
+        onPress: () => {
+          void stopGuidanceServices();
+          router.back();
+        },
+      },
     ]);
   };
 
@@ -1291,16 +1350,83 @@ export default function CourseNavigationScreen() {
     distanceToStart != null &&
     distanceToStart <= START_PROXIMITY_M;
 
-  const startNavigation = (confirmedStartable = false) => {
+  const activateGuidanceTask = async (options: {
+    withForegroundService: boolean;
+  }) => {
+    await activateGuidanceAudioSession().catch(() => undefined);
+    const started = await Location.hasStartedLocationUpdatesAsync(
+      VOICE_GUIDE_LOCATION_TASK,
+    ).catch(() => false);
+    if (started) return;
+    await Location.startLocationUpdatesAsync(VOICE_GUIDE_LOCATION_TASK, {
+      accuracy: Location.Accuracy.BestForNavigation,
+      distanceInterval: 3,
+      timeInterval: 1500,
+      showsBackgroundLocationIndicator: true,
+      ...(options.withForegroundService
+        ? {
+            foregroundService: {
+              notificationTitle: "산책 안내 진행 중",
+              notificationBody: "화면을 잠가도 음성 안내가 이어집니다",
+              notificationColor: "#087A3F",
+              killServiceOnDestroy: true,
+            },
+          }
+        : {}),
+    });
+  };
+
+  const startNavigation = async (confirmedStartable = false) => {
     if (!canStartWalk && !confirmedStartable) return;
-    previousProgressRef.current = null;
-    offRouteSamplesRef.current = 0;
-    setProgress(null);
-    setIsOffRoute(false);
-    setIsCompleted(false);
-    setFollowUser(true);
-    setNavigationStarted(true);
-    setIsDirectionsOpen(false);
+
+    const proceed = async (withForegroundService: boolean) => {
+      previousProgressRef.current = null;
+      offRouteSamplesRef.current = 0;
+      setProgress(null);
+      setIsOffRoute(false);
+      setIsCompleted(false);
+      setFollowUser(true);
+      resetPlanner();
+      try {
+        await activateGuidanceTask({ withForegroundService });
+      } catch (error) {
+        Alert.alert(
+          "안내를 시작할 수 없어요",
+          error instanceof Error
+            ? error.message
+            : "위치 서비스를 시작하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        );
+        await releaseGuidanceAudioSession();
+        return;
+      }
+      setNavigationStarted(true);
+      setIsDirectionsOpen(false);
+    };
+
+    const backgroundStatus = await Location.getBackgroundPermissionsAsync().catch(
+      () => null,
+    );
+    if (backgroundStatus?.status === Location.PermissionStatus.GRANTED) {
+      await proceed(true);
+      return;
+    }
+
+    const requested = await Location.requestBackgroundPermissionsAsync().catch(
+      () => null,
+    );
+    if (requested?.status === Location.PermissionStatus.GRANTED) {
+      await proceed(true);
+      return;
+    }
+
+    Alert.alert(
+      "백그라운드 위치가 제한됐어요",
+      "화면을 잠그거나 다른 앱을 사용하는 동안에는 음성 안내가 멈춥니다. 앱을 열어둔 상태에서 안내를 계속할까요?",
+      [
+        { text: "취소", style: "cancel" },
+        { text: "계속", onPress: () => void proceed(false) },
+      ],
+    );
   };
 
   if (!Number.isFinite(courseId)) {
@@ -1594,6 +1720,19 @@ export default function CourseNavigationScreen() {
           <Button
             variant="secondary"
             size="icon"
+            accessibilityLabel={muted ? "음성 안내 켜기" : "음성 안내 끄기"}
+            className="mb-2 h-12 w-12 rounded-2xl bg-white dark:bg-[#1B211D]"
+            onPress={() => void toggleMute()}
+          >
+            <Ionicons
+              name={muted ? "volume-mute" : "volume-high"}
+              size={21}
+              color={muted ? "#94A09A" : "#087A3F"}
+            />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
             accessibilityLabel="현재 위치 따라가기"
             className="mb-3 h-12 w-12 rounded-2xl bg-white dark:bg-[#1B211D]"
             onPress={() => setFollowUser(true)}
@@ -1672,7 +1811,7 @@ export default function CourseNavigationScreen() {
                   <Button
                     disabled={!canStartWalk}
                     className="h-12 rounded-2xl bg-[#087A3F]"
-                    onPress={() => startNavigation()}
+                    onPress={() => void startNavigation()}
                   >
                     <Ionicons
                       name="walk"
@@ -1720,7 +1859,10 @@ export default function CourseNavigationScreen() {
                 {isCompleted && (
                   <Button
                     className="mt-4 h-12 rounded-2xl bg-[#087A3F]"
-                    onPress={() => router.back()}
+                    onPress={() => {
+                      void stopGuidanceServices();
+                      router.back();
+                    }}
                   >
                     <Text className="font-black text-white">안내 마치기</Text>
                   </Button>
@@ -1750,7 +1892,7 @@ export default function CourseNavigationScreen() {
         }}
         onRetry={() => void directionsQuery.refetch()}
         onOpenKakao={(directions) => void openKakaoDirections(directions)}
-        onStart={startNavigation}
+        onStart={(confirmedStartable) => void startNavigation(confirmedStartable)}
         onSelectRoute={setSelectedDirectionsRoute}
       />
       <RouteDetailSheet
