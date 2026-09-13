@@ -63,7 +63,7 @@ import type {
   DirectionsMode,
 } from "@/types/domain";
 
-const START_PROXIMITY_M = 50;
+const START_PROXIMITY_M = 10;
 const OFF_ROUTE_DISTANCE_M = 30;
 const OFF_ROUTE_SAMPLE_COUNT = 3;
 const COMPLETION_REMAINING_M = 20;

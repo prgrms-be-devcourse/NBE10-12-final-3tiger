@@ -151,6 +151,7 @@ class CourseStartDirectionsServiceTest {
 
         assertThat(result.status()).isEqualTo(DirectionsStatus.ALREADY_NEAR_START);
         assertThat(result.startable()).isTrue();
+        assertThat(result.startableRadiusMeters()).isEqualTo(10);
         assertThat(result.routes()).isEmpty();
         assertThat(result.landingUrl()).isNull();
         verifyNoInteractions(directionsClient);
