@@ -71,6 +71,15 @@ const OFF_ROUTE_DISTANCE_M = 30;
 const OFF_ROUTE_SAMPLE_COUNT = 3;
 const COMPLETION_REMAINING_M = 20;
 const COMPLETION_END_DISTANCE_M = 30;
+const HEADING_DEAD_ZONE_DEGREES = 3;
+const HEADING_SMOOTHING_FACTOR = 0.25;
+
+const smoothHeading = (previous: number | null, next: number) => {
+  if (previous === null) return next;
+  const delta = ((next - previous + 540) % 360) - 180;
+  if (Math.abs(delta) < HEADING_DEAD_ZONE_DEGREES) return previous;
+  return (previous + delta * HEADING_SMOOTHING_FACTOR + 360) % 360;
+};
 
 const formatDistance = (meters: number) =>
   meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`;
@@ -1159,7 +1168,9 @@ export default function CourseNavigationScreen() {
         if (!active) return;
         const nextHeading =
           heading.trueHeading >= 0 ? heading.trueHeading : heading.magHeading;
-        if (Number.isFinite(nextHeading)) setDeviceHeading(nextHeading);
+        if (Number.isFinite(nextHeading)) {
+          setDeviceHeading((previous) => smoothHeading(previous, nextHeading));
+        }
       });
     };
     void start().catch(() => undefined);
