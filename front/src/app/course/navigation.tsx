@@ -64,8 +64,9 @@ import type {
 } from "@/types/domain";
 
 const START_PROXIMITY_M = 10;
-const LOOP_START_UNLOCK_DISTANCE_M = 30;
-const LOOP_END_AMBIGUITY_RATIO = 0.5;
+const LOOP_START_CONFIRM_DISTANCE_M = 30;
+const LOOP_START_SEARCH_DISTANCE_M = 80;
+const LOOP_START_ROUTE_TOLERANCE_M = 12;
 const OFF_ROUTE_DISTANCE_M = 30;
 const OFF_ROUTE_SAMPLE_COUNT = 3;
 const COMPLETION_REMAINING_M = 20;
@@ -913,6 +914,7 @@ export default function CourseNavigationScreen() {
   const mapHeadingFrameRef = useRef<number | null>(null);
   const previousProgressRef = useRef<RouteProgress | null>(null);
   const loopStartLockedRef = useRef(false);
+  const wrongDirectionAnnouncedRef = useRef(false);
   const offRouteSamplesRef = useRef(0);
   const hasFitRouteRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
@@ -928,6 +930,7 @@ export default function CourseNavigationScreen() {
   const [followUser, setFollowUser] = useState(true);
   const [progress, setProgress] = useState<RouteProgress | null>(null);
   const [isOffRoute, setIsOffRoute] = useState(false);
+  const [isWrongDirectionAtStart, setIsWrongDirectionAtStart] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [isDirectionsOpen, setIsDirectionsOpen] = useState(false);
   const [directionsMode, setDirectionsMode] = useState<DirectionsMode>("WALK");
@@ -1199,19 +1202,43 @@ export default function CourseNavigationScreen() {
   useEffect(() => {
     if (!navigationStarted || !userLocation || route.length < 2) return;
 
+    const isLoopStartLocked =
+      (navigationQuery.data?.isLoop ?? false) && loopStartLockedRef.current;
     let nextProgress = matchRouteProgress(
       userLocation,
       route,
       cumulativeDistances,
       previousProgressRef.current?.segmentIndex,
+      isLoopStartLocked ? LOOP_START_SEARCH_DISTANCE_M : undefined,
     );
     if (!nextProgress) return;
 
-    if (navigationQuery.data?.isLoop && loopStartLockedRef.current) {
+    if (isLoopStartLocked) {
       const startDistance = distanceMeters(userLocation, route[0]);
-      if (startDistance > LOOP_START_UNLOCK_DISTANCE_M) {
+      const followsOpeningRoute =
+        nextProgress.distanceFromRouteM <= LOOP_START_ROUTE_TOLERANCE_M;
+      const hasConfirmedForwardDirection =
+        followsOpeningRoute &&
+        nextProgress.traveledDistanceM >= LOOP_START_CONFIRM_DISTANCE_M &&
+        nextProgress.traveledDistanceM <= LOOP_START_SEARCH_DISTANCE_M;
+      const movingAgainstRoute =
+        startDistance > START_PROXIMITY_M &&
+        (!followsOpeningRoute ||
+          nextProgress.traveledDistanceM < START_PROXIMITY_M);
+
+      if (hasConfirmedForwardDirection) {
         loopStartLockedRef.current = false;
-      } else if (nextProgress.progress > LOOP_END_AMBIGUITY_RATIO) {
+        wrongDirectionAnnouncedRef.current = false;
+        setIsWrongDirectionAtStart(false);
+      } else if (movingAgainstRoute) {
+        if (!wrongDirectionAnnouncedRef.current) {
+          wrongDirectionAnnouncedRef.current = true;
+          speak({
+            kind: "OFF_ROUTE_ENTER",
+            text: "코스 진행 방향의 반대로 이동하고 있어요. 출발점 방향으로 돌아가 주세요.",
+          });
+        }
+        setIsWrongDirectionAtStart(true);
         nextProgress = previousProgressRef.current ?? {
           segmentIndex: 0,
           segmentFraction: 0,
@@ -1221,6 +1248,9 @@ export default function CourseNavigationScreen() {
           remainingDistanceM: totalDistanceM,
           progress: 0,
         };
+      } else {
+        wrongDirectionAnnouncedRef.current = false;
+        setIsWrongDirectionAtStart(false);
       }
     }
 
@@ -1269,6 +1299,7 @@ export default function CourseNavigationScreen() {
     navigationStarted,
     navigationQuery.data?.isLoop,
     route,
+    speak,
     stopGuidanceServices,
     totalDistanceM,
     userLocation,
@@ -1417,9 +1448,11 @@ export default function CourseNavigationScreen() {
         : null;
       previousProgressRef.current = initialProgress;
       loopStartLockedRef.current = navigationQuery.data?.isLoop ?? false;
+      wrongDirectionAnnouncedRef.current = false;
       offRouteSamplesRef.current = 0;
       setProgress(initialProgress);
       setIsOffRoute(false);
+      setIsWrongDirectionAtStart(false);
       setIsCompleted(false);
       setFollowUser(true);
       resetPlanner();
@@ -1511,21 +1544,23 @@ export default function CourseNavigationScreen() {
   const isWaitingToStart = !navigationStarted && !isCompleted;
   const status = isCompleted
     ? "코스를 완주했어요"
-    : isOffRoute
-      ? "코스에서 벗어났어요"
-      : navigationStarted
-        ? "경로를 따라 이동하세요"
-        : isLocating || distanceToStart == null
-          ? "현재 위치를 확인하고 있어요"
-          : canStartWalk
-            ? "산책을 시작할 수 있어요"
-            : "출발점 근처로 이동해주세요";
+    : isWrongDirectionAtStart
+      ? "코스 진행 방향을 확인해주세요"
+      : isOffRoute
+        ? "코스에서 벗어났어요"
+        : navigationStarted
+          ? "경로를 따라 이동하세요"
+          : isLocating || distanceToStart == null
+            ? "현재 위치를 확인하고 있어요"
+            : canStartWalk
+              ? "산책을 시작할 수 있어요"
+              : "출발점 근처로 이동해주세요";
   const completedRouteColor = isDark ? "#64748B" : "#94A3B8";
   const remainingRouteColor = selectedDirectionsRoute
     ? isDark
       ? "#475569"
       : "#94A3B8"
-    : isOffRoute
+    : isWrongDirectionAtStart || isOffRoute
       ? "#E66B3D"
       : "#087A3F";
 
@@ -1859,31 +1894,53 @@ export default function CourseNavigationScreen() {
               </View>
             ) : (
               <View>
-                <View className="flex-row items-end justify-between">
-                  <View>
+                <View className="flex-row items-end justify-between gap-3">
+                  <View className="min-w-0 flex-1">
                     <Text className="text-xs font-bold text-[#738078] dark:text-[#AAB5AD]">
                       남은 거리
                     </Text>
-                    <Text className="mt-1 text-3xl font-black text-[#203126] dark:text-[#F1F5F2]">
+                    <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.78}
+                      className="mt-1 text-3xl font-black text-[#203126] dark:text-[#F1F5F2]"
+                    >
                       {formatDistance(remainingDistanceM)}
                     </Text>
                   </View>
-                  <View className="items-end">
-                    <Text className="text-xs font-bold text-[#738078] dark:text-[#AAB5AD]">
+                  <View className="max-w-[48%] shrink items-end pb-1">
+                    <Text
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                      className="text-right text-xs font-bold text-[#738078] dark:text-[#AAB5AD]"
+                    >
                       약 {remainingMinutes}분 · {Math.round(progressPercent)}%
                     </Text>
-                    <Text
-                      className={`mt-2 text-sm font-black ${
-                        isOffRoute ? "text-[#D6542A]" : "text-[#087A3F]"
-                      }`}
-                    >
-                      {isOffRoute
+                  </View>
+                </View>
+                <View
+                  className={`mt-3 rounded-xl px-3 py-2.5 ${
+                    isWrongDirectionAtStart || isOffRoute
+                      ? "bg-[#FFF1EB] dark:bg-[#3A241D]"
+                      : "bg-[#E9FBEF] dark:bg-[#24382B]"
+                  }`}
+                >
+                  <Text
+                    className={`w-full text-sm font-black leading-5 ${
+                      isWrongDirectionAtStart || isOffRoute
+                        ? "text-[#D6542A] dark:text-[#FFB59D]"
+                        : "text-[#087A3F] dark:text-[#86EFAC]"
+                    }`}
+                  >
+                    {isWrongDirectionAtStart
+                      ? "진행 방향의 반대예요. 출발점 방향으로 돌아가 주세요"
+                      : isOffRoute
                         ? "표시된 코스로 돌아가 주세요"
                         : isCompleted
                           ? "산책을 마쳤습니다"
                           : "코스 위에서 안내 중"}
-                    </Text>
-                  </View>
+                  </Text>
                 </View>
                 <View className="mt-4 h-2 overflow-hidden rounded-full bg-[#E1E9E3] dark:bg-[#324039]">
                   <View
