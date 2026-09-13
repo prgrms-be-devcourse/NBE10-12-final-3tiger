@@ -49,6 +49,7 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
+import { ApiError } from "@/types/api";
 import type { GenerateCandidate } from "@/types/domain";
 
 const DEFAULT_COORDS = { latitude: 37.5462, longitude: 127.0372 };
@@ -78,11 +79,31 @@ const PERSONA_OPTIONS: Array<{ key: string | null; label: string }> = [
 ];
 
 const CANDIDATE_COLORS = ["#087A3F", "#F97316", "#A855F7"];
+const OFF_ROAD_ERROR_CODES = new Set(["COURSE_422_3", "COURSE_422_4"]);
+// 사용자가 찍은 지점과 실제 코스 시작점 사이 거리가 이 값 이상이면 별도 마커로 스냅 위치를 안내.
+const START_MARKER_HINT_METERS = 25;
+
 const toPolyline = (candidate: GenerateCandidate) =>
   (candidate.path.coordinates ?? []).map(([lng, lat]) => ({
     latitude: lat,
     longitude: lng,
   }));
+
+const haversineMeters = (
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number },
+) => {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+};
 
 const locationAddressLabel = (location: ReverseGeocodeResult) =>
   location.roadAddress ||
@@ -369,6 +390,16 @@ export default function CourseGenerateScreen() {
     onError: (error: Error) => {
       setCandidates([]);
       setSelectedIndex(null);
+      if (error instanceof ApiError && error.resultCode) {
+        if (OFF_ROAD_ERROR_CODES.has(error.resultCode)) {
+          setErrorMessage(
+            error.resultCode === "COURSE_422_4"
+              ? "도착 지점이 도로에서 너무 멀어요. 지도에서 도로 위 지점을 다시 선택해 주세요."
+              : "출발 지점이 도로에서 너무 멀어요. 지도에서 도로 위 지점을 다시 선택해 주세요.",
+          );
+          return;
+        }
+      }
       setErrorMessage(error.message);
     },
   });
@@ -470,6 +501,18 @@ export default function CourseGenerateScreen() {
     [coords],
   );
 
+  // 선택된 후보 코스의 실제 시작점(스냅된 도로 위 vertex).
+  // 사용자가 찍은 지점과 충분히 떨어져 있을 때만 별도 마커로 안내한다.
+  const snappedStartMarker = useMemo(() => {
+    if (selectedIndex === null) return null;
+    const picked = candidates[selectedIndex];
+    const firstCoord = picked?.path.coordinates?.[0];
+    if (!firstCoord) return null;
+    const snapped = { latitude: firstCoord[1], longitude: firstCoord[0] };
+    if (haversineMeters(snapped, coords) < START_MARKER_HINT_METERS) return null;
+    return snapped;
+  }, [candidates, coords, selectedIndex]);
+
   const isBusy = generateMutation.isPending || saveMutation.isPending;
   const isOneway = mode === "oneway";
   const canGenerate = !isBusy && (isOneway ? endCoords !== null : true);
@@ -552,6 +595,14 @@ export default function CourseGenerateScreen() {
                 coordinate={endCoords}
                 pinColor="#F97316"
                 title={endPlaceName ?? "도착지"}
+              />
+            )}
+            {snappedStartMarker && (
+              <Marker
+                coordinate={snappedStartMarker}
+                pinColor="#38BDF8"
+                title="실제 코스 시작점"
+                description="도로 위 가장 가까운 지점으로 스냅되었어요."
               />
             )}
             {candidates.map((candidate, index) => {

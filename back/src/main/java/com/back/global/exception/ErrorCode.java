@@ -131,6 +131,18 @@ public enum ErrorCode {
             "코스 출발점 정보가 없습니다."
     ),
 
+    COURSE_START_POINT_OFF_ROAD(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "COURSE_422_3",
+            "출발 지점이 도로에서 너무 멀어요. 근처 도로 위 지점을 선택해주세요."
+    ),
+
+    COURSE_END_POINT_OFF_ROAD(
+            HttpStatus.UNPROCESSABLE_ENTITY,
+            "COURSE_422_4",
+            "도착 지점이 도로에서 너무 멀어요. 근처 도로 위 지점을 선택해주세요."
+    ),
+
     INVALID_COORDINATE(
             HttpStatus.BAD_REQUEST,
             "COMMON_400_1",
