@@ -64,6 +64,8 @@ import type {
 } from "@/types/domain";
 
 const START_PROXIMITY_M = 10;
+const LOOP_START_UNLOCK_DISTANCE_M = 30;
+const LOOP_END_AMBIGUITY_RATIO = 0.5;
 const OFF_ROUTE_DISTANCE_M = 30;
 const OFF_ROUTE_SAMPLE_COUNT = 3;
 const COMPLETION_REMAINING_M = 20;
@@ -910,6 +912,7 @@ export default function CourseNavigationScreen() {
   const mapRef = useRef<MapView>(null);
   const mapHeadingFrameRef = useRef<number | null>(null);
   const previousProgressRef = useRef<RouteProgress | null>(null);
+  const loopStartLockedRef = useRef(false);
   const offRouteSamplesRef = useRef(0);
   const hasFitRouteRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
@@ -1196,13 +1199,30 @@ export default function CourseNavigationScreen() {
   useEffect(() => {
     if (!navigationStarted || !userLocation || route.length < 2) return;
 
-    const nextProgress = matchRouteProgress(
+    let nextProgress = matchRouteProgress(
       userLocation,
       route,
       cumulativeDistances,
       previousProgressRef.current?.segmentIndex,
     );
     if (!nextProgress) return;
+
+    if (navigationQuery.data?.isLoop && loopStartLockedRef.current) {
+      const startDistance = distanceMeters(userLocation, route[0]);
+      if (startDistance > LOOP_START_UNLOCK_DISTANCE_M) {
+        loopStartLockedRef.current = false;
+      } else if (nextProgress.progress > LOOP_END_AMBIGUITY_RATIO) {
+        nextProgress = previousProgressRef.current ?? {
+          segmentIndex: 0,
+          segmentFraction: 0,
+          snappedCoordinate: route[0],
+          distanceFromRouteM: startDistance,
+          traveledDistanceM: 0,
+          remainingDistanceM: totalDistanceM,
+          progress: 0,
+        };
+      }
+    }
 
     const previousProgress = previousProgressRef.current;
     const didRegressTooFar =
@@ -1247,8 +1267,10 @@ export default function CourseNavigationScreen() {
     cumulativeDistances,
     endPoint,
     navigationStarted,
+    navigationQuery.data?.isLoop,
     route,
     stopGuidanceServices,
+    totalDistanceM,
     userLocation,
   ]);
 
@@ -1380,9 +1402,23 @@ export default function CourseNavigationScreen() {
     if (!canStartWalk && !confirmedStartable) return;
 
     const proceed = async (withForegroundService: boolean) => {
-      previousProgressRef.current = null;
+      const initialProgress = route[0]
+        ? {
+            segmentIndex: 0,
+            segmentFraction: 0,
+            snappedCoordinate: route[0],
+            distanceFromRouteM: userLocation
+              ? distanceMeters(userLocation, route[0])
+              : 0,
+            traveledDistanceM: 0,
+            remainingDistanceM: totalDistanceM,
+            progress: 0,
+          }
+        : null;
+      previousProgressRef.current = initialProgress;
+      loopStartLockedRef.current = navigationQuery.data?.isLoop ?? false;
       offRouteSamplesRef.current = 0;
-      setProgress(null);
+      setProgress(initialProgress);
       setIsOffRoute(false);
       setIsCompleted(false);
       setFollowUser(true);
@@ -1403,9 +1439,8 @@ export default function CourseNavigationScreen() {
       setIsDirectionsOpen(false);
     };
 
-    const backgroundStatus = await Location.getBackgroundPermissionsAsync().catch(
-      () => null,
-    );
+    const backgroundStatus =
+      await Location.getBackgroundPermissionsAsync().catch(() => null);
     if (backgroundStatus?.status === Location.PermissionStatus.GRANTED) {
       await proceed(true);
       return;
@@ -1793,8 +1828,8 @@ export default function CourseNavigationScreen() {
                     }`}
                   >
                     {canStartWalk
-                      ? "출발점 50m 이내입니다. 산책을 시작할 수 있어요."
-                      : "안전하고 정확한 안내를 위해 출발점 50m 이내에서 산책을 시작할 수 있어요."}
+                      ? `출발점 ${START_PROXIMITY_M}m 이내입니다. 산책을 시작할 수 있어요.`
+                      : `안전하고 정확한 안내를 위해 출발점 ${START_PROXIMITY_M}m 이내에서 산책을 시작할 수 있어요.`}
                   </Text>
                 </View>
                 <View className="mt-4 gap-2">
@@ -1892,7 +1927,9 @@ export default function CourseNavigationScreen() {
         }}
         onRetry={() => void directionsQuery.refetch()}
         onOpenKakao={(directions) => void openKakaoDirections(directions)}
-        onStart={(confirmedStartable) => void startNavigation(confirmedStartable)}
+        onStart={(confirmedStartable) =>
+          void startNavigation(confirmedStartable)
+        }
         onSelectRoute={setSelectedDirectionsRoute}
       />
       <RouteDetailSheet
