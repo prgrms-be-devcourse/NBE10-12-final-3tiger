@@ -8,15 +8,6 @@ import type {
 
 export const login = (data: LoginRequest) =>
   apiRequest<AuthTokens>({ url: "/api/v1/auth/login", method: "POST", data });
-export const socialLogin = (
-  provider: "kakao" | "google",
-  authorizationCode: string,
-) =>
-  apiRequest<AuthTokens>({
-    url: `/api/v1/auth/oauth/${provider}/login`,
-    method: "POST",
-    data: { authorizationCode },
-  });
 export const logout = (refreshToken: string) =>
   apiRequest<null>({
     url: "/api/v1/auth/logout",
