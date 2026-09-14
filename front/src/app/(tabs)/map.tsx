@@ -68,6 +68,31 @@ const smoothHeading = (previous: number | null, next: number) => {
   return (previous + delta * 0.3 + 360) % 360;
 };
 
+const weatherAppearance = (
+  code: number | null,
+  isDay: boolean | null,
+): {
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  partlyCloudy?: boolean;
+} => {
+  const cloudColor = "#CBD5E1";
+  if (code == null) return { icon: "cloud-outline", color: cloudColor };
+  if (code === 0)
+    return {
+      icon: isDay === false ? "moon" : "sunny",
+      color: isDay === false ? "#CBD5E1" : "#F5A623",
+    };
+  if (code <= 2)
+    return { icon: "partly-sunny", color: "#F5A623", partlyCloudy: true };
+  if (code === 3 || code === 45 || code === 48)
+    return { icon: "cloudy", color: cloudColor };
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86)
+    return { icon: "snow", color: "#3B82F6" };
+  if (code >= 95) return { icon: "thunderstorm", color: "#7C3AED" };
+  return { icon: "rainy", color: "#2563EB" };
+};
+
 type Coordinates = {
   latitude: number;
   longitude: number;
@@ -274,18 +299,38 @@ export default function MapScreen() {
     }
     return null;
   }, [regionBounds, mapCenter]);
+  const weatherCoordinates =
+    currentCoordinates ??
+    (activeRegion
+      ? {
+          latitude: activeRegion.centerLat,
+          longitude: activeRegion.centerLng,
+        }
+      : null);
   const weatherQuery = useQuery({
-    queryKey: ["weather", activeRegion?.regionCode ?? "none"],
+    queryKey: [
+      "weather",
+      weatherCoordinates?.latitude.toFixed(2) ?? "none",
+      weatherCoordinates?.longitude.toFixed(2) ?? "none",
+    ],
     queryFn: () =>
-      activeRegion
-        ? getWeatherSnapshot(activeRegion.centerLat, activeRegion.centerLng)
+      weatherCoordinates
+        ? getWeatherSnapshot(
+            weatherCoordinates.latitude,
+            weatherCoordinates.longitude,
+          )
         : Promise.resolve(null),
-    enabled: !!activeRegion,
+    enabled: weatherCoordinates !== null,
     staleTime: 10 * 60 * 1000,
   });
   const upcomingWeather = activeRegion
     ? (weatherQuery.data?.upcoming ?? null)
     : null;
+  const currentWeather = weatherQuery.data;
+  const currentWeatherAppearance = weatherAppearance(
+    currentWeather?.currentWeatherCode ?? null,
+    currentWeather?.isDay ?? null,
+  );
   const upcomingBannerText =
     upcomingWeather && activeRegion
       ? (() => {
@@ -842,11 +887,49 @@ export default function MapScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerClassName="gap-2 pt-3 pr-[18px]"
         >
-          <View className="h-[38px] flex-row items-center gap-1 rounded-full bg-[#E9FBEF] px-3 dark:bg-[#24382B]">
-            <Ionicons name="location" size={16} color="#087A3F" />
-            <Text className="text-[13px] font-bold text-[#24372A] dark:text-[#D4DDD6]">
-              내 주변
-            </Text>
+          <View className="items-start gap-1.5">
+            <View className="h-[38px] flex-row items-center gap-1 rounded-full bg-[#E9FBEF] px-3 dark:bg-[#24382B]">
+              <Ionicons name="location" size={16} color="#087A3F" />
+              <Text className="text-[13px] font-bold text-[#24372A] dark:text-[#D4DDD6]">
+                내 주변
+              </Text>
+            </View>
+            {weatherQuery.isPending && weatherCoordinates ? (
+              <View className="h-[58px] w-10 items-center justify-center rounded-xl bg-white shadow-sm dark:bg-[#1B211D]">
+                <ActivityIndicator size="small" color="#64748B" />
+              </View>
+            ) : currentWeather?.currentTemperatureC != null ? (
+              <View
+                accessibilityLabel={`현재 날씨, 기온 ${Math.round(currentWeather.currentTemperatureC)}도`}
+                className="h-[58px] w-10 items-center justify-center rounded-xl bg-white shadow-sm dark:bg-[#1B211D]"
+              >
+                {currentWeatherAppearance.partlyCloudy ? (
+                  <View className="relative h-[23px] w-[27px]">
+                    <Ionicons
+                      name="sunny"
+                      size={17}
+                      color="#F5A623"
+                      style={{ position: "absolute", right: 0, top: 0 }}
+                    />
+                    <Ionicons
+                      name="cloud"
+                      size={19}
+                      color="#CBD5E1"
+                      style={{ position: "absolute", bottom: 0, left: 0 }}
+                    />
+                  </View>
+                ) : (
+                  <Ionicons
+                    name={currentWeatherAppearance.icon}
+                    size={21}
+                    color={currentWeatherAppearance.color}
+                  />
+                )}
+                <Text className="mt-0.5 text-[12px] font-black text-[#24372A] dark:text-[#F1F5F2]">
+                  {Math.round(currentWeather.currentTemperatureC)}°
+                </Text>
+              </View>
+            ) : null}
           </View>
           <Button
             variant="secondary"
