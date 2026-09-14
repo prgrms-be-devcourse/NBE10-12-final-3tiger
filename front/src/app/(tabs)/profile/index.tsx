@@ -20,7 +20,6 @@ import {
   profileBorderStyle,
 } from "@/components/shop/cosmetics";
 import { ErrorState } from "@/components/ui/data-state";
-import { InterestTagsSheet } from "@/components/profile/interest-tags-sheet";
 import { MyScheduleCard } from "@/components/profile/my-schedule-card";
 import { Separator } from "@/components/ui/separator";
 import { WalkHistoryCard } from "@/components/profile/walk-history-card";
@@ -62,7 +61,11 @@ const SECONDARY_MENUS = [
     icon: "bookmark" as const,
     route: "/(tabs)/profile/bookmark",
   },
-  { label: "관심 태그", icon: "pricetag" as const, action: "tags" as const },
+  {
+    label: "받은 알림",
+    icon: "notifications" as const,
+    route: "/notifications",
+  },
   {
     label: "나의 걷기 유형",
     icon: "accessibility" as const,
@@ -76,7 +79,6 @@ export default function ProfileScreen() {
   const [persona, setPersona] = useState("dog");
   const [tags, setTags] = useState<string[]>([]);
   const [walkingTypeOpen, setWalkingTypeOpen] = useState(false);
-  const [interestTagsOpen, setInterestTagsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const profileQuery = useQuery({
     queryKey: ["my-profile"],
@@ -109,11 +111,6 @@ export default function ProfileScreen() {
         personaTags: nextTags,
       });
   };
-  const toggle = (tag: string) =>
-    savePreferences(
-      persona,
-      tags.includes(tag) ? tags.filter((x) => x !== tag) : [...tags, tag],
-    );
   const refreshProfile = async () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
@@ -310,7 +307,6 @@ export default function ProfileScreen() {
                   className="h-10 flex-row items-center justify-start gap-1.5 px-3"
                   onPress={() => {
                     if ("route" in item) router.push(item.route as never);
-                    else if (item.action === "tags") setInterestTagsOpen(true);
                     else setWalkingTypeOpen(true);
                   }}
                 >
@@ -352,13 +348,6 @@ export default function ProfileScreen() {
         pending={profileMutation.isPending}
         onSelect={(nextPersona) => savePreferences(nextPersona, tags)}
         onClose={() => setWalkingTypeOpen(false)}
-      />
-      <InterestTagsSheet
-        open={interestTagsOpen}
-        tags={tags}
-        pending={profileMutation.isPending}
-        onToggle={toggle}
-        onClose={() => setInterestTagsOpen(false)}
       />
     </SafeAreaView>
   );
