@@ -156,6 +156,8 @@ export default function MapScreen() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isDark = useThemeStore((state) => state.isDark);
   const mapRef = useRef<MapView>(null);
+  const mapReadyRef = useRef(false);
+  const pendingRegionRef = useRef<MapRegion | null>(null);
   const mapHeadingFrameRef = useRef<number | null>(null);
   const isAligningHeadingRef = useRef(false);
   const headingAlignmentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -305,6 +307,10 @@ export default function MapScreen() {
       headingAlignmentTimerRef.current = null;
     }
     lastViewedRegionRef.current = next;
+    if (!mapReadyRef.current) {
+      pendingRegionRef.current = next;
+      return;
+    }
     mapRef.current?.animateToRegion(next, 500);
   }, []);
 
@@ -655,6 +661,15 @@ export default function MapScreen() {
         mapType="standard"
         userInterfaceStyle={isDark ? "dark" : "light"}
         mapPadding={{ top: 120, right: 16, bottom: 170, left: 16 }}
+        onMapReady={() => {
+          mapReadyRef.current = true;
+          const pendingRegion = pendingRegionRef.current;
+          if (!pendingRegion) return;
+          pendingRegionRef.current = null;
+          requestAnimationFrame(() => {
+            mapRef.current?.animateToRegion(pendingRegion, 500);
+          });
+        }}
         onPanDrag={() => {
           setIsLocationButtonPrimed(false);
           isAligningHeadingRef.current = false;

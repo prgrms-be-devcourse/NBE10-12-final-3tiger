@@ -17,7 +17,7 @@ import java.util.List;
 @Service
 public class CourseStartDirectionsService {
 
-    private static final int STARTABLE_RADIUS_METERS = 50;
+    private static final int STARTABLE_RADIUS_METERS = 10;
     private static final double EARTH_RADIUS_METERS = 6_371_000;
 
     private final CourseStartPointQueryService startPointQueryService;

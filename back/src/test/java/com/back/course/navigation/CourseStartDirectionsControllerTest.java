@@ -62,7 +62,7 @@ class CourseStartDirectionsControllerTest {
                         DirectionsMode.WALK,
                         DirectionsStatus.ROUTE_AVAILABLE,
                         false,
-                        50,
+                        10,
                         new CourseStartDirectionsResponse.Destination(
                                 "서울식물원 코스 출발점", 37.569, 126.835
                         ),

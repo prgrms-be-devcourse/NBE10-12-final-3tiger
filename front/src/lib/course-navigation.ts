@@ -92,6 +92,7 @@ export const matchRouteProgress = (
   route: LatLng[],
   cumulativeDistances: number[],
   previousSegmentIndex?: number,
+  maximumTraveledDistanceM?: number,
 ): RouteProgress | null => {
   if (route.length < 2 || cumulativeDistances.length !== route.length)
     return null;
@@ -99,10 +100,21 @@ export const matchRouteProgress = (
   const lastSegmentIndex = route.length - 2;
   const searchStart =
     previousSegmentIndex == null ? 0 : Math.max(0, previousSegmentIndex - 8);
-  const searchEnd =
+  let searchEnd =
     previousSegmentIndex == null
       ? lastSegmentIndex
       : Math.min(lastSegmentIndex, previousSegmentIndex + 120);
+  if (maximumTraveledDistanceM != null) {
+    const maximumSegmentIndex = cumulativeDistances.findIndex(
+      (distance) => distance > maximumTraveledDistanceM,
+    );
+    searchEnd = Math.min(
+      searchEnd,
+      maximumSegmentIndex < 0
+        ? lastSegmentIndex
+        : Math.max(0, maximumSegmentIndex - 1),
+    );
+  }
 
   let best:
     | {
