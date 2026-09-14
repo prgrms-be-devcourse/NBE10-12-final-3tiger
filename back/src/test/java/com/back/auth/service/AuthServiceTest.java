@@ -257,6 +257,8 @@ class AuthServiceTest {
                                 new KakaoUserInfoResponse.KakaoProfile("홍길동"))));
         given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, "12345"))
                 .willReturn(Optional.empty());
+        given(userRepository.findByEmailAndDeletedAtIsNull("user@kakao.com"))
+                .willReturn(Optional.empty());
         User saved = mock(User.class);
         given(saved.getId()).willReturn(2L);
         given(userRepository.save(any(User.class))).willReturn(saved);
@@ -270,6 +272,50 @@ class AuthServiceTest {
 
         assertThat(result.accessToken()).isEqualTo("at");
         assertThat(result.isNewUser()).isTrue();
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void oauthLogin_카카오_신규유저_이메일중복_EMAIL_ALREADY_EXISTS() {
+        given(kakaoClient.exchangeToken("auth-code")).willReturn(new KakaoTokenResponse("kakao-at"));
+        given(kakaoClient.getUserInfo("kakao-at")).willReturn(
+                new KakaoUserInfoResponse(12345L,
+                        new KakaoUserInfoResponse.KakaoAccount("dup@test.com",
+                                new KakaoUserInfoResponse.KakaoProfile("홍길동"))));
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, "12345"))
+                .willReturn(Optional.empty());
+        given(userRepository.findByEmailAndDeletedAtIsNull("dup@test.com"))
+                .willReturn(Optional.of(mock(User.class)));
+
+        assertThatThrownBy(() -> authService.oauthLogin("kakao", "auth-code"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.EMAIL_ALREADY_EXISTS);
+
+        verify(userRepository, never()).save(any(User.class));
+    }
+
+    @Test
+    void oauthLogin_카카오_신규유저_이메일null_이메일체크생략() {
+        given(kakaoClient.exchangeToken("auth-code")).willReturn(new KakaoTokenResponse("kakao-at"));
+        given(kakaoClient.getUserInfo("kakao-at")).willReturn(
+                new KakaoUserInfoResponse(12345L,
+                        new KakaoUserInfoResponse.KakaoAccount(null,
+                                new KakaoUserInfoResponse.KakaoProfile("홍길동"))));
+        given(userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, "12345"))
+                .willReturn(Optional.empty());
+        User saved = mock(User.class);
+        given(saved.getId()).willReturn(2L);
+        given(userRepository.save(any(User.class))).willReturn(saved);
+        given(redisTemplate.opsForValue()).willReturn(valueOps);
+        given(jwtProvider.generateAccessToken(2L)).willReturn("at");
+        given(jwtProvider.generateRefreshToken(2L)).willReturn("rt");
+        given(jwtProvider.getJti("rt")).willReturn("jti-uuid");
+        given(jwtProvider.getRefreshTokenExpiry()).willReturn(1209600L);
+
+        assertThatCode(() -> authService.oauthLogin("kakao", "auth-code")).doesNotThrowAnyException();
+
+        verify(userRepository, never()).findByEmailAndDeletedAtIsNull(anyString());
         verify(userRepository).save(any(User.class));
     }
 

@@ -106,7 +106,16 @@ public class AuthService {
 
         Optional<User> existing = userRepository.findByProviderAndProviderUidAndDeletedAtIsNull(Provider.KAKAO, providerUid);
         boolean isNewUser = existing.isEmpty();
-        User user = existing.orElseGet(() -> userRepository.save(User.createKakao(providerUid, email, nickname)));
+
+        User user;
+        if (existing.isPresent()) {
+            user = existing.get();
+        } else {
+            if (email != null && userRepository.findByEmailAndDeletedAtIsNull(email).isPresent()) {
+                throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
+            }
+            user = userRepository.save(User.createKakao(providerUid, email, nickname));
+        }
 
         return issueTokens(user.getId(), isNewUser);
     }
