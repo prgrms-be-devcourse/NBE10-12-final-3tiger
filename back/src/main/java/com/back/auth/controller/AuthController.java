@@ -54,8 +54,9 @@ public class AuthController {
                     .location(URI.create(location))
                     .build();
         } catch (Exception e) {
+            String message = e.getMessage() != null ? e.getMessage() : "알 수 없는 오류가 발생했습니다";
             String location = "front://oauth-callback?error="
-                    + URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8);
+                    + URLEncoder.encode(message, StandardCharsets.UTF_8);
             return ResponseEntity.status(HttpStatus.FOUND)
                     .location(URI.create(location))
                     .build();
