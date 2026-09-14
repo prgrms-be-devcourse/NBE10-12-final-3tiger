@@ -50,6 +50,7 @@ public class AuthService {
         return issueTokens(user.getId(), false);
     }
 
+    @Transactional(readOnly = true)
     public AuthResponse refresh(String refreshToken) {
         Claims claims;
         try {
