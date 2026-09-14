@@ -5,6 +5,10 @@ import com.back.global.exception.ErrorCode;
 import com.back.place.kakao.dto.KakaoPlaceSearchResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -53,5 +57,50 @@ class KakaoPlaceClientTest {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(ErrorCode.KAKAO_PLACE_SEARCH_FAILED));
+    }
+
+    @Test
+    void convertsHttp429ToRateLimitError() {
+        given(responseSpec.body(KakaoPlaceSearchResponse.class))
+                .willThrow(HttpClientErrorException.create(
+                        HttpStatus.TOO_MANY_REQUESTS,
+                        "Too Many Requests",
+                        null,
+                        null,
+                        null
+                ));
+
+        assertThatThrownBy(() -> client.search("서울식물원", 15))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.PLACE_SEARCH_RATE_LIMIT_EXCEEDED));
+    }
+
+    @Test
+    void convertsHttp5xxToExternalUnavailableError() {
+        given(responseSpec.body(KakaoPlaceSearchResponse.class))
+                .willThrow(HttpServerErrorException.create(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Service Unavailable",
+                        null,
+                        null,
+                        null
+                ));
+
+        assertThatThrownBy(() -> client.search("서울식물원", 15))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.EXTERNAL_API_TEMPORARILY_UNAVAILABLE));
+    }
+
+    @Test
+    void convertsResourceAccessExceptionToExternalUnavailableError() {
+        given(responseSpec.body(KakaoPlaceSearchResponse.class))
+                .willThrow(new ResourceAccessException("connect timed out"));
+
+        assertThatThrownBy(() -> client.search("서울식물원", 15))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode())
+                                .isEqualTo(ErrorCode.EXTERNAL_API_TEMPORARILY_UNAVAILABLE));
     }
 }
