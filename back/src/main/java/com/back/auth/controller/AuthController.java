@@ -3,7 +3,6 @@ package com.back.auth.controller;
 import com.back.auth.dto.AuthResponse;
 import com.back.auth.dto.LoginRequest;
 import com.back.auth.dto.LogoutRequest;
-import com.back.auth.dto.OAuthLoginRequest;
 import com.back.auth.dto.RefreshRequest;
 import com.back.auth.service.AuthService;
 import com.back.global.api.ApiResponse;
@@ -41,15 +40,6 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request.refreshToken());
         return ResponseEntity.ok(ApiResponse.ok("로그아웃이 완료되었습니다.", null));
-    }
-
-    @PostMapping("/oauth/{provider}/login")
-    public ResponseEntity<ApiResponse<AuthResponse>> oauthLogin(
-            @PathVariable String provider,
-            @Valid @RequestBody OAuthLoginRequest request
-    ) {
-        AuthResponse response = authService.oauthLogin(provider, request.authorizationCode());
-        return ResponseEntity.ok(ApiResponse.ok("소셜 로그인이 완료되었습니다.", response));
     }
 
     @GetMapping("/kakao/callback")

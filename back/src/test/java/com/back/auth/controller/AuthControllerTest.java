@@ -3,7 +3,6 @@ package com.back.auth.controller;
 import com.back.auth.dto.AuthResponse;
 import com.back.auth.dto.LoginRequest;
 import com.back.auth.dto.LogoutRequest;
-import com.back.auth.dto.OAuthLoginRequest;
 import com.back.auth.service.AuthService;
 import com.back.global.auth.CurrentUserIdResolver;
 import com.back.global.config.PasswordEncoderConfig;
@@ -112,48 +111,4 @@ class AuthControllerTest extends RateLimitWebMvcTestSupport {
                 .andExpect(status().isBadRequest());
     }
 
-    @Test
-    void oauthLogin_카카오_성공_200() throws Exception {
-        given(authService.oauthLogin("kakao", "valid-code"))
-                .willReturn(new AuthResponse("at", "rt", false));
-
-        mvc.perform(post("/api/v1/auth/oauth/kakao/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new OAuthLoginRequest("valid-code"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.accessToken").value("at"))
-                .andExpect(jsonPath("$.message").value("소셜 로그인이 완료되었습니다."));
-    }
-
-    @Test
-    void oauthLogin_카카오_신규유저_isNewUser_true() throws Exception {
-        given(authService.oauthLogin("kakao", "new-user-code"))
-                .willReturn(new AuthResponse("at", "rt", true));
-
-        mvc.perform(post("/api/v1/auth/oauth/kakao/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new OAuthLoginRequest("new-user-code"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.isNewUser").value(true));
-    }
-
-    @Test
-    void oauthLogin_authorizationCode_없음_400() throws Exception {
-        mvc.perform(post("/api/v1/auth/oauth/kakao/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void oauthLogin_지원안하는provider_400() throws Exception {
-        given(authService.oauthLogin("apple", "some-code"))
-                .willThrow(new BusinessException(ErrorCode.INVALID_PROVIDER));
-
-        mvc.perform(post("/api/v1/auth/oauth/apple/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new OAuthLoginRequest("some-code"))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("AUTH_400_1"));
-    }
 }
