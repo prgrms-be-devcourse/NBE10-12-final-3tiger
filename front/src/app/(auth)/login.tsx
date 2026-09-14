@@ -17,13 +17,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { login, socialLogin } from "@/api/auth-api";
+import { API_BASE_URL } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useAuthStore } from "@/stores/auth-store";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const KAKAO_BACKEND_REDIRECT_URI = "http://3.38.196.152:8080/api/v1/auth/kakao/callback";
+// EC2 인스턴스는 stop/start 시 퍼블릭 IP가 바뀌므로 하드코딩 금지
+const KAKAO_BACKEND_REDIRECT_URI = `${API_BASE_URL}/api/v1/auth/kakao/callback`;
 const GOOGLE_REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: "front" });
 
 export default function LoginScreen() {
