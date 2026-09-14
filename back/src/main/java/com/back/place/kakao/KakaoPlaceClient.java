@@ -5,7 +5,10 @@ import com.back.global.exception.ErrorCode;
 import com.back.place.kakao.dto.KakaoPlaceSearchResponse;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -40,10 +43,26 @@ public class KakaoPlaceClient {
             }
 
             return response;
+        } catch (HttpStatusCodeException exception) {
+            throw new BusinessException(mapHttpStatus(exception.getStatusCode()));
+        } catch (ResourceAccessException exception) {
+            throw new BusinessException(
+                    ErrorCode.EXTERNAL_API_TEMPORARILY_UNAVAILABLE
+            );
         } catch (RestClientException exception) {
             throw new BusinessException(
                     ErrorCode.KAKAO_PLACE_SEARCH_FAILED
             );
         }
+    }
+
+    private ErrorCode mapHttpStatus(HttpStatusCode status) {
+        if (status.value() == 429) {
+            return ErrorCode.PLACE_SEARCH_RATE_LIMIT_EXCEEDED;
+        }
+        if (status.is5xxServerError()) {
+            return ErrorCode.EXTERNAL_API_TEMPORARILY_UNAVAILABLE;
+        }
+        return ErrorCode.KAKAO_PLACE_SEARCH_FAILED;
     }
 }

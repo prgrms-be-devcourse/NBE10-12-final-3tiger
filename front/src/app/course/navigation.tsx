@@ -69,8 +69,9 @@ const LOOP_START_SEARCH_DISTANCE_M = 80;
 const LOOP_START_ROUTE_TOLERANCE_M = 12;
 const OFF_ROUTE_DISTANCE_M = 30;
 const OFF_ROUTE_SAMPLE_COUNT = 3;
-const COMPLETION_REMAINING_M = 20;
-const COMPLETION_END_DISTANCE_M = 30;
+const COMPLETION_REMAINING_M = 8;
+const COMPLETION_END_DISTANCE_M = 12;
+const COMPLETION_SAMPLE_COUNT = 2;
 const HEADING_DEAD_ZONE_DEGREES = 3;
 const HEADING_SMOOTHING_FACTOR = 0.25;
 
@@ -925,6 +926,7 @@ export default function CourseNavigationScreen() {
   const loopStartLockedRef = useRef(false);
   const wrongDirectionAnnouncedRef = useRef(false);
   const offRouteSamplesRef = useRef(0);
+  const completionSamplesRef = useRef(0);
   const hasFitRouteRef = useRef(false);
   const [mapReady, setMapReady] = useState(false);
   const [showDirectionsMarkers, setShowDirectionsMarkers] = useState(false);
@@ -1295,11 +1297,17 @@ export default function CourseNavigationScreen() {
     }
     setIsOffRoute(offRouteSamplesRef.current >= OFF_ROUTE_SAMPLE_COUNT);
 
-    if (
-      endPoint &&
+    const meetsCompletionThreshold =
+      !!endPoint &&
+      reliableLocation &&
       nextProgress.remainingDistanceM <= COMPLETION_REMAINING_M &&
-      distanceMeters(userLocation, endPoint) <= COMPLETION_END_DISTANCE_M
-    ) {
+      distanceMeters(userLocation, endPoint) <= COMPLETION_END_DISTANCE_M;
+    if (meetsCompletionThreshold) {
+      completionSamplesRef.current += 1;
+    } else {
+      completionSamplesRef.current = 0;
+    }
+    if (completionSamplesRef.current >= COMPLETION_SAMPLE_COUNT) {
       setIsCompleted(true);
       setNavigationStarted(false);
       void stopGuidanceServices();
@@ -1461,6 +1469,7 @@ export default function CourseNavigationScreen() {
       loopStartLockedRef.current = navigationQuery.data?.isLoop ?? false;
       wrongDirectionAnnouncedRef.current = false;
       offRouteSamplesRef.current = 0;
+      completionSamplesRef.current = 0;
       setProgress(initialProgress);
       setIsOffRoute(false);
       setIsWrongDirectionAtStart(false);

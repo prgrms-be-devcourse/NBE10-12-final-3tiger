@@ -55,6 +55,10 @@ export function getPlaceSearchErrorMessage(error: unknown) {
     return "검색 요청이 많아요. 잠시 후 다시 검색해 주세요.";
   }
 
+  if (error.resultCode === "PLACE_502_1") {
+    return "장소 검색 서비스에 일시적인 오류가 발생했어요. 잠시 후 다시 시도해 주세요.";
+  }
+
   if (error.status === undefined) {
     return "장소를 검색하지 못했어요. 네트워크 연결을 확인해 주세요.";
   }

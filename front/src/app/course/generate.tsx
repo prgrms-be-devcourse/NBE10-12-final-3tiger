@@ -383,7 +383,7 @@ export default function CourseGenerateScreen() {
         list.length === 0
           ? mode === "oneway"
             ? "두 지점을 잇는 도보 경로를 찾지 못했어요. 도착지를 조금 옮겨 보세요."
-            : "이 조건으로 만들 수 있는 코스가 없어요. 거리나 페르소나를 바꿔 보세요."
+            : "이 위치에서는 코스를 만들 수 없어요. 출발지를 조금 옮기거나 거리·페르소나를 바꿔 보세요."
           : null,
       );
     },
