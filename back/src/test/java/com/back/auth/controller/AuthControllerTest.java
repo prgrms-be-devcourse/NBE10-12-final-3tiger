@@ -24,10 +24,15 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -109,6 +114,18 @@ class AuthControllerTest extends RateLimitWebMvcTestSupport {
                         .content(objectMapper.writeValueAsString(
                                 new LogoutRequest(""))))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void kakaoCallback_예외메시지null_기본메시지로_302리다이렉트() throws Exception {
+        given(authService.oauthLogin("kakao", "any-code"))
+                .willThrow(new RuntimeException());
+
+        String expectedError = URLEncoder.encode("알 수 없는 오류가 발생했습니다", StandardCharsets.UTF_8);
+
+        mvc.perform(get("/api/v1/auth/kakao/callback").param("code", "any-code"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "front://oauth-callback?error=" + expectedError));
     }
 
 }
