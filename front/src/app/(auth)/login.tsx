@@ -38,6 +38,7 @@ export default function LoginScreen() {
       {
         clientId: process.env.EXPO_PUBLIC_KAKAO_CLIENT_ID ?? "",
         redirectUri: KAKAO_BACKEND_REDIRECT_URI,
+        usePKCE: false,
       },
       { authorizationEndpoint: "https://kauth.kakao.com/oauth/authorize" },
     );

@@ -5,6 +5,7 @@ import com.back.auth.kakao.dto.KakaoUserInfoResponse;
 import com.back.global.exception.BusinessException;
 import com.back.global.exception.ErrorCode;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatusCode;
@@ -16,6 +17,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+@Slf4j
 @Component
 public class KakaoClient {
 
@@ -53,6 +55,7 @@ public class KakaoClient {
             }
             return response;
         } catch (RestClientResponseException e) {
+            log.warn("카카오 토큰 교환 실패: status={} body={}", e.getStatusCode(), e.getResponseBodyAsString());
             throw authenticationException(
                     e.getStatusCode(),
                     ErrorCode.INVALID_AUTHORIZATION_CODE
