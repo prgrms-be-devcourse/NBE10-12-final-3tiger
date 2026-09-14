@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { login, socialLogin } from "@/api/auth-api";
+import { login } from "@/api/auth-api";
 import { API_BASE_URL } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
@@ -26,7 +26,6 @@ WebBrowser.maybeCompleteAuthSession();
 
 // EC2 인스턴스는 stop/start 시 퍼블릭 IP가 바뀌므로 하드코딩 금지
 const KAKAO_BACKEND_REDIRECT_URI = `${API_BASE_URL}/api/v1/auth/kakao/callback`;
-const GOOGLE_REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: "front" });
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -44,32 +43,8 @@ export default function LoginScreen() {
       { authorizationEndpoint: "https://kauth.kakao.com/oauth/authorize" },
     );
 
-  const [googleRequest, googleResponse, googlePromptAsync] =
-    AuthSession.useAuthRequest(
-      {
-        clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? "",
-        redirectUri: GOOGLE_REDIRECT_URI,
-        scopes: ["openid", "profile", "email"],
-      },
-      { authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth" },
-    );
-
   const loginMutation = useMutation({
     mutationFn: login,
-    onSuccess: async (tokens) => {
-      await saveTokens(tokens);
-      router.replace("/(tabs)/map" as never);
-    },
-  });
-
-  const socialLoginMutation = useMutation({
-    mutationFn: ({
-      provider,
-      code,
-    }: {
-      provider: "kakao" | "google";
-      code: string;
-    }) => socialLogin(provider, code),
     onSuccess: async (tokens) => {
       await saveTokens(tokens);
       router.replace("/(tabs)/map" as never);
@@ -82,10 +57,7 @@ export default function LoginScreen() {
       if (path !== "oauth-callback") return;
 
       const params = queryParams as Record<string, string>;
-      if (params.error) {
-        socialLoginMutation.reset();
-        return;
-      }
+      if (params.error) return;
       if (params.accessToken && params.refreshToken) {
         saveTokens({
           accessToken: params.accessToken,
@@ -96,15 +68,6 @@ export default function LoginScreen() {
     });
     return () => subscription.remove();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-useEffect(() => {
-  if (googleResponse?.type === "success") {
-    socialLoginMutation.mutate({
-      provider: "google",
-      code: googleResponse.params.code,
-    });
-  }
-}, [googleResponse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFocusEffect(
     useCallback(() => {
@@ -183,9 +146,9 @@ useEffect(() => {
               />
             </Pressable>
           </View>
-          {(loginMutation.isError || socialLoginMutation.isError) && (
+          {loginMutation.isError && (
             <Text className="mt-3 text-sm text-destructive">
-              {loginMutation.error?.message ?? socialLoginMutation.error?.message}
+              {loginMutation.error?.message}
             </Text>
           )}
           <Button
@@ -217,22 +180,10 @@ useEffect(() => {
           <Button
             variant="secondary"
             className="mb-2.5 h-[54px] rounded-xl bg-[#FEE500]"
-            disabled={!kakaoRequest || socialLoginMutation.isPending}
+            disabled={!kakaoRequest}
             onPress={() => kakaoPromptAsync()}
           >
-            <Text className="font-extrabold text-black">
-              {socialLoginMutation.isPending ? "로그인 중..." : "카카오로 시작하기"}
-            </Text>
-          </Button>
-          <Button
-            variant="secondary"
-            className="mb-2.5 h-[54px] rounded-xl bg-white dark:bg-[#1B211D]"
-            disabled={!googleRequest || socialLoginMutation.isPending}
-            onPress={() => googlePromptAsync()}
-          >
-            <Text className="font-extrabold text-black">
-              {socialLoginMutation.isPending ? "로그인 중..." : "G　Google로 시작하기"}
-            </Text>
+            <Text className="font-extrabold text-black">카카오로 시작하기</Text>
           </Button>
           <View className="mt-5 flex-row justify-center">
             <Text className="text-[13px] text-slate-500 dark:text-[#AAB5AD]">
