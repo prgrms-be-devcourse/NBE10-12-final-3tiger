@@ -2,13 +2,17 @@ package com.back.course.repository;
 
 import com.back.course.dto.GeoJsonLineString;
 import com.back.course.map.domain.CourseMapImageStatus;
+import com.back.global.exception.BusinessException;
+import com.back.global.exception.ErrorCode;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +20,10 @@ import java.util.Optional;
 
 @Repository
 public class CourseGenerationRepository {
+
+    /** routing.generate_only 계열에서 사용자 지점이 도보 그래프에서 너무 멀 때 발생시키는 SQLSTATE. */
+    private static final String SQLSTATE_OFF_ROAD_START = "P1001";
+    private static final String SQLSTATE_OFF_ROAD_END = "P1002";
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -32,7 +40,12 @@ public class CourseGenerationRepository {
                 SELECT path_geojson, total_m, avg_score, error_pct, region_code
                   FROM routing.generate_only(?, ?, ?, ?, ?, ?)
                 """;
-        List<Map<String, Object>> rows = jdbc.queryForList(sql, lng, lat, targetM, at, candidateIdx, persona);
+        List<Map<String, Object>> rows;
+        try {
+            rows = jdbc.queryForList(sql, lng, lat, targetM, at, candidateIdx, persona);
+        } catch (DataAccessException e) {
+            throw translateRoutingException(e);
+        }
         if (rows.isEmpty()) return Optional.empty();
         Map<String, Object> r = rows.get(0);
         if (r.get("path_geojson") == null) return Optional.empty();
@@ -63,8 +76,13 @@ public class CourseGenerationRepository {
                 SELECT path_geojson, total_m, avg_score, region_code
                   FROM routing.generate_oneway_only(?, ?, ?, ?, ?, ?)
                 """;
-        List<Map<String, Object>> rows = jdbc.queryForList(sql,
-                startLng, startLat, endLng, endLat, at, persona);
+        List<Map<String, Object>> rows;
+        try {
+            rows = jdbc.queryForList(sql,
+                    startLng, startLat, endLng, endLat, at, persona);
+        } catch (DataAccessException e) {
+            throw translateRoutingException(e);
+        }
         if (rows.isEmpty()) return Optional.empty();
         Map<String, Object> r = rows.get(0);
         if (r.get("path_geojson") == null) return Optional.empty();
@@ -163,6 +181,33 @@ public class CourseGenerationRepository {
                 status.name(),
                 courseId
         );
+    }
+
+    /**
+     * routing.generate_* 함수의 커스텀 SQLSTATE (P1001/P1002) 예외를 도메인 예외로 변환.
+     * 이외의 예외는 그대로 재던져 GlobalExceptionHandler 가 처리하도록 둔다.
+     */
+    private RuntimeException translateRoutingException(DataAccessException e) {
+        SQLException sqlException = findSqlException(e);
+        if (sqlException != null) {
+            String sqlState = sqlException.getSQLState();
+            if (SQLSTATE_OFF_ROAD_START.equals(sqlState)) {
+                return new BusinessException(ErrorCode.COURSE_START_POINT_OFF_ROAD);
+            }
+            if (SQLSTATE_OFF_ROAD_END.equals(sqlState)) {
+                return new BusinessException(ErrorCode.COURSE_END_POINT_OFF_ROAD);
+            }
+        }
+        return e;
+    }
+
+    private SQLException findSqlException(Throwable t) {
+        Throwable cursor = t;
+        while (cursor != null) {
+            if (cursor instanceof SQLException sqlException) return sqlException;
+            cursor = cursor.getCause();
+        }
+        return null;
     }
 
     public record GenerateRow(GeoJsonLineString path, Integer totalM, BigDecimal avgScore,
