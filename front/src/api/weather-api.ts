@@ -7,6 +7,9 @@ export type WeatherAlert = {
 
 export type WeatherSnapshot = {
   current: PrecipitationType | null;
+  currentTemperatureC: number | null;
+  currentWeatherCode: number | null;
+  isDay: boolean | null;
   upcoming: WeatherAlert | null;
 };
 
@@ -15,6 +18,9 @@ type OpenMeteoResponse = {
     time?: string;
     precipitation?: number;
     snowfall?: number;
+    temperature_2m?: number;
+    weather_code?: number;
+    is_day?: number;
   };
   hourly?: {
     time?: string[];
@@ -28,7 +34,7 @@ const FORECAST_HOURS = 6;
 const buildUrl = (lat: number, lng: number) =>
   "https://api.open-meteo.com/v1/forecast" +
   `?latitude=${lat}&longitude=${lng}` +
-  "&current=precipitation,snowfall" +
+  "&current=precipitation,snowfall,temperature_2m,weather_code,is_day" +
   "&hourly=precipitation,snowfall" +
   `&forecast_hours=${FORECAST_HOURS}` +
   "&timezone=Asia%2FSeoul";
@@ -70,6 +76,9 @@ export async function getWeatherSnapshot(
   const data = (await response.json()) as OpenMeteoResponse;
   return {
     current: pickCurrent(data),
+    currentTemperatureC: data.current?.temperature_2m ?? null,
+    currentWeatherCode: data.current?.weather_code ?? null,
+    isDay: data.current?.is_day == null ? null : data.current.is_day === 1,
     upcoming: pickUpcoming(data),
   };
 }
