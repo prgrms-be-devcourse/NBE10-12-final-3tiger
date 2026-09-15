@@ -1,5 +1,5 @@
 import { Fragment, useMemo } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { Marker, Polyline, type LatLng } from "react-native-maps";
 import Svg, { Path } from "react-native-svg";
 
@@ -10,7 +10,14 @@ type CourseRouteOverlayProps = {
   color?: string;
   mapHeading?: number;
   zIndex?: number;
+  showEndpoints?: boolean;
 };
+
+const ENDPOINT_COLORS = {
+  start: "#087A3F",
+  end: "#F97316",
+  loop: "#365F49",
+} as const;
 
 const lightenColor = (hex: string, amount = 0.58) => {
   const value = hex.replace("#", "");
@@ -85,6 +92,7 @@ export function CourseRouteOverlay({
   color = "#087A3F",
   mapHeading = 0,
   zIndex = 10,
+  showEndpoints = false,
 }: CourseRouteOverlayProps) {
   const arrows = useMemo(() => {
     const totalLength = coordinates
@@ -108,6 +116,37 @@ export function CourseRouteOverlay({
   }, [coordinates]);
 
   if (coordinates.length < 2) return null;
+
+  const start = coordinates[0];
+  const end = coordinates[coordinates.length - 1];
+  const isLoop = distanceMeters(start, end) <= 20;
+
+  const endpointMarker = (
+    coordinate: LatLng,
+    label: string,
+    backgroundColor: string,
+    key: string,
+  ) => (
+    <Marker
+      key={key}
+      coordinate={coordinate}
+      anchor={{ x: 0.5, y: 1 }}
+      zIndex={zIndex + 5}
+    >
+      <View className="items-center">
+        <View
+          className="rounded-full border-2 border-white px-2.5 py-1 shadow-md"
+          style={{ backgroundColor }}
+        >
+          <Text className="text-[11px] font-black text-white">{label}</Text>
+        </View>
+        <View
+          className="-mt-0.5 h-2.5 w-2.5 rotate-45 border-b-2 border-r-2 border-white"
+          style={{ backgroundColor }}
+        />
+      </View>
+    </Marker>
+  );
 
   return (
     <Fragment>
@@ -167,6 +206,19 @@ export function CourseRouteOverlay({
           </View>
         </Marker>
       ))}
+      {showEndpoints && isLoop
+        ? endpointMarker(start, "출발·도착", ENDPOINT_COLORS.loop, "loop-point")
+        : showEndpoints
+          ? [
+              endpointMarker(
+                start,
+                "출발",
+                ENDPOINT_COLORS.start,
+                "start-point",
+              ),
+              endpointMarker(end, "도착", ENDPOINT_COLORS.end, "end-point"),
+            ]
+          : null}
     </Fragment>
   );
 }
