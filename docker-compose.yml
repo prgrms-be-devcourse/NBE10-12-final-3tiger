@@ -65,6 +65,8 @@ services:
       - ./docker/149-walk-reservation-reminder.sh:/docker-entrypoint-initdb.d/149-walk-reservation-reminder.sh:ro
       - ./docker/150-course-road-snap-validation.sql:/tmp/course-road-snap-validation.sql:ro
       - ./docker/150-course-road-snap-validation.sh:/docker-entrypoint-initdb.d/150-course-road-snap-validation.sh:ro
+      - ./docker/151-loop-route-ordering.sql:/tmp/loop-route-ordering.sql:ro
+      - ./docker/151-loop-route-ordering.sh:/docker-entrypoint-initdb.d/151-loop-route-ordering.sh:ro
       - ./docker/21_persona_weight.sql:/tmp/persona/21_persona_weight.sql:ro
       - ./docker/22_persona_course_scores.sql:/tmp/persona/22_persona_course_scores.sql:ro
       - ./docker/23_persona_edge_costs.sql:/tmp/persona/23_persona_edge_costs.sql:ro
