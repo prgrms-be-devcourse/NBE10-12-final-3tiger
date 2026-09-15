@@ -57,10 +57,6 @@ export default function ProfileBookmarkScreen() {
     dismissBottomSheet(sheetTranslateY, windowHeight, () =>
       setSelectedId(null),
     );
-  useEffect(() => {
-    if (!isAuthenticated) router.replace("/(auth)/login" as never);
-  }, [isAuthenticated]);
-
   const bookmarksQuery = useInfiniteQuery({
     queryKey: ["bookmarks"],
     queryFn: ({ pageParam }) => getMyBookmarks({ page: pageParam, size: 20 }),
@@ -169,6 +165,32 @@ export default function ProfileBookmarkScreen() {
     setSelectedId(null);
     setTimeout(() => router.push(`/course/${courseId}` as never), 300);
   };
+
+  if (!isAuthenticated)
+    return (
+      <SafeAreaView
+        className="flex-1 items-center justify-center bg-[#F8FAFB] px-6 dark:bg-[#111411]"
+        edges={["top"]}
+      >
+        <View className="w-full max-w-md items-center rounded-3xl bg-white px-6 py-9 shadow-sm dark:bg-[#1B211D]">
+          <View className="h-16 w-16 items-center justify-center rounded-full bg-[#E9FBEF] dark:bg-[#24382B]">
+            <Ionicons name="bookmark-outline" size={30} color="#087A3F" />
+          </View>
+          <Text className="mt-5 text-xl font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
+            로그인하고 코스를 저장하세요
+          </Text>
+          <Text className="mt-2 text-center text-sm leading-5 text-slate-500 dark:text-[#AAB5AD]">
+            마음에 드는 산책 코스를 저장하고 한곳에서 관리할 수 있어요.
+          </Text>
+          <Button
+            className="mt-7 h-12 w-full rounded-xl bg-[#087A3F]"
+            onPress={() => router.push("/(auth)/login" as never)}
+          >
+            <Text className="font-extrabold text-white">로그인하기</Text>
+          </Button>
+        </View>
+      </SafeAreaView>
+    );
 
   return (
     <SafeAreaView className="flex-1 bg-white dark:bg-[#111411]" edges={["top"]}>

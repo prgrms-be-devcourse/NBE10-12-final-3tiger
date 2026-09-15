@@ -509,7 +509,8 @@ export default function CourseGenerateScreen() {
     const firstCoord = picked?.path.coordinates?.[0];
     if (!firstCoord) return null;
     const snapped = { latitude: firstCoord[1], longitude: firstCoord[0] };
-    if (haversineMeters(snapped, coords) < START_MARKER_HINT_METERS) return null;
+    if (haversineMeters(snapped, coords) < START_MARKER_HINT_METERS)
+      return null;
     return snapped;
   }, [candidates, coords, selectedIndex]);
 
@@ -618,6 +619,7 @@ export default function CourseGenerateScreen() {
                     coordinates={coordinates}
                     color={baseColor}
                     mapHeading={mapHeading}
+                    showEndpoints
                   />
                 );
               }
@@ -837,7 +839,12 @@ export default function CourseGenerateScreen() {
                       {(candidate.totalM / 1000).toFixed(2)}km
                     </Text>
                     <Text className="mt-0.5 text-[11px] text-[#6B756D] dark:text-[#AAB5AD]">
-                      점수 {Math.min(100, Math.round(Number(candidate.avgScore ?? 0) * 150))}점
+                      점수{" "}
+                      {Math.min(
+                        100,
+                        Math.round(Number(candidate.avgScore ?? 0) * 150),
+                      )}
+                      점
                     </Text>
                   </View>
                   <Ionicons

@@ -579,6 +579,7 @@ export default function CourseScreen() {
             key={`course-route-${selectedId ?? "none"}`}
             coordinates={route}
             mapHeading={mapHeading}
+            showEndpoints
           />
         )}
         {courses.map(

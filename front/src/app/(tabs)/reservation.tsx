@@ -30,6 +30,7 @@ import {
   type CalendarMarker,
 } from "@/components/calendar/monthly-calendar";
 import { localDateKey } from "@/lib/korean-holidays";
+import { useAuthStore } from "@/stores/auth-store";
 import { useThemeStore } from "@/stores/theme-store";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -50,6 +51,7 @@ const formatReservationDate = (value: string) => {
 
 export default function ReservationScreen() {
   const isDark = useThemeStore((state) => state.isDark);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const queryClient = useQueryClient();
   const today = useMemo(() => startOfDay(new Date()), []);
   const [visibleMonth, setVisibleMonth] = useState(
@@ -65,10 +67,12 @@ export default function ReservationScreen() {
   const bookmarksQuery = useQuery({
     queryKey: ["bookmarks", "reservation"],
     queryFn: () => getMyBookmarks({ page: 0, size: 100 }),
+    enabled: isAuthenticated,
   });
   const reservationsQuery = useQuery({
     queryKey: ["walk-reservations"],
     queryFn: () => getMyWalkReservations({ page: 0, size: 100 }),
+    enabled: isAuthenticated,
   });
   const reservations = reservationsQuery.data?.content ?? [];
   const bookmarkedCourses = bookmarksQuery.data?.content ?? [];
@@ -118,7 +122,7 @@ export default function ReservationScreen() {
     setSelectedMinute(value.getMinutes());
   };
   const refreshReservations = async () => {
-    if (isRefreshing) return;
+    if (!isAuthenticated || isRefreshing) return;
     setIsRefreshing(true);
     const startedAt = Date.now();
     try {
@@ -133,6 +137,32 @@ export default function ReservationScreen() {
       setIsRefreshing(false);
     }
   };
+
+  if (!isAuthenticated)
+    return (
+      <SafeAreaView
+        className="flex-1 items-center justify-center bg-[#F8FAFB] px-6 dark:bg-[#111411]"
+        edges={["top"]}
+      >
+        <View className="w-full max-w-md items-center rounded-3xl bg-white px-6 py-9 shadow-sm dark:bg-[#1B211D]">
+          <View className="h-16 w-16 items-center justify-center rounded-full bg-[#DDFBE5] dark:bg-[#24382B]">
+            <Ionicons name="calendar-outline" size={30} color="#087A3F" />
+          </View>
+          <Text className="mt-5 text-xl font-extrabold text-[#191C1D] dark:text-[#F1F5F2]">
+            로그인하고 산책을 예약하세요
+          </Text>
+          <Text className="mt-2 text-center text-sm leading-5 text-[#637064] dark:text-[#AAB5AD]">
+            저장한 코스를 원하는 날짜와 시간에 예약할 수 있어요.
+          </Text>
+          <Button
+            className="mt-7 h-12 w-full rounded-xl bg-[#087A3F]"
+            onPress={() => router.push("/(auth)/login" as never)}
+          >
+            <Text className="font-extrabold text-white">로그인하기</Text>
+          </Button>
+        </View>
+      </SafeAreaView>
+    );
 
   if (reservationsQuery.isError)
     return (

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Image,
+  InteractionManager,
   Pressable,
   ScrollView,
   TextInput,
@@ -74,23 +75,26 @@ export default function SettingsScreen() {
         queryKey: ["notification-setting"],
       }),
   });
+  const finishSignOut = () => {
+    router.dismissAll();
+    requestAnimationFrame(() => {
+      router.replace("/(auth)/login" as never);
+      InteractionManager.runAfterInteractions(() => {
+        void clearSession().finally(() => queryClient.clear());
+      });
+    });
+  };
   const logoutMutation = useMutation({
     mutationFn: () =>
       refreshToken ? logout(refreshToken) : Promise.resolve(null),
     onSettled: async () => {
       await deregisterPushToken();
-      await clearSession();
-      queryClient.clear();
-      router.replace("/(auth)/login" as never);
+      finishSignOut();
     },
   });
   const withdrawMutation = useMutation({
     mutationFn: withdraw,
-    onSuccess: async () => {
-      await clearSession();
-      queryClient.clear();
-      router.replace("/(auth)/login" as never);
-    },
+    onSuccess: finishSignOut,
   });
   useEffect(() => {
     if (profileQuery.data) {

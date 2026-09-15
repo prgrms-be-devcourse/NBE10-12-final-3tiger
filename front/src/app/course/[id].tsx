@@ -3,12 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo } from "react";
 import { Image, Platform, ScrollView, View } from "react-native";
-import MapView, { PROVIDER_GOOGLE, Polyline, type Region } from "react-native-maps";
+import MapView, { PROVIDER_GOOGLE, type Region } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getCourseDetail } from "@/api/course-api";
 import { resolveApiHostUrl } from "@/api/client";
 import { Button } from "@/components/ui/button";
+import { CourseRouteOverlay } from "@/components/map/course-route-overlay";
 import { ErrorState, LoadingState } from "@/components/ui/data-state";
 import { Text } from "@/components/ui/text";
 import { useThemeStore } from "@/stores/theme-store";
@@ -111,17 +112,12 @@ export default function CourseDetailScreen() {
       </View>
       <ScrollView contentContainerClassName="p-5 pb-10">
         <View className="rounded-3xl bg-white p-5 dark:bg-[#1B211D]">
-          {detail.mapImageUrl ? (
-            <Image
-              source={{ uri: resolveApiHostUrl(detail.mapImageUrl) }}
-              className="mb-5 h-[190px] w-full rounded-2xl bg-[#E5EBE5] dark:bg-[#303632]"
-              resizeMode="cover"
-              accessibilityLabel={`${detail.name} 코스 지도`}
-            />
-          ) : mapRegion ? (
+          {mapRegion ? (
             <View className="mb-5 h-[190px] w-full overflow-hidden rounded-2xl bg-[#E5EBE5] dark:bg-[#303632]">
               <MapView
-                provider={Platform.OS === "android" ? PROVIDER_GOOGLE : undefined}
+                provider={
+                  Platform.OS === "android" ? PROVIDER_GOOGLE : undefined
+                }
                 style={{ flex: 1 }}
                 initialRegion={mapRegion}
                 scrollEnabled={false}
@@ -130,13 +126,16 @@ export default function CourseDetailScreen() {
                 rotateEnabled={false}
                 toolbarEnabled={false}
               >
-                <Polyline
-                  coordinates={pathCoords}
-                  strokeColor="#087A3F"
-                  strokeWidth={5}
-                />
+                <CourseRouteOverlay coordinates={pathCoords} showEndpoints />
               </MapView>
             </View>
+          ) : detail.mapImageUrl ? (
+            <Image
+              source={{ uri: resolveApiHostUrl(detail.mapImageUrl) }}
+              className="mb-5 h-[190px] w-full rounded-2xl bg-[#E5EBE5] dark:bg-[#303632]"
+              resizeMode="cover"
+              accessibilityLabel={`${detail.name} 코스 지도`}
+            />
           ) : null}
           <Text className="text-[11px] font-black text-[#087A3F]">
             추천 산책 코스
@@ -163,7 +162,11 @@ export default function CourseDetailScreen() {
           </View>
           {(() => {
             const bars = detail.scoreBars;
-            const personaScore = detail.scoreWalker ?? detail.scoreSenior ?? detail.scoreStroller ?? detail.scoreDog;
+            const personaScore =
+              detail.scoreWalker ??
+              detail.scoreSenior ??
+              detail.scoreStroller ??
+              detail.scoreDog;
             // 실측 raw score 분포가 낮은 편(대부분 0.2~0.5) → 1.5배 boost로 UX 자연스럽게. 100 상한.
             const toPointsBoosted = (v?: number | null) =>
               v == null ? "-" : `${Math.min(100, Math.round(v * 150))}점`;

@@ -67,6 +67,10 @@ const START_PROXIMITY_M = 10;
 const LOOP_START_CONFIRM_DISTANCE_M = 30;
 const LOOP_START_SEARCH_DISTANCE_M = 80;
 const LOOP_START_ROUTE_TOLERANCE_M = 12;
+const LOOP_START_DIRECTION_TIMEOUT_MS = 45_000;
+const LOOP_DIRECTION_MIN_MOVEMENT_M = 3;
+const LOOP_WRONG_DIRECTION_MIN_ANGLE = 120;
+const LOOP_WRONG_DIRECTION_SAMPLE_COUNT = 3;
 const OFF_ROUTE_DISTANCE_M = 30;
 const OFF_ROUTE_SAMPLE_COUNT = 3;
 const COMPLETION_REMAINING_M = 8;
@@ -219,6 +223,9 @@ const bearingDegrees = (from: LatLng, to: LatLng) => {
     Math.sin(fromLatitude) * Math.cos(toLatitude) * Math.cos(longitudeDelta);
   return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 };
+
+const angleDifferenceDegrees = (first: number, second: number) =>
+  Math.abs(((first - second + 540) % 360) - 180);
 
 const getPolylineLength = (coordinates: LatLng[]) =>
   coordinates
@@ -924,6 +931,9 @@ export default function CourseNavigationScreen() {
   const mapHeadingFrameRef = useRef<number | null>(null);
   const previousProgressRef = useRef<RouteProgress | null>(null);
   const loopStartLockedRef = useRef(false);
+  const loopStartTimeRef = useRef<number | null>(null);
+  const loopDirectionLocationRef = useRef<LatLng | null>(null);
+  const wrongDirectionSamplesRef = useRef(0);
   const wrongDirectionAnnouncedRef = useRef(false);
   const offRouteSamplesRef = useRef(0);
   const completionSamplesRef = useRef(0);
@@ -1215,7 +1225,7 @@ export default function CourseNavigationScreen() {
   useEffect(() => {
     if (!navigationStarted || !userLocation || route.length < 2) return;
 
-    const isLoopStartLocked =
+    let isLoopStartLocked =
       (navigationQuery.data?.isLoop ?? false) && loopStartLockedRef.current;
     let nextProgress = matchRouteProgress(
       userLocation,
@@ -1227,20 +1237,80 @@ export default function CourseNavigationScreen() {
     if (!nextProgress) return;
 
     if (isLoopStartLocked) {
+      const directionCheckExpired =
+        loopStartTimeRef.current !== null &&
+        userLocation.timestamp - loopStartTimeRef.current >=
+          LOOP_START_DIRECTION_TIMEOUT_MS;
+
+      if (directionCheckExpired) {
+        loopStartLockedRef.current = false;
+        isLoopStartLocked = false;
+        wrongDirectionSamplesRef.current = 0;
+        wrongDirectionAnnouncedRef.current = false;
+        setIsWrongDirectionAtStart(false);
+        nextProgress =
+          matchRouteProgress(
+            userLocation,
+            route,
+            cumulativeDistances,
+            previousProgressRef.current?.segmentIndex,
+          ) ?? nextProgress;
+      }
+    }
+
+    if (isLoopStartLocked) {
       const startDistance = distanceMeters(userLocation, route[0]);
       const followsOpeningRoute =
         nextProgress.distanceFromRouteM <= LOOP_START_ROUTE_TOLERANCE_M;
+      const expectedDirection = getDirectionPoint(
+        route,
+        Math.max(2, nextProgress.traveledDistanceM),
+        totalDistanceM,
+      );
+      const previousDirectionLocation = loopDirectionLocationRef.current;
+      const movementDistance = previousDirectionLocation
+        ? distanceMeters(previousDirectionLocation, userLocation)
+        : 0;
+      const hasReliableMovement =
+        previousDirectionLocation !== null &&
+        movementDistance >= LOOP_DIRECTION_MIN_MOVEMENT_M;
+      const directionDifference =
+        hasReliableMovement && expectedDirection
+          ? angleDifferenceDegrees(
+              bearingDegrees(previousDirectionLocation, userLocation),
+              expectedDirection.bearing,
+            )
+          : 0;
+      const isMovingBackward =
+        hasReliableMovement &&
+        directionDifference >= LOOP_WRONG_DIRECTION_MIN_ANGLE;
+
+      if (!previousDirectionLocation || hasReliableMovement) {
+        loopDirectionLocationRef.current = userLocation;
+      }
+
       const hasConfirmedForwardDirection =
-        followsOpeningRoute &&
-        nextProgress.traveledDistanceM >= LOOP_START_CONFIRM_DISTANCE_M &&
-        nextProgress.traveledDistanceM <= LOOP_START_SEARCH_DISTANCE_M;
+        !isMovingBackward &&
+        ((followsOpeningRoute &&
+          nextProgress.traveledDistanceM >= LOOP_START_CONFIRM_DISTANCE_M &&
+          nextProgress.traveledDistanceM <= LOOP_START_SEARCH_DISTANCE_M) ||
+          (hasReliableMovement &&
+            directionDifference < 60 &&
+            startDistance >= LOOP_START_CONFIRM_DISTANCE_M));
+      const movingAgainstRouteCandidate =
+        startDistance > START_PROXIMITY_M && isMovingBackward;
+
+      wrongDirectionSamplesRef.current = movingAgainstRouteCandidate
+        ? wrongDirectionSamplesRef.current + 1
+        : 0;
       const movingAgainstRoute =
-        startDistance > START_PROXIMITY_M &&
-        (!followsOpeningRoute ||
-          nextProgress.traveledDistanceM < START_PROXIMITY_M);
+        wrongDirectionSamplesRef.current >= LOOP_WRONG_DIRECTION_SAMPLE_COUNT;
 
       if (hasConfirmedForwardDirection) {
         loopStartLockedRef.current = false;
+        loopStartTimeRef.current = null;
+        loopDirectionLocationRef.current = null;
+        wrongDirectionSamplesRef.current = 0;
         wrongDirectionAnnouncedRef.current = false;
         setIsWrongDirectionAtStart(false);
       } else if (movingAgainstRoute) {
@@ -1262,8 +1332,10 @@ export default function CourseNavigationScreen() {
           progress: 0,
         };
       } else {
-        wrongDirectionAnnouncedRef.current = false;
-        setIsWrongDirectionAtStart(false);
+        if (!movingAgainstRouteCandidate) {
+          wrongDirectionAnnouncedRef.current = false;
+          setIsWrongDirectionAtStart(false);
+        }
       }
     }
 
@@ -1467,6 +1539,9 @@ export default function CourseNavigationScreen() {
         : null;
       previousProgressRef.current = initialProgress;
       loopStartLockedRef.current = navigationQuery.data?.isLoop ?? false;
+      loopStartTimeRef.current = userLocation?.timestamp ?? Date.now();
+      loopDirectionLocationRef.current = userLocation;
+      wrongDirectionSamplesRef.current = 0;
       wrongDirectionAnnouncedRef.current = false;
       offRouteSamplesRef.current = 0;
       completionSamplesRef.current = 0;
